@@ -162,6 +162,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 
 /* Expanded state content */
 .dest-expanded{padding:0 20px 30px;overflow-y:auto;flex:1;opacity:0;transition:opacity .3s .2s}
+.dest-sheet.closed .dest-expanded{display:none;pointer-events:none}
 .dest-sheet.expanded .dest-expanded{opacity:1}
 .dest-expanded::-webkit-scrollbar{width:2px}
 
