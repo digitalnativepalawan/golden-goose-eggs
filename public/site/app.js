@@ -221,15 +221,19 @@ function openDest(d) {
   document.getElementById('dcRating').innerHTML = `<span class="ds"></span>${d.stats.rating}`;
   document.getElementById('dcTravel').innerHTML = `<span class="ds"></span>${d.stats.travel}`;
 
-  // Expanded — video replaces photo when present
+  // Expanded — video replaces photo when present, autoplays muted
+  // (browsers block unmuted autoplay; the player's own controls let
+  // the visitor unmute with one tap).
   const mediaEl = document.getElementById('deMedia');
   if(d.videoUrl && d.videoType === 'youtube'){
     const yid = getYoutubeId(d.videoUrl);
     mediaEl.innerHTML = yid
-      ? `<iframe src="https://www.youtube.com/embed/${yid}?rel=0&playsinline=1" title="${d.name} video" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`
+      ? `<iframe src="https://www.youtube.com/embed/${yid}?autoplay=1&mute=1&playsinline=1&rel=0" title="${d.name} video" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`
       : `<img src="${d.image}" alt="${d.name}">`;
   } else if(d.videoUrl && d.videoType === 'upload'){
-    mediaEl.innerHTML = `<video src="${d.videoUrl}" controls playsinline preload="metadata" poster="${d.image||''}"></video>`;
+    mediaEl.innerHTML = `<video src="${d.videoUrl}" autoplay muted loop controls playsinline preload="auto" poster="${d.image||''}"></video>`;
+    const vEl = mediaEl.querySelector('video');
+    if(vEl) vEl.play().catch(()=>{ /* autoplay blocked — controls still let them tap play */ });
   } else {
     mediaEl.innerHTML = `<img src="${d.image}" alt="${d.name}">`;
   }
