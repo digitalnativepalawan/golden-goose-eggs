@@ -265,9 +265,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
   .dock-item{width:56px;height:44px}
   .dock-item span{font-size:.6rem}
   .tala-orb-wrap{bottom:90px;right:24px}
-  .dest-sheet{bottom:auto;top:0;right:0;left:auto;width:400px;height:100vh;max-height:100vh;border-radius:0;transform:translateX(100%)}
-  .dest-sheet.closed{transform:translateX(100%)}
-  .dest-sheet.expanded{transform:translateX(0)}
+  .dest-sheet{bottom:24px;top:auto;right:24px;left:auto;width:400px;height:auto;max-height:90vh;border-radius:var(--radius-xl);transform:translateX(calc(100% + 40px));box-shadow:0 10px 40px rgba(0,0,0,.35)}
+  .dest-sheet.closed{transform:translateX(0)}
+  .dest-sheet.expanded{top:0;bottom:0;right:0;width:400px;height:100vh;max-height:100vh;border-radius:0;transform:translateX(0)}
   .dest-handle{display:none}
   .tala-sheet{width:400px;right:0;left:auto;max-height:60vh;border-radius:var(--radius-xl) 0 0 var(--radius-xl)}
   .tala-sheet-handle{display:none}
