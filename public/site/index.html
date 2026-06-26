@@ -19,12 +19,12 @@
 
 <style>
 :root {
-  --charcoal: #0a0e14; --charcoal-deep: #060a10; --charcoal-surface: #111820;
+  --charcoal: #06122a; --charcoal-deep: #020e26; --charcoal-surface: #0d1c36;
   --ocean-teal: #0d9488; --ocean-teal-light: #14b8a6; --ocean-glow: rgba(20,184,166,0.25);
   --coral: #e07a5f; --coral-deep: #c4613f; --coral-glow: rgba(224,122,95,0.25);
   --limestone: #c4a882; --sand: #e8dcc8;
   --white-soft: rgba(255,255,255,0.9); --white-muted: rgba(255,255,255,0.5); --white-dim: rgba(255,255,255,0.25);
-  --glass-bg: rgba(15,20,26,0.6); --glass-bg-heavy: rgba(10,14,20,0.82);
+  --glass-bg: rgba(8,18,38,0.6); --glass-bg-heavy: rgba(4,12,30,0.82);
   --glass-border: rgba(255,255,255,0.06);
   --radius-pill: 9999px; --radius-sm: 14px; --radius-md: 20px; --radius-lg: 28px; --radius-xl: 32px;
   --font-display: 'Cormorant Garamond', Georgia, serif;
@@ -95,7 +95,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 @keyframes sg{0%,100%{box-shadow:0 0 0 rgba(20,184,166,0)}50%{box-shadow:0 0 30px rgba(20,184,166,.06)}}
 
 /* Hero fade gradient at bottom */
-.hero-fade{position:fixed;top:0;left:0;right:0;bottom:0;z-index:49;background:linear-gradient(180deg,rgba(6,10,16,.85) 0%,rgba(6,10,16,.6) 30%,rgba(6,10,16,.3) 45%,transparent 60%);pointer-events:none;transition:opacity .5s}
+.hero-fade{position:fixed;top:0;left:0;right:0;bottom:0;z-index:49;background:linear-gradient(180deg,rgba(2,14,38,.85) 0%,rgba(2,14,38,.6) 30%,rgba(2,14,38,.3) 45%,transparent 60%);pointer-events:none;transition:opacity .5s}
 .hero-fade.hidden{opacity:0}
 
 /* ═══════════════════════════════════
@@ -232,7 +232,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 /* ═══════════════════════════════════
    TALA SHEET (concierge)
    ═══════════════════════════════════ */
-.tala-overlay{position:fixed;inset:0;z-index:90;background:rgba(6,10,16,.45);backdrop-filter:blur(2px);opacity:0;visibility:hidden;transition:all .3s}
+.tala-overlay{position:fixed;inset:0;z-index:90;background:rgba(2,14,38,.45);backdrop-filter:blur(2px);opacity:0;visibility:hidden;transition:all .3s}
 .tala-overlay.active{opacity:1;visibility:visible}
 
 .tala-sheet{position:fixed;bottom:0;left:0;right:0;z-index:91;max-height:55vh;background:var(--charcoal-surface);border-radius:var(--radius-xl) var(--radius-xl) 0 0;overflow:hidden;transform:translateY(100%);transition:transform .5s var(--ease-out-expo);display:flex;flex-direction:column;box-shadow:0 -10px 60px rgba(0,0,0,.4)}
@@ -276,7 +276,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 /* ═══════════════════════════════════
    AROUND ME PANEL (nearby places in this barangay)
    ═══════════════════════════════════ */
-.around-overlay{position:fixed;inset:0;z-index:95;background:rgba(6,10,16,.5);backdrop-filter:blur(2px);opacity:0;visibility:hidden;transition:all .3s}
+.around-overlay{position:fixed;inset:0;z-index:95;background:rgba(2,14,38,.5);backdrop-filter:blur(2px);opacity:0;visibility:hidden;transition:all .3s}
 .around-overlay.active{opacity:1;visibility:visible}
 .around-sheet{position:fixed;bottom:0;left:0;right:0;z-index:96;max-height:75vh;background:var(--charcoal-surface);border-radius:var(--radius-xl) var(--radius-xl) 0 0;overflow:hidden;transform:translateY(100%);transition:transform .5s var(--ease-out-expo);display:flex;flex-direction:column;box-shadow:0 -10px 60px rgba(0,0,0,.4)}
 .around-sheet.open{transform:translateY(0)}
@@ -324,7 +324,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 /* ═══════════════════════════════════
    ADMIN (hidden, PIN-gated)
    ═══════════════════════════════════ */
-.admin-overlay{position:fixed;inset:0;z-index:200;background:rgba(6,10,16,.7);backdrop-filter:blur(4px);opacity:0;visibility:hidden;transition:all .25s;display:flex;align-items:center;justify-content:center;padding:20px}
+.admin-overlay{position:fixed;inset:0;z-index:200;background:rgba(2,14,38,.7);backdrop-filter:blur(4px);opacity:0;visibility:hidden;transition:all .25s;display:flex;align-items:center;justify-content:center;padding:20px}
 .admin-overlay.active{opacity:1;visibility:visible}
 
 .admin-pin-card{width:100%;max-width:300px;background:var(--charcoal-surface);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:28px 22px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)}
