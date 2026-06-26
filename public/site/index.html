@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Palawan — SANVIC</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:ital,wght@0,200;0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --charcoal: #0a0e14; --charcoal-deep: #060a10; --charcoal-surface: #111820;
+  --ocean-teal: #0d9488; --ocean-teal-light: #14b8a6; --ocean-glow: rgba(20,184,166,0.25);
+  --coral: #e07a5f; --coral-deep: #c4613f; --coral-glow: rgba(224,122,95,0.25);
+  --limestone: #c4a882; --sand: #e8dcc8;
+  --white-soft: rgba(255,255,255,0.9); --white-muted: rgba(255,255,255,0.5); --white-dim: rgba(255,255,255,0.25);
+  --glass-bg: rgba(15,20,26,0.6); --glass-bg-heavy: rgba(10,14,20,0.82);
+  --glass-border: rgba(255,255,255,0.06);
+  --radius-pill: 9999px; --radius-sm: 14px; --radius-md: 20px; --radius-lg: 28px; --radius-xl: 32px;
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-body: 'DM Sans', -apple-system, sans-serif;
+  --ease-out-expo: cubic-bezier(0.16,1,0.3,1);
+  --ease-spring: cubic-bezier(0.34,1.56,0.64,1);
+  --safe-top: env(safe-area-inset-top, 24px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep);font-family:var(--font-body);color:var(--white-soft);-webkit-font-smoothing:antialiased;touch-action:manipulation;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
+
+/* ═══════════════════════════════════
+   SPLASH
+   ═══════════════════════════════════ */
+.splash{position:fixed;inset:0;z-index:9999;background:var(--charcoal-deep);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .6s}
+.splash.hidden{opacity:0;pointer-events:none}
+.splash-word{font-family:var(--font-display);font-size:2rem;font-weight:300;letter-spacing:.4em;text-transform:uppercase;color:var(--white-soft);opacity:0;animation:fu .8s var(--ease-out-expo) .3s forwards}
+.splash-line{width:40px;height:1px;background:var(--coral);margin-top:14px;transform:scaleX(0);animation:gl .8s var(--ease-out-expo) .7s forwards}
+.splash-sub{font-size:.6rem;font-weight:300;letter-spacing:.3em;text-transform:uppercase;color:var(--white-muted);margin-top:18px;opacity:0;animation:fu .6s var(--ease-out-expo) 1s forwards}
+@keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes gl{to{transform:scaleX(1)}}
+
+/* ═══════════════════════════════════
+   MAP CANVAS
+   ═══════════════════════════════════ */
+#map{position:fixed;inset:0;z-index:1}
+.leaflet-container{background:var(--charcoal-deep)!important}
+
+/* Zoom control */
+.leaflet-control-zoom{border:none!important;border-radius:14px!important;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.3)!important}
+.leaflet-control-zoom a{width:32px!important;height:32px!important;line-height:32px!important;font-size:16px!important;color:var(--white-soft)!important;border:none!important;border-bottom:1px solid rgba(255,255,255,.08)!important;background:var(--glass-bg-heavy)!important;backdrop-filter:blur(20px);transition:background .2s}
+.leaflet-control-zoom a:hover{background:rgba(255,255,255,.15)!important}
+.leaflet-control-zoom a:last-child{border-bottom:none!important}
+
+.leaflet-control-attribution{background:var(--glass-bg)!important;backdrop-filter:blur(20px);color:var(--white-dim)!important;font-family:var(--font-body)!important;font-size:.55rem!important;padding:3px 8px!important;border-radius:10px 0 0 0!important;border:none!important}
+.leaflet-control-attribution a{color:var(--ocean-teal-light)!important}
+
+/* Custom markers */
+.mk-wrap{position:relative;width:32px;height:32px;cursor:pointer;transition:transform .3s var(--ease-spring);animation:mkb 4s ease-in-out infinite}
+.mk-wrap:active{transform:scale(.85)}
+.mk-ring{position:absolute;inset:0;border-radius:50%;border:1.5px solid;opacity:.3;animation:mkp 3s ease-in-out infinite}
+.mk-dot{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:8px;height:8px;border-radius:50%;box-shadow:0 0 12px}
+.mk-glow{position:absolute;inset:-5px;border-radius:50%;background:radial-gradient(circle,currentColor 0%,transparent 70%);opacity:.1}
+@keyframes mkp{0%,100%{transform:scale(1);opacity:.3}50%{transform:scale(1.5);opacity:.1}}
+@keyframes mkb{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+
+/* ═══════════════════════════════════
+   HERO OVERLAY (top of map)
+   ═══════════════════════════════════ */
+.hero-overlay{position:fixed;top:0;left:0;right:0;z-index:50;padding-top:calc(var(--safe-top) + 20px);padding-bottom:20px;padding-left:16px;padding-right:16px;display:flex;flex-direction:column;pointer-events:none;transition:opacity .5s,transform .5s;transition-delay:0s}
+.hero-overlay.hidden{opacity:0;transform:translateY(-20px);pointer-events:none}
+
+.hero-brand{font-size:.6rem;font-weight:400;letter-spacing:.35em;text-transform:uppercase;color:var(--white-muted);margin-bottom:28px;pointer-events:auto}
+
+.hero-headline{font-family:var(--font-display);font-size:clamp(2.2rem,8vw,3rem);font-weight:300;line-height:1.1;letter-spacing:-.01em;color:var(--white-soft);pointer-events:auto;margin-bottom:28px}
+.hero-headline em{font-style:italic;background:linear-gradient(135deg,var(--coral),var(--limestone));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+
+/* Search — the primary CTA */
+.hero-search{width:100%;height:52px;display:flex;align-items:center;background:rgba(255,255,255,.07);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,.1);border-radius:var(--radius-pill);padding:0 6px 0 18px;position:relative;overflow:hidden;pointer-events:auto;transition:all .4s var(--ease-smooth);animation:sg 5s ease-in-out infinite}
+.hero-search:focus-within{border-color:rgba(255,255,255,.18);box-shadow:0 0 40px rgba(20,184,166,.1)}
+.hero-search input{flex:1;height:100%;background:none;border:none;outline:none;font-family:var(--font-body);font-size:.88rem;font-weight:300;color:var(--white-soft)}
+.hero-search input::placeholder{color:var(--white-dim)}
+.hero-search .hs-send{width:38px;height:38px;border-radius:50%;border:none;cursor:pointer;background:linear-gradient(135deg,var(--coral),var(--coral-deep));color:#fff;display:flex;align-items:center;justify-content:center;margin-left:4px;font-size:.85rem;transition:all .3s var(--ease-spring);box-shadow:0 4px 16px var(--coral-glow);flex-shrink:0}
+.hero-search .hs-send:active{transform:scale(.92)}
+.hero-search .hs-mic{width:36px;height:36px;border-radius:50%;border:none;cursor:pointer;background:rgba(255,255,255,.06);color:var(--white-muted);display:flex;align-items:center;justify-content:center;margin-right:2px;font-size:.9rem;transition:all .3s;flex-shrink:0}
+@keyframes sg{0%,100%{box-shadow:0 0 0 rgba(20,184,166,0)}50%{box-shadow:0 0 30px rgba(20,184,166,.06)}}
+
+/* Hero fade gradient at bottom */
+.hero-fade{position:fixed;top:0;left:0;right:0;bottom:0;z-index:49;background:linear-gradient(180deg,rgba(6,10,16,.85) 0%,rgba(6,10,16,.6) 30%,rgba(6,10,16,.3) 45%,transparent 60%);pointer-events:none;transition:opacity .5s}
+.hero-fade.hidden{opacity:0}
+
+/* ═══════════════════════════════════
+   LAYER TOGGLE (map type)
+   ═══════════════════════════════════ */
+.map-layer-toggle{position:fixed;top:calc(var(--safe-top) + 12px);right:16px;z-index:60;display:flex;align-items:center;padding:5px;background:var(--glass-bg-heavy);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border:1px solid var(--glass-border);border-radius:var(--radius-pill);box-shadow:0 6px 24px rgba(0,0,0,.25);opacity:0;pointer-events:none;transform:translateY(-8px) scale(.96);transition:all .4s var(--ease-out-expo)}
+.map-layer-toggle.visible{opacity:1;pointer-events:auto;transform:translateY(0) scale(1)}
+.map-layer-toggle .mlt-btn{padding:7px 14px;border-radius:var(--radius-pill);border:none;background:transparent;color:var(--white-dim);font-family:var(--font-body);font-size:.68rem;font-weight:400;letter-spacing:.04em;cursor:pointer;transition:all .3s var(--ease-smooth);white-space:nowrap;display:flex;align-items:center;gap:4px}
+.map-layer-toggle .mlt-btn:hover{color:var(--white-muted)}
+.map-layer-toggle .mlt-btn.active{background:rgba(255,255,255,.1);color:var(--white-soft)}
+.mlt-icon{font-size:.82rem}
+
+/* ═══════════════════════════════════
+   BOTTOM DOCK NAV (4 items)
+   ═══════════════════════════════════ */
+.bottom-dock{position:fixed;bottom:calc(16px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateY(20px);z-index:70;display:flex;align-items:center;gap:2px;padding:6px 8px;background:var(--glass-bg-heavy);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border:1px solid var(--glass-border);border-radius:var(--radius-pill);box-shadow:0 8px 32px rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:all .5s var(--ease-out-expo)}
+.bottom-dock.visible{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+.dock-item{width:50px;height:38px;border-radius:var(--radius-sm);border:none;background:transparent;color:var(--white-dim);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;transition:all .25s;position:relative}
+.dock-item:active{transform:scale(.92)}
+.dock-item.active{color:var(--white-soft);background:rgba(255,255,255,.06)}
+.dock-item.active::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--ocean-teal-light);box-shadow:0 0 8px var(--ocean-glow)}
+.dock-item svg{width:19px;height:19px}
+.dock-item span{font-size:.55rem;font-weight:400;letter-spacing:.02em}
+
+/* ═══════════════════════════════════
+   TALA ORB (single entry point)
+   ═══════════════════════════════════ */
+.tala-orb-wrap{position:fixed;bottom:calc(72px + var(--safe-bottom));right:20px;z-index:75;display:flex;flex-direction:column;align-items:flex-end;gap:6px;transition:all .5s var(--ease-out-expo)}
+.tala-orb-wrap.hidden{opacity:0;pointer-events:none;transform:translateY(20px)}
+
+.tala-orb-label{font-size:.6rem;font-weight:300;color:var(--white-dim);letter-spacing:.1em;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+
+.tala-orb{width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;background:linear-gradient(135deg,var(--ocean-teal),var(--coral));color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:1.1rem;font-weight:500;box-shadow:0 6px 24px var(--ocean-glow);transition:all .3s var(--ease-spring);position:relative;animation:orbBreathe 4s ease-in-out infinite}
+.tala-orb:active{transform:scale(.9)}
+.tala-orb.listening{animation:orbListen .8s ease-in-out infinite;background:linear-gradient(135deg,#ef4444,#dc2626)}
+.tala-orb .orb-ring{position:absolute;inset:-5px;border-radius:50%;border:1.5px solid var(--ocean-teal-light);opacity:0;transition:opacity .3s}
+.tala-orb.listening .orb-ring{opacity:.5;animation:orbRing 1.5s ease-in-out infinite}
+.tala-orb .orb-dot{position:absolute;bottom:1px;right:1px;width:10px;height:10px;border-radius:50%;background:#22c55e;border:2px solid var(--charcoal-deep)}
+@keyframes orbBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+@keyframes orbListen{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.4)}50%{box-shadow:0 0 0 12px rgba(239,68,68,0)}}
+@keyframes orbRing{0%{transform:scale(1);opacity:.4}100%{transform:scale(1.6);opacity:0}}
+
+/* ═══════════════════════════════════
+   DESTINATION BOTTOM SHEET
+   ═══════════════════════════════════ */
+.dest-overlay{position:fixed;inset:0;z-index:80;background:rgba(6,10,16,.45);backdrop-filter:blur(2px);opacity:0;visibility:hidden;transition:all .3s}
+.dest-overlay.active{opacity:1;visibility:visible}
+
+/* Closed state: compact card (~110px) */
+.dest-sheet{position:fixed;bottom:0;left:0;right:0;z-index:81;background:var(--charcoal-surface);border-radius:var(--radius-xl) var(--radius-xl) 0 0;overflow:hidden;transition:transform .5s var(--ease-out-expo);display:flex;flex-direction:column;will-change:transform}
+.dest-sheet.closed{transform:translateY(calc(100% - 110px))}
+.dest-sheet.expanded{transform:translateY(0)}
+
+.dest-handle{width:28px;height:4px;border-radius:4px;background:rgba(255,255,255,.12);margin:10px auto 0;flex-shrink:0;cursor:pointer}
+
+/* Compact state content */
+.dest-compact{display:flex;align-items:center;gap:12px;padding:0 16px 12px;flex-shrink:0}
+.dest-compact-img{width:56px;height:56px;border-radius:var(--radius-sm);overflow:hidden;flex-shrink:0;object-fit:cover}
+.dest-compact-img img{width:100%;height:100%;object-fit:cover}
+.dest-compact-info{flex:1;min-width:0}
+.dest-compact-name{font-family:var(--font-display);font-size:1.15rem;font-weight:400;color:var(--white-soft);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dest-compact-meta{display:flex;gap:8px;margin-top:4px}
+.dest-compact-meta span{font-size:.68rem;font-weight:300;color:var(--white-muted);display:flex;align-items:center;gap:3px}
+.dest-compact-meta .ds{width:3px;height:3px;border-radius:50%;background:var(--ocean-teal-light);opacity:.5;flex-shrink:0}
+.dest-compact-prompt{font-size:.62rem;font-weight:300;color:var(--white-dim);margin-top:6px;display:flex;align-items:center;gap:4px}
+.dest-compact-prompt svg{width:10px;height:10px;animation:pulseDown 1.5s ease-in-out infinite}
+@keyframes pulseDown{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
+
+/* Expanded state content */
+.dest-expanded{padding:0 20px 30px;overflow-y:auto;flex:1;opacity:0;transition:opacity .3s .2s}
+.dest-sheet.expanded .dest-expanded{opacity:1}
+.dest-expanded::-webkit-scrollbar{width:2px}
+
+.dest-exp-photo{width:calc(100% + 40px);height:200px;margin:-20px -20px 0;overflow:hidden}
+.dest-exp-photo img{width:100%;height:100%;object-fit:cover;transition:transform 6s ease-out}
+.dest-sheet.expanded .dest-exp-photo img{transform:scale(1.03)}
+.dest-exp-photo .exp-overlay{position:absolute;inset:0;background:linear-gradient(180deg,transparent 25%,var(--charcoal-surface) 100%)}
+
+.dest-exp-cat{display:inline-block;padding:4px 12px;border-radius:var(--radius-pill);font-size:.6rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;margin-top:16px;margin-bottom:8px}
+.dest-exp-title{font-family:var(--font-display);font-size:1.6rem;font-weight:400;color:var(--white-soft);line-height:1.15;margin-bottom:12px}
+
+.dest-exp-stats{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.dest-exp-stat{font-size:.72rem;font-weight:300;color:var(--white-muted);display:flex;align-items:center;gap:5px}
+.dest-exp-stat .dot{width:4px;height:4px;border-radius:50%;background:var(--ocean-teal-light);opacity:.5}
+
+.dest-exp-desc{font-size:.84rem;font-weight:300;line-height:1.7;color:var(--sand);margin-bottom:16px}
+.dest-exp-desc.collapsed{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.dest-readmore{font-size:.75rem;font-weight:400;color:var(--ocean-teal-light);cursor:pointer;background:none;border:none;padding:0;margin-bottom:16px;transition:color .2s}
+.dest-readmore:hover{color:var(--white-soft)}
+
+.dest-exp-tip{background:rgba(196,168,130,.06);border-left:2px solid var(--limestone);border-radius:0 12px 12px 0;padding:12px 16px;font-size:.78rem;font-weight:300;line-height:1.6;color:var(--limestone);margin-bottom:20px}
+
+.dest-exp-actions{display:flex;gap:10px}
+.dest-exp-btn{flex:1;padding:13px;border-radius:var(--radius-pill);border:none;font-family:var(--font-body);font-size:.8rem;font-weight:500;cursor:pointer;transition:all .3s;text-align:center}
+.dest-exp-btn.primary{background:linear-gradient(135deg,var(--coral),var(--coral-deep));color:#fff;box-shadow:0 4px 20px var(--coral-glow)}
+.dest-exp-btn.primary:active{transform:scale(.97)}
+.dest-exp-btn.secondary{background:rgba(255,255,255,.05);border:1px solid var(--glass-border);color:var(--white-muted)}
+.dest-exp-btn.secondary:active{background:rgba(255,255,255,.1)}
+
+/* ═══════════════════════════════════
+   TALA SHEET (concierge)
+   ═══════════════════════════════════ */
+.tala-overlay{position:fixed;inset:0;z-index:90;background:rgba(6,10,16,.45);backdrop-filter:blur(2px);opacity:0;visibility:hidden;transition:all .3s}
+.tala-overlay.active{opacity:1;visibility:visible}
+
+.tala-sheet{position:fixed;bottom:0;left:0;right:0;z-index:91;max-height:55vh;background:var(--charcoal-surface);border-radius:var(--radius-xl) var(--radius-xl) 0 0;overflow:hidden;transform:translateY(100%);transition:transform .5s var(--ease-out-expo);display:flex;flex-direction:column;box-shadow:0 -10px 60px rgba(0,0,0,.4)}
+.tala-sheet.open{transform:translateY(0)}
+
+.tala-sheet-handle{width:28px;height:4px;border-radius:4px;background:rgba(255,255,255,.12);margin:10px auto 0;flex-shrink:0}
+
+.tala-sheet-header{padding:14px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--glass-border);flex-shrink:0}
+.tsh-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--ocean-teal),var(--coral));display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:.85rem;font-weight:500;color:#fff;flex-shrink:0;position:relative}
+.tsh-avatar.speaking{animation:orbBreathe 1s ease-in-out infinite}
+.tsh-avatar .tsh-dot{position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;border-radius:50%;background:#22c55e;border:2px solid var(--charcoal-surface)}
+.tsh-info h4{font-family:var(--font-display);font-size:.95rem;font-weight:400;color:var(--white-soft);margin:0}
+.tsh-info p{font-size:.62rem;font-weight:300;color:var(--white-muted);margin:1px 0 0}
+.tsh-mute{margin-left:auto;width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,255,255,.05);color:var(--white-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.72rem;transition:all .2s}
+.tsh-mute:hover{background:rgba(255,255,255,.1)}
+.tsh-mute.muted{color:#ef4444}
+
+.tala-chat{flex:1;overflow-y:auto;padding:14px 20px;display:flex;flex-direction:column;gap:12px}
+.tala-chat::-webkit-scrollbar{width:2px}
+
+.tala-msg{max-width:88%;padding:11px 15px;font-size:.82rem;font-weight:300;line-height:1.6;animation:mi .35s var(--ease-out-expo)}
+@keyframes mi{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+.tala-msg.bot{background:rgba(255,255,255,.04);border:1px solid var(--glass-border);border-radius:18px 18px 18px 4px;color:var(--sand);align-self:flex-start}
+.tala-msg.user{background:linear-gradient(135deg,rgba(20,184,166,.12),rgba(20,184,166,.06));border:1px solid rgba(20,184,166,.12);border-radius:18px 18px 4px 18px;color:var(--white-soft);align-self:flex-end}
+.tala-msg strong{font-weight:500;color:var(--white-soft)}
+
+.tala-sugs{display:flex;flex-wrap:wrap;gap:6px;padding:0 20px 10px}
+.tala-sug{padding:6px 13px;border-radius:var(--radius-pill);border:1px solid var(--glass-border);background:transparent;color:var(--white-muted);font-family:var(--font-body);font-size:.7rem;font-weight:400;cursor:pointer;transition:all .2s}
+.tala-sug:hover{background:rgba(255,255,255,.05);color:var(--white-soft)}
+
+.tala-input-bar{padding:10px 14px;padding-bottom:calc(10px + var(--safe-bottom));border-top:1px solid var(--glass-border);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.tala-input-bar input{flex:1;padding:10px 16px;border-radius:var(--radius-pill);border:1px solid var(--glass-border);background:rgba(255,255,255,.04);color:var(--white-soft);font-family:var(--font-body);font-size:.82rem;font-weight:300;outline:none;transition:all .3s}
+.tala-input-bar input::placeholder{color:var(--white-dim)}
+.tala-input-bar input:focus{border-color:rgba(20,184,166,.25);background:rgba(255,255,255,.06)}
+.tala-mic-btn{width:36px;height:36px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem;transition:all .25s var(--ease-spring);flex-shrink:0;background:rgba(255,255,255,.06);color:var(--white-muted)}
+.tala-mic-btn.listening{background:rgba(239,68,68,.15);color:#ef4444;animation:mp 1s ease-in-out infinite}
+@keyframes mp{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}50%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
+.tala-send-btn{width:36px;height:36px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.82rem;transition:all .25s var(--ease-spring);flex-shrink:0;background:linear-gradient(135deg,var(--ocean-teal),var(--ocean-teal-light));color:#fff;box-shadow:0 4px 14px var(--ocean-glow)}
+.tala-send-btn:active{transform:scale(.92)}
+
+/* ═══════════════════════════════════
+   DESKTOP
+   ═══════════════════════════════════ */
+@media(min-width:768px){
+  .bottom-dock{bottom:24px}
+  .dock-item{width:56px;height:44px}
+  .dock-item span{font-size:.6rem}
+  .tala-orb-wrap{bottom:90px;right:24px}
+  .dest-sheet{bottom:auto;top:0;right:0;left:auto;width:400px;height:100vh;max-height:100vh;border-radius:0;transform:translateX(100%)}
+  .dest-sheet.closed{transform:translateX(100%)}
+  .dest-sheet.expanded{transform:translateX(0)}
+  .dest-handle{display:none}
+  .tala-sheet{width:400px;right:0;left:auto;max-height:60vh;border-radius:var(--radius-xl) 0 0 var(--radius-xl)}
+  .tala-sheet-handle{display:none}
+  .map-layer-toggle{top:16px;right:24px}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ SPLASH ═══ -->
+<div class="splash" id="splash">
+  <div class="splash-word">SANVIC</div>
+  <div class="splash-line"></div>
+  <div class="splash-sub">Palawan, Philippines</div>
+</div>
+
+<!-- ═══ MAP ═══ -->
+<div id="map"></div>
+
+<!-- ═══ HERO OVERLAY (on top of map) ═══ -->
+<div class="hero-overlay" id="heroOverlay">
+  <div class="hero-brand">SANVIC.PH</div>
+  <h1 class="hero-headline">Discover Palawan<br><em>Differently.</em></h1>
+  <div class="hero-search" id="heroSearch">
+    <input type="text" id="heroInput" placeholder="" onkeydown="if(event.key==='Enter')heroAsk()">
+    <button class="hs-mic" onclick="heroMic()" title="Speak">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="1" width="6" height="12" rx="3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+    </button>
+    <button class="hs-send" onclick="heroAsk()" title="Search">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+<div class="hero-fade" id="heroFade"></div>
+
+<!-- ═══ LAYER TOGGLE ═══ -->
+<div class="map-layer-toggle" id="mapLayerToggle">
+  <button class="mlt-btn active" onclick="switchMapLayer('street',this)"><span class="mlt-icon">◧</span> Map</button>
+  <button class="mlt-btn" onclick="switchMapLayer('satellite',this)"><span class="mlt-icon">◉</span> Satellite</button>
+</div>
+
+<!-- ═══ BOTTOM DOCK (4 items) ═══ -->
+<div class="bottom-dock" id="bottomDock">
+  <button class="dock-item active" onclick="dockNav('map')" data-tab="map">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+    <span>Map</span>
+  </button>
+  <button class="dock-item" onclick="dockNav('discover')" data-tab="discover">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+    <span>Discover</span>
+  </button>
+  <button class="dock-item" onclick="dockNav('tala')" data-tab="tala">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+    <span>Tala</span>
+  </button>
+  <button class="dock-item" onclick="dockNav('saved')" data-tab="saved">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+    <span>Saved</span>
+  </button>
+</div>
+
+<!-- ═══ TALA ORB ═══ -->
+<div class="tala-orb-wrap" id="talaOrbWrap">
+  <span class="tala-orb-label">Ask tala</span>
+  <button class="tala-orb" id="talaOrb" ontouchstart="orbTouchStart()" ontouchend="orbTouchEnd()" onmousedown="orbMouseDown()" onmouseup="orbMouseUp()">
+    <div class="orb-ring"></div>
+    t
+    <div class="orb-dot"></div>
+  </button>
+</div>
+
+<!-- ═══ DESTINATION BOTTOM SHEET ═══ -->
+<div class="dest-overlay" id="destOverlay"></div>
+<div class="dest-sheet closed" id="destSheet">
+  <div class="dest-handle" onclick="toggleDestSheet()"></div>
+
+  <!-- Compact view -->
+  <div class="dest-compact" onclick="toggleDestSheet()">
+    <div class="dest-compact-img"><img id="dcImg" src="" alt=""></div>
+    <div class="dest-compact-info">
+      <div class="dest-compact-name" id="dcName"></div>
+      <div class="dest-compact-meta">
+        <span id="dcRating"></span>
+        <span id="dcTravel"></span>
+      </div>
+      <div class="dest-compact-prompt">
+        Tap for details
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Expanded view -->
+  <div class="dest-expanded">
+    <div class="dest-exp-photo" id="dePhoto">
+      <img id="deImg" src="" alt="">
+      <div class="exp-overlay"></div>
+    </div>
+    <div class="dest-exp-cat" id="deCat"></div>
+    <h2 class="dest-exp-title" id="deTitle"></h2>
+    <div class="dest-exp-stats" id="deStats"></div>
+    <p class="dest-exp-desc collapsed" id="deDesc"></p>
+    <button class="dest-readmore" id="deReadMore" onclick="toggleReadMore()">Read more</button>
+    <div class="dest-exp-tip" id="deTip"></div>
+    <div class="dest-exp-actions">
+      <button class="dest-exp-btn primary" id="deAskTala">Ask tala</button>
+      <button class="dest-exp-btn secondary" onclick="closeDestSheet()">Back to map</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TALA SHEET ═══ -->
+<div class="tala-overlay" id="talaOverlay" onclick="closeTalaSheet()"></div>
+<div class="tala-sheet" id="talaSheet">
+  <div class="tala-sheet-handle" onclick="closeTalaSheet()"></div>
+  <div class="tala-sheet-header">
+    <div class="tsh-avatar" id="tshAvatar">
+      t
+      <div class="tsh-dot"></div>
+    </div>
+    <div class="tsh-info">
+      <h4>tala</h4>
+      <p id="tshStatus">Your Palawan concierge</p>
+    </div>
+    <button class="tsh-mute" id="tshMute" onclick="toggleMute()">🔊</button>
+  </div>
+  <div class="tala-chat" id="talaChat">
+    <div class="tala-msg bot">Welcome. I'm <strong>tala</strong> — your personal Palawan concierge. Ask me about destinations, timing, routes, or hidden gems.</div>
+  </div>
+  <div class="tala-sugs" id="talaSugs">
+    <button class="tala-sug" onclick="askTala(this)">Best beaches</button>
+    <button class="tala-sug" onclick="askTala(this)">How to reach El Nido</button>
+    <button class="tala-sug" onclick="askTala(this)">Best time to visit</button>
+    <button class="tala-sug" onclick="askTala(this)">Coron highlights</button>
+    <button class="tala-sug" onclick="askTala(this)">Budget guide</button>
+  </div>
+  <div class="tala-input-bar">
+    <input type="text" id="talaInput" placeholder="Ask tala anything..." onkeydown="if(event.key==='Enter')sendTala()">
+    <button class="tala-mic-btn" id="talaMicBtn" onclick="toggleMic()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="1" width="6" height="12" rx="3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+    </button>
+    <button class="tala-send-btn" onclick="sendTala()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
