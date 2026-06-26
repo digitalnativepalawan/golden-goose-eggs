@@ -75,9 +75,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 .hero-overlay{position:fixed;top:0;left:0;right:0;z-index:50;padding-top:calc(var(--safe-top) + 20px);padding-bottom:20px;padding-left:16px;padding-right:16px;display:flex;flex-direction:column;pointer-events:none;transition:opacity .5s,transform .5s;transition-delay:0s}
 .hero-overlay.hidden{opacity:0;transform:translateY(-20px);pointer-events:none}
 
-.hero-brand{font-size:.6rem;font-weight:400;letter-spacing:.35em;text-transform:uppercase;color:var(--white-muted);margin-bottom:28px;pointer-events:auto}
+.hero-brand{font-size:.6rem;font-weight:400;letter-spacing:.35em;text-transform:uppercase;color:var(--white-muted);margin-bottom:28px;pointer-events:none}
 
-.hero-headline{font-family:var(--font-display);font-size:clamp(2.2rem,8vw,3rem);font-weight:300;line-height:1.1;letter-spacing:-.01em;color:var(--white-soft);pointer-events:auto;margin-bottom:28px}
+.hero-headline{font-family:var(--font-display);font-size:clamp(2.2rem,8vw,3rem);font-weight:300;line-height:1.1;letter-spacing:-.01em;color:var(--white-soft);pointer-events:none;margin-bottom:28px}
 .hero-headline em{font-style:italic;background:linear-gradient(135deg,var(--coral),var(--limestone));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 
 /* Search — the primary CTA */
@@ -137,12 +137,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 /* ═══════════════════════════════════
    DESTINATION BOTTOM SHEET
    ═══════════════════════════════════ */
-.dest-overlay{position:fixed;inset:0;z-index:80;background:rgba(6,10,16,.45);backdrop-filter:blur(2px);opacity:0;visibility:hidden;transition:all .3s}
+.dest-overlay{position:fixed;inset:0;z-index:80;background:transparent;opacity:0;visibility:hidden;transition:all .3s}
 .dest-overlay.active{opacity:1;visibility:visible}
 
 /* Closed state: compact card (~110px) */
-.dest-sheet{position:fixed;bottom:0;left:0;right:0;z-index:81;background:var(--charcoal-surface);border-radius:var(--radius-xl) var(--radius-xl) 0 0;overflow:hidden;transition:transform .5s var(--ease-out-expo);display:flex;flex-direction:column;will-change:transform}
-.dest-sheet.closed{transform:translateY(calc(100% - 110px))}
+.dest-sheet{position:fixed;bottom:0;left:0;right:0;z-index:81;background:var(--charcoal-surface);border-radius:var(--radius-xl) var(--radius-xl) 0 0;overflow:hidden;transition:transform .5s var(--ease-out-expo);display:flex;flex-direction:column;will-change:transform;transform:translateY(100%);max-height:90vh}
+.dest-sheet.closed{transform:translateY(calc(100% - 130px))}
 .dest-sheet.expanded{transform:translateY(0)}
 
 .dest-handle{width:28px;height:4px;border-radius:4px;background:rgba(255,255,255,.12);margin:10px auto 0;flex-shrink:0;cursor:pointer}
@@ -318,7 +318,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 </div>
 
 <!-- ═══ DESTINATION BOTTOM SHEET ═══ -->
-<div class="dest-overlay" id="destOverlay"></div>
+<div class="dest-overlay" id="destOverlay" onclick="closeDestSheet()"></div>
 <div class="dest-sheet closed" id="destSheet">
   <div class="dest-handle" onclick="toggleDestSheet()"></div>
 

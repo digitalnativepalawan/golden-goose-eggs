@@ -215,13 +215,18 @@ function openDest(d) {
 
   // Show compact sheet
   const sheet = document.getElementById('destSheet');
+  sheet.style.transform = '';
   sheet.className = 'dest-sheet closed';
   document.getElementById('destOverlay').classList.add('active');
+  // Hide hero so map is interactive
+  document.getElementById('heroOverlay').classList.add('hidden');
+  document.getElementById('heroFade').classList.add('hidden');
   if(map) map.flyTo([d.lat,d.lng],11,{duration:1});
 }
 
 function toggleDestSheet() {
   const sheet = document.getElementById('destSheet');
+  sheet.style.transform = '';
   if(sheet.classList.contains('closed')){
     sheet.className = 'dest-sheet expanded';
   } else {
@@ -231,12 +236,15 @@ function toggleDestSheet() {
 
 function closeDestSheet(animate) {
   const sheet = document.getElementById('destSheet');
-  if(animate===false){sheet.className='dest-sheet';sheet.style.transform='translateY(100%)';}
-  else {sheet.className='dest-sheet';sheet.style.transform='';}
+  sheet.style.transform = '';
+  sheet.className = 'dest-sheet';
   document.getElementById('destOverlay').classList.remove('active');
   currentDest = null;
   // Show tala orb again
   document.getElementById('talaOrbWrap').classList.remove('hidden');
+  // Restore hero
+  document.getElementById('heroOverlay').classList.remove('hidden');
+  document.getElementById('heroFade').classList.remove('hidden');
 }
 
 function toggleReadMore() {
