@@ -95,6 +95,7 @@ function destRowToObj(row){
   return {
     id: row.id, name: row.name, lat: row.lat, lng: row.lng, category: row.category,
     image: row.image, description: row.description, tip: row.tip, color: row.color || '#0ea5e9',
+    videoUrl: row.video_url || '', videoType: row.video_type || '',
     stats: { rating: row.rating, travel: row.travel, temp: row.temp, season: row.season }
   };
 }
@@ -204,6 +205,12 @@ function closeAllPanels() {
 // ─── DESTINATION SHEET ───
 let currentDest = null;
 
+function getYoutubeId(url){
+  if(!url) return '';
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
+  return m ? m[1] : '';
+}
+
 function openDest(d) {
   currentDest = d;
   const cat = catStyle[d.category];
@@ -214,8 +221,18 @@ function openDest(d) {
   document.getElementById('dcRating').innerHTML = `<span class="ds"></span>${d.stats.rating}`;
   document.getElementById('dcTravel').innerHTML = `<span class="ds"></span>${d.stats.travel}`;
 
-  // Expanded
-  document.getElementById('deImg').src = d.image;
+  // Expanded — video replaces photo when present
+  const mediaEl = document.getElementById('deMedia');
+  if(d.videoUrl && d.videoType === 'youtube'){
+    const yid = getYoutubeId(d.videoUrl);
+    mediaEl.innerHTML = yid
+      ? `<iframe src="https://www.youtube.com/embed/${yid}?rel=0&playsinline=1" title="${d.name} video" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`
+      : `<img src="${d.image}" alt="${d.name}">`;
+  } else if(d.videoUrl && d.videoType === 'upload'){
+    mediaEl.innerHTML = `<video src="${d.videoUrl}" controls playsinline preload="metadata" poster="${d.image||''}"></video>`;
+  } else {
+    mediaEl.innerHTML = `<img src="${d.image}" alt="${d.name}">`;
+  }
   document.getElementById('dePhoto').style.background = '';
   document.getElementById('deTitle').textContent = d.name;
   const catPill = document.getElementById('deCat');
@@ -633,7 +650,7 @@ function renderAdminDest(){
       <div class="admin-list-item">
         <div class="admin-list-item-head">
           <div onclick="adminEditDest(${d.id})" style="flex:1;cursor:pointer;">
-            <strong>${escapeHtml(d.name)}</strong><br>
+            <strong>${escapeHtml(d.name)}</strong>${d.videoUrl ? ' 🎬' : ''}<br>
             <span>${escapeHtml(catStyle[d.category]?.label||d.category)} · ${escapeHtml(d.stats.travel||'')}</span>
           </div>
           <div class="admin-row-actions">
@@ -648,8 +665,9 @@ function renderAdminDest(){
 
 function adminDestFormHtml(){
   const isNew = adminEditingDestId === 'new';
-  const d = isNew ? {name:'',lat:'',lng:'',category:'beaches',image:'',description:'',tip:'',color:'#0ea5e9',stats:{rating:'',travel:'',temp:'',season:''}} : destinations.find(x=>x.id===adminEditingDestId);
+  const d = isNew ? {name:'',lat:'',lng:'',category:'beaches',image:'',description:'',tip:'',color:'#0ea5e9',videoUrl:'',videoType:'',stats:{rating:'',travel:'',temp:'',season:''}} : destinations.find(x=>x.id===adminEditingDestId);
   if(!d) return '';
+  const vType = d.videoType || 'none';
   return `
     <div class="admin-edit-box">
       <div class="admin-field"><label>Name</label><input id="adfName" value="${escapeHtml(d.name)}"></div>
@@ -676,37 +694,104 @@ function adminDestFormHtml(){
         <div class="admin-field"><label>Temp</label><input id="adfTemp" value="${escapeHtml(d.stats.temp)}"></div>
         <div class="admin-field"><label>Season</label><input id="adfSeason" value="${escapeHtml(d.stats.season)}"></div>
       </div>
+
+      <div class="admin-field">
+        <label>Video (shown instead of the photo when set)</label>
+        <select id="adfVideoType" onchange="adminToggleVideoFields()">
+          <option value="none" ${vType==='none'?'selected':''}>No video</option>
+          <option value="youtube" ${vType==='youtube'?'selected':''}>YouTube URL</option>
+          <option value="upload" ${vType==='upload'?'selected':''}>Upload from device</option>
+        </select>
+      </div>
+      <div class="admin-field" id="adfVideoYoutubeWrap" style="display:${vType==='youtube'?'':'none'}">
+        <label>YouTube URL</label>
+        <input id="adfVideoYoutube" value="${vType==='youtube'?escapeHtml(d.videoUrl):''}" placeholder="https://youtube.com/watch?v=...">
+      </div>
+      <div class="admin-field" id="adfVideoUploadWrap" style="display:${vType==='upload'?'':'none'}">
+        <label>Video file (mp4/webm/mov, up to 100MB)</label>
+        <input type="file" id="adfVideoFile" accept="video/mp4,video/webm,video/quicktime,video/x-m4v">
+        <div id="adfVideoUploadStatus" style="font-size:.7rem;color:var(--white-dim);margin-top:6px;">
+          ${vType==='upload' && d.videoUrl ? 'Current: <a href="'+d.videoUrl+'" target="_blank" style="color:var(--ocean-teal-light)">existing video</a>' : ''}
+        </div>
+        <input type="hidden" id="adfVideoUploadedUrl" value="${vType==='upload'?escapeHtml(d.videoUrl):''}">
+      </div>
+
       <div class="admin-edit-actions">
-        <button class="admin-save-btn" onclick="adminSaveDest()">${isNew?'Create':'Save changes'}</button>
+        <button class="admin-save-btn" id="adfSaveBtn" onclick="adminSaveDest()">${isNew?'Create':'Save changes'}</button>
         <button class="admin-cancel-btn" onclick="adminEditingDestId=null;renderAdminDest();">Cancel</button>
       </div>
     </div>`;
 }
 
+function adminToggleVideoFields(){
+  const type = document.getElementById('adfVideoType').value;
+  document.getElementById('adfVideoYoutubeWrap').style.display = type==='youtube' ? '' : 'none';
+  document.getElementById('adfVideoUploadWrap').style.display = type==='upload' ? '' : 'none';
+}
+
 function adminNewDest(){ adminEditingDestId='new'; renderAdminDest(); }
 function adminEditDest(id){ adminEditingDestId=id; renderAdminDest(); }
 
+async function adminUploadVideoIfNeeded(){
+  const type = document.getElementById('adfVideoType').value;
+  if(type !== 'upload') return null;
+
+  const fileInput = document.getElementById('adfVideoFile');
+  const file = fileInput.files[0];
+  const statusEl = document.getElementById('adfVideoUploadStatus');
+  const existingUrl = document.getElementById('adfVideoUploadedUrl').value;
+
+  if(!file) return existingUrl || null; // keep existing video if no new file chosen
+
+  const ext = (file.name.split('.').pop() || 'mp4').toLowerCase();
+  const path = `dest_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+
+  statusEl.textContent = 'Uploading...';
+  const { error } = await sb.storage.from('destination-videos').upload(path, file, {
+    cacheControl: '3600', upsert: false, contentType: file.type || 'video/mp4'
+  });
+  if(error){ statusEl.textContent = 'Upload failed: ' + error.message; throw error; }
+
+  const { data } = sb.storage.from('destination-videos').getPublicUrl(path);
+  statusEl.textContent = 'Uploaded.';
+  return data.publicUrl;
+}
+
 async function adminSaveDest(){
-  const payload = {
-    name: document.getElementById('adfName').value.trim(),
-    lat: parseFloat(document.getElementById('adfLat').value),
-    lng: parseFloat(document.getElementById('adfLng').value),
-    category: document.getElementById('adfCat').value,
-    color: document.getElementById('adfColor').value.trim() || '#0ea5e9',
-    image: document.getElementById('adfImage').value.trim(),
-    description: document.getElementById('adfDesc').value.trim(),
-    tip: document.getElementById('adfTip').value.trim(),
-    rating: document.getElementById('adfRating').value.trim(),
-    travel: document.getElementById('adfTravel').value.trim(),
-    temp: document.getElementById('adfTemp').value.trim(),
-    season: document.getElementById('adfSeason').value.trim(),
-  };
-  if(!payload.name || isNaN(payload.lat) || isNaN(payload.lng)){
-    alert('Name, latitude, and longitude are required.');
-    return;
-  }
+  const saveBtn = document.getElementById('adfSaveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
 
   try {
+    const videoType = document.getElementById('adfVideoType').value;
+    let videoUrl = '';
+    if(videoType === 'youtube'){
+      videoUrl = document.getElementById('adfVideoYoutube').value.trim();
+    } else if(videoType === 'upload'){
+      videoUrl = await adminUploadVideoIfNeeded() || '';
+    }
+
+    const payload = {
+      name: document.getElementById('adfName').value.trim(),
+      lat: parseFloat(document.getElementById('adfLat').value),
+      lng: parseFloat(document.getElementById('adfLng').value),
+      category: document.getElementById('adfCat').value,
+      color: document.getElementById('adfColor').value.trim() || '#0ea5e9',
+      image: document.getElementById('adfImage').value.trim(),
+      description: document.getElementById('adfDesc').value.trim(),
+      tip: document.getElementById('adfTip').value.trim(),
+      rating: document.getElementById('adfRating').value.trim(),
+      travel: document.getElementById('adfTravel').value.trim(),
+      temp: document.getElementById('adfTemp').value.trim(),
+      season: document.getElementById('adfSeason').value.trim(),
+      video_url: videoType === 'none' ? null : (videoUrl || null),
+      video_type: videoType === 'none' ? null : videoType,
+    };
+    if(!payload.name || isNaN(payload.lat) || isNaN(payload.lng)){
+      alert('Name, latitude, and longitude are required.');
+      return;
+    }
+
     if(adminEditingDestId === 'new'){
       payload.sort_order = destinations.length;
       const { error } = await sb.from('destinations').insert(payload);
@@ -721,6 +806,8 @@ async function adminSaveDest(){
     rebuildMarkers();
   } catch(err){
     alert('Save failed: ' + (err.message || err));
+    saveBtn.disabled = false;
+    saveBtn.textContent = adminEditingDestId === 'new' ? 'Create' : 'Save changes';
   }
 }
 
