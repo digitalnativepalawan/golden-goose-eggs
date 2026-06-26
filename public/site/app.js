@@ -289,10 +289,109 @@ function switchMapLayer(type,btn){
 function closeAllPanels() {
   closeDestSheet(false);
   closeTalaSheet(false);
+  closeAroundMePanel();
 }
 
 // ─── DESTINATION SHEET ───
 let currentDest = null;
+
+// ─── AROUND ME (mock data — will move to admin/Supabase later) ───
+// Maps each destination to its real barangay, then looks up mock
+// nearby places for that barangay. Categories: food, stay, shop, service.
+const DEST_BARANGAY = {
+  "Long Beach": "Poblacion",
+  "Port Barton": "Port Barton",
+  "Boayan Island": "Alimanguan",
+  "German Island": "Port Barton",
+  "Pamuayan Falls": "Port Barton",
+  "Bato ni Ningning": "Poblacion",
+  "San Vicente Poblacion": "Poblacion",
+  "Inaladelan Island": "Port Barton"
+};
+
+const AROUND_ME_MOCK = {
+  "Poblacion": [
+    { name:"Tienda ni Aling Rosa", cat:"shop", desc:"Sari-sari store, snacks & drinks", dist:"3 min walk", icon:"🛒" },
+    { name:"Long Beach Grill", cat:"food", desc:"Grilled seafood, beachfront seating", dist:"5 min walk", icon:"🍽️" },
+    { name:"San Vicente Inn", cat:"stay", desc:"Budget rooms, fan & aircon", dist:"8 min walk", icon:"🛏️" },
+    { name:"Motorbike Rental Hub", cat:"service", desc:"Daily & weekly rentals", dist:"4 min walk", icon:"🛵" },
+    { name:"Poblacion Public Market", cat:"shop", desc:"Fresh produce, fish, dry goods", dist:"6 min walk", icon:"🧺" },
+    { name:"Municipal Health Center", cat:"service", desc:"Basic medical care, open weekdays", dist:"10 min walk", icon:"⚕️" }
+  ],
+  "Port Barton": [
+    { name:"Jambalaya Cajun Café", cat:"food", desc:"Cajun-Filipino fusion, fast wifi", dist:"2 min walk", icon:"🍽️" },
+    { name:"Greenviews Resort", cat:"stay", desc:"Beachfront cottages, island-hopping desk", dist:"5 min walk", icon:"🛏️" },
+    { name:"Easy Dive Port Barton", cat:"service", desc:"PADI courses, fun dives", dist:"7 min walk", icon:"🤿" },
+    { name:"Ballesteros General Store", cat:"shop", desc:"Supplies, snacks, sunscreen", dist:"3 min walk", icon:"🛒" },
+    { name:"Summer Homes", cat:"stay", desc:"Simple beachfront rooms", dist:"6 min walk", icon:"🛏️" },
+    { name:"NFH Port Barton Dive Club", cat:"service", desc:"PADI training & equipment", dist:"8 min walk", icon:"🤿" }
+  ],
+  "Alimanguan": [
+    { name:"Alimanguan Boat Co-op", cat:"service", desc:"Island-hopping boat hire", dist:"At the dock", icon:"🛶" },
+    { name:"Beachside Carinderia", cat:"food", desc:"Home-style Filipino meals", dist:"4 min walk", icon:"🍽️" },
+    { name:"Alimanguan Sari-Sari", cat:"shop", desc:"Basic supplies, cold drinks", dist:"2 min walk", icon:"🛒" }
+  ]
+};
+
+let currentAroundBarangay = null;
+let currentAroundCat = 'all';
+
+function getAroundMeData(barangay){
+  return AROUND_ME_MOCK[barangay] || [];
+}
+
+function openAroundMePanel(){
+  if(!currentDest) return;
+  currentAroundBarangay = DEST_BARANGAY[currentDest.name] || null;
+  currentAroundCat = 'all';
+  document.querySelectorAll('.around-cat').forEach(b=>b.classList.toggle('active', b.dataset.cat==='all'));
+
+  const titleEl = document.getElementById('aroundTitle');
+  const subEl = document.getElementById('aroundSubtitle');
+  if(currentAroundBarangay){
+    titleEl.textContent = `Around ${currentDest.name}`;
+    subEl.textContent = `Brgy. ${currentAroundBarangay} · ${getAroundMeData(currentAroundBarangay).length} places`;
+  } else {
+    titleEl.textContent = `Around ${currentDest.name}`;
+    subEl.textContent = `Nearby places`;
+  }
+
+  renderAroundList();
+  document.getElementById('aroundSheet').classList.add('open');
+  document.getElementById('aroundOverlay').classList.add('active');
+}
+
+function closeAroundMePanel(){
+  document.getElementById('aroundSheet').classList.remove('open');
+  document.getElementById('aroundOverlay').classList.remove('active');
+}
+
+function selectAroundCategory(cat){
+  currentAroundCat = cat;
+  document.querySelectorAll('.around-cat').forEach(b=>b.classList.toggle('active', b.dataset.cat===cat));
+  renderAroundList();
+}
+
+function renderAroundList(){
+  const list = document.getElementById('aroundList');
+  const places = getAroundMeData(currentAroundBarangay);
+  const filtered = currentAroundCat==='all' ? places : places.filter(p=>p.cat===currentAroundCat);
+
+  if(!filtered.length){
+    list.innerHTML = `<div class="around-empty">No ${currentAroundCat==='all'?'':currentAroundCat+' '}places listed yet for this area.</div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(p => `
+    <div class="around-card">
+      <div class="around-card-icon">${p.icon}</div>
+      <div class="around-card-body">
+        <div class="around-card-name">${escapeHtml(p.name)}</div>
+        <div class="around-card-meta">${escapeHtml(p.desc)}</div>
+      </div>
+      <div class="around-card-dist">${escapeHtml(p.dist)}</div>
+    </div>`).join('');
+}
 
 function getYoutubeId(url){
   if(!url) return '';
@@ -429,6 +528,7 @@ function closeDestSheet(animate) {
   sheet.style.transform = '';
   sheet.className = 'dest-sheet';
   document.getElementById('destOverlay').classList.remove('active');
+  closeAroundMePanel();
   currentDest = null;
   // Show tala orb again
   if(!talaOpen) document.getElementById('talaOrbWrap').classList.remove('hidden');
