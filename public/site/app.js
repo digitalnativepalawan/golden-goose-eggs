@@ -211,6 +211,33 @@ function getYoutubeId(url){
   return m ? m[1] : '';
 }
 
+// Extracts {lat, lng} from a (non-shortened) Google Maps URL.
+// Handles the common patterns Google Maps produces:
+//   .../@10.538951,119.27753,15z              (viewport center)
+//   ...!3d10.538951!4d119.27753...            (exact pin, preferred)
+//   .../place/.../data=...!8m2!3d10.5!4d119.2 (place page)
+//   ?q=10.538951,119.27753  or  ?ll=10.5,119.2
+// Returns null if it's a shortened maps.app.goo.gl link (those need
+// to be opened once so the browser can follow the redirect) or if
+// no coordinate pattern is found.
+function parseGoogleMapsUrl(url){
+  if(!url) return null;
+  url = url.trim();
+  if(/maps\.app\.goo\.gl|goo\.gl\/maps/i.test(url)) return null; // shortened — can't resolve client-side
+
+  // Prefer the exact-pin pair (!3d...!4d...) over the viewport-center pair (@lat,lng)
+  let m = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+  if(m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+
+  m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if(m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+
+  m = url.match(/[?&](?:q|ll)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if(m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+
+  return null;
+}
+
 function openDest(d) {
   currentDest = d;
   const cat = catStyle[d.category];
@@ -675,6 +702,15 @@ function adminDestFormHtml(){
   return `
     <div class="admin-edit-box">
       <div class="admin-field"><label>Name</label><input id="adfName" value="${escapeHtml(d.name)}"></div>
+
+      <div class="admin-field">
+        <label>Paste Google Maps link (fills lat/lng below)</label>
+        <input id="adfMapsLink" placeholder="https://www.google.com/maps/place/..." oninput="adminParseMapsLink()">
+        <div id="adfMapsLinkStatus" style="font-size:.68rem;color:var(--white-dim);margin-top:6px;">
+          Tip: on a shortened maps.app.goo.gl link, open it once in a browser tab, then paste the full google.com/maps/... URL from the address bar here.
+        </div>
+      </div>
+
       <div class="admin-grid-2">
         <div class="admin-field"><label>Latitude</label><input id="adfLat" value="${d.lat}"></div>
         <div class="admin-field"><label>Longitude</label><input id="adfLng" value="${d.lng}"></div>
@@ -731,6 +767,32 @@ function adminToggleVideoFields(){
   const type = document.getElementById('adfVideoType').value;
   document.getElementById('adfVideoYoutubeWrap').style.display = type==='youtube' ? '' : 'none';
   document.getElementById('adfVideoUploadWrap').style.display = type==='upload' ? '' : 'none';
+}
+
+function adminParseMapsLink(){
+  const input = document.getElementById('adfMapsLink');
+  const status = document.getElementById('adfMapsLinkStatus');
+  const url = input.value.trim();
+  if(!url){
+    status.textContent = 'Tip: on a shortened maps.app.goo.gl link, open it once in a browser tab, then paste the full google.com/maps/... URL from the address bar here.';
+    status.style.color = 'var(--white-dim)';
+    return;
+  }
+  if(/maps\.app\.goo\.gl|goo\.gl\/maps/i.test(url)){
+    status.textContent = 'That\'s a shortened link — open it in a browser tab first, then paste the expanded google.com/maps/... URL here.';
+    status.style.color = '#f59e0b';
+    return;
+  }
+  const coords = parseGoogleMapsUrl(url);
+  if(coords){
+    document.getElementById('adfLat').value = coords.lat;
+    document.getElementById('adfLng').value = coords.lng;
+    status.textContent = `Found: ${coords.lat}, ${coords.lng} — filled in below.`;
+    status.style.color = '#22c55e';
+  } else {
+    status.textContent = 'Could not find coordinates in that link. Try copying the link again from the address bar after opening the place on Google Maps.';
+    status.style.color = '#ef4444';
+  }
 }
 
 function adminNewDest(){ adminEditingDestId='new'; renderAdminDest(); }
