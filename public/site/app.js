@@ -5,66 +5,46 @@
 
 // ─── DATA ───
 const destinations = [
-  { id:1, name:"El Nido", lat:11.1767, lng:119.4107, category:"beaches",
-    image:"https://images.pexels.com/photos/31533426/pexels-photo-31533426.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=1200&h=800",
-    description:"The crown jewel of Palawan — limestone karsts rising from sapphire waters, hidden lagoons accessible only by boat, and world-class island-hopping that redefines tropical beauty.",
-    tip:"Book island-hopping Tour A early morning. Visit November through May. Eco-fee: 200 pesos/day.",
-    stats:{rating:"4.9",travel:"2h from Manila",temp:"28°C",season:"Nov–May"}, color:"#0ea5e9" },
-  { id:2, name:"Coron", lat:12.0053, lng:120.1994, category:"islands",
-    image:"https://images.pexels.com/photos/35652152/pexels-photo-35652152.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=1200&h=800",
-    description:"A diver's paradise with crystal-clear lagoons, WWII shipwrecks beneath turquoise depths, and natural hot springs among dramatic limestone formations.",
-    tip:"Best diving March–June. Book island-hopping covering Kayangan Lake, Barracuda Lake, and shipwrecks.",
-    stats:{rating:"4.8",travel:"1.5h from Manila",temp:"30°C",season:"Mar–Jun"}, color:"#8b5cf6" },
-  { id:3, name:"Subterranean River", lat:9.6780, lng:118.8070, category:"nature",
-    image:"https://images.pexels.com/photos/35650900/pexels-photo-35650900.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=1200&h=800",
-    description:"A UNESCO World Heritage Site. An 8-kilometer underground river flowing through ancient limestone directly into the sea.",
-    tip:"Book 2–3 days ahead. Tours every 45 minutes. No photography inside the caves.",
-    stats:{rating:"4.7",travel:"2h from PPS",temp:"29°C",season:"Year-round"}, color:"#22c55e" },
-  { id:4, name:"Seven Commandos Cave", lat:12.0083, lng:120.2083, category:"adventure",
-    image:"https://images.pexels.com/photos/35649530/pexels-photo-35649530.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=1200&h=800",
-    description:"A 150-meter coral cave where seven US Navy SEALs hid before the Battle of Coron. Entrance opens to a pristine turquoise pool.",
-    tip:"Included in Coron Tour B. Bring a flashlight. Exceptional snorkeling outside.",
-    stats:{rating:"4.6",travel:"30m from Coron",temp:"30°C",season:"Mar–Jun"}, color:"#ef4444" },
-  { id:5, name:"Snake Island", lat:12.1583, lng:120.1583, category:"islands",
-    image:"https://images.pexels.com/photos/31533417/pexels-photo-31533417.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=1200&h=800",
-    description:"A tiny crescent-shaped sandbar floating on aquamarine waters. The sand shifts with the current, ever-changing.",
-    tip:"Part of Coron Tour A. Visit early morning. No two photos look the same.",
-    stats:{rating:"4.8",travel:"1h from Coron",temp:"31°C",season:"Jan–May"}, color:"#8b5cf6" },
-  { id:6, name:"Balabac Island", lat:9.3833, lng:118.0, category:"beaches",
-    image:"https://images.pexels.com/photos/31533423/pexels-photo-31533423.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=1200&h=800",
-    description:"Palawan's best-kept secret — Caribbean-like waters and the legendary Twin Lagoon. The Maldives of the Philippines.",
-    tip:"6hr ferry + 1hr boat from Puerto Princesa. April–October best. Bring all cash — no ATMs.",
-    stats:{rating:"4.9",travel:"7h from PPS",temp:"30°C",season:"Apr–Oct"}, color:"#0ea5e9" },
-  { id:7, name:"Kayangan Lake", lat:12.0167, lng:120.1833, category:"nature",
-    image:"https://images.pexels.com/photos/31533421/pexels-photo-31533421.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=1200&h=800",
-    description:"Voted the cleanest lake in the Philippines. Elevated freshwater surrounded by towering limestone cliffs.",
-    tip:"Part of Tour A in Coron. Swim across to the deeper side. Bring a snorkel mask.",
-    stats:{rating:"4.9",travel:"20m from Coron",temp:"28°C",season:"Year-round"}, color:"#22c55e" },
-  { id:8, name:"Port Barton", lat:10.6556, lng:118.3833, category:"beaches",
-    image:"https://images.pexels.com/photos/31533418/pexels-photo-31533418.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=1200&h=800",
-    description:"A laid-back fishing village, untouched by mass tourism. Authentic island-hopping and genuine local experience.",
-    tip:"8hr van from Puerto Princesa. January–May best. No ATMs — bring cash.",
-    stats:{rating:"4.5",travel:"8h from PPS",temp:"29°C",season:"Jan–May"}, color:"#0ea5e9" },
-  { id:9, name:"Malcapuya Lagoon", lat:11.0833, lng:119.4167, category:"islands",
-    image:"https://images.pexels.com/photos/36724824/pexels-photo-36724824.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=1200&h=800",
-    description:"A stunning private sandbar surrounded by crystal-clear turquoise lagoon waters. One of El Nido's most iconic spots.",
-    tip:"Part of El Nido Tour A. Arrive early. Only accessible during high tide.",
-    stats:{rating:"4.8",travel:"45m from El Nido",temp:"29°C",season:"Nov–May"}, color:"#8b5cf6" },
-  { id:10, name:"Nacpan Beach", lat:11.1333, lng:119.4333, category:"beaches",
-    image:"https://images.pexels.com/photos/31533424/pexels-photo-31533424.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=1200&h=800",
-    description:"A four-kilometer stretch of untouched golden sand, voted among the world's best beaches. Quiet, serene.",
-    tip:"Moto taxi from El Nido town. Or walk free. Best at sunset. Bring food and water.",
-    stats:{rating:"4.7",travel:"30m from El Nido",temp:"28°C",season:"Nov–May"}, color:"#0ea5e9" },
-  { id:11, name:"Puerto Princesa City", lat:9.7392, lng:118.7353, category:"culture",
-    image:"https://images.pexels.com/photos/35650900/pexels-photo-35650900.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=1200&h=800",
-    description:"The capital of Palawan — gateway to the west. Crocodile farm, floating bamboo rafts, vibrant night market.",
-    tip:"Try the floating breakfast on bamboo rafts. Jeepneys just 10 pesos.",
-    stats:{rating:"4.3",travel:"1.5h flight",temp:"31°C",season:"Year-round"}, color:"#f59e0b" },
-  { id:12, name:"Barracuda Lake", lat:12.02, lng:120.17, category:"adventure",
-    image:"https://images.pexels.com/photos/35652152/pexels-photo-35652152.jpeg?auto=compress&cs=tinysrgb&fit=crop&w=1200&h=800",
-    description:"A thermocline lake — warm surface water gives way to near-freezing deep water. Feel the invisible boundary yourself.",
-    tip:"Part of Coron Tour A. Thermocline at 5–10m depth. Great for freediving.",
-    stats:{rating:"4.5",travel:"15m from Coron",temp:"26°C deep",season:"Year-round"}, color:"#ef4444" }
+  { id:1, name:"Long Beach", lat:10.4962, lng:119.2607, category:"beaches",
+    image:"assets/san-vicente-long-beach.jpg",
+    description:"San Vicente's signature coastline: a long, open sweep of golden sand with gentle water, coconut edges, and quiet sections that still feel undeveloped compared with busier Palawan towns.",
+    tip:"Best for sunset, long walks, and easy swimming. Start near Poblacion, then move north or south for quieter stretches.",
+    stats:{rating:"4.9",travel:"10m from Poblacion",temp:"29°C",season:"Nov–May"}, color:"#0ea5e9" },
+  { id:2, name:"Port Barton", lat:10.4102, lng:119.1771, category:"beaches",
+    image:"assets/san-vicente-port-barton.jpg",
+    description:"A relaxed fishing village inside San Vicente with calm bay views, island-hopping boats, simple beachfront stays, and a slower local rhythm made for unhurried travelers.",
+    tip:"Use Port Barton as the base for island hopping. Bring cash, book boats early, and expect a quieter night scene.",
+    stats:{rating:"4.8",travel:"1h 20m from Poblacion",temp:"29°C",season:"Dec–May"}, color:"#0ea5e9" },
+  { id:3, name:"Boayan Island", lat:10.5500, lng:119.0900, category:"islands",
+    image:"assets/san-vicente-boayan.jpg",
+    description:"A remote island off San Vicente with clear water, forested hills, small coves, and a frontier feeling for travelers who want a quieter island escape.",
+    tip:"Go with a local boat operator and check sea conditions. Pack water, snacks, dry bag, and reef-safe sunscreen.",
+    stats:{rating:"4.7",travel:"Boat from San Vicente",temp:"30°C",season:"Mar–May"}, color:"#8b5cf6" },
+  { id:4, name:"German Island", lat:10.4586, lng:119.0705, category:"islands",
+    image:"assets/san-vicente-boayan.jpg",
+    description:"A small island stop often paired with Port Barton tours, known for clear shallows, snorkeling areas, and peaceful beach time between boat rides.",
+    tip:"Ask your boatman about turtle-friendly viewing rules. Keep distance from wildlife and avoid stepping on coral.",
+    stats:{rating:"4.6",travel:"30–45m by boat",temp:"30°C",season:"Dec–May"}, color:"#8b5cf6" },
+  { id:5, name:"Pamuayan Falls", lat:10.3908, lng:119.2083, category:"nature",
+    image:"assets/san-vicente-waterfalls.jpg",
+    description:"A freshwater waterfall near Port Barton reached by a short inland ride and forest walk, ideal when you want a break from saltwater and beach heat.",
+    tip:"Wear sandals with grip. Go after light rain for stronger flow, but avoid trails during heavy rain.",
+    stats:{rating:"4.5",travel:"25m from Port Barton",temp:"27°C",season:"Year-round"}, color:"#22c55e" },
+  { id:6, name:"Bato ni Ningning", lat:10.5634, lng:119.3092, category:"nature",
+    image:"assets/san-vicente-long-beach.jpg",
+    description:"A scenic viewpoint above San Vicente where the coast, green hills, and Long Beach reveal the scale of the municipality from above.",
+    tip:"Go late afternoon for softer light. Use a motorbike or tricycle and allow extra time for the uphill route.",
+    stats:{rating:"4.6",travel:"35m from Poblacion",temp:"28°C",season:"Nov–May"}, color:"#22c55e" },
+  { id:7, name:"San Vicente Poblacion", lat:10.5318, lng:119.2822, category:"culture",
+    image:"assets/san-vicente-long-beach.jpg",
+    description:"The practical center of San Vicente, with access to Long Beach, transport, small eateries, municipal services, and local life away from the island-hopping crowds.",
+    tip:"Use Poblacion for arrivals, supplies, and Long Beach access. Confirm van and boat schedules one day ahead.",
+    stats:{rating:"4.4",travel:"Town center",temp:"29°C",season:"Year-round"}, color:"#f59e0b" },
+  { id:8, name:"Inaladelan Island", lat:10.4643, lng:119.0447, category:"islands",
+    image:"assets/san-vicente-boayan.jpg",
+    description:"A polished island stop from Port Barton with bright sand, clear water, hammocks, and an easy picnic atmosphere for day trips.",
+    tip:"Often included in Port Barton island-hopping. Bring a small dry bag and ask if environmental fees are included.",
+    stats:{rating:"4.7",travel:"Boat from Port Barton",temp:"30°C",season:"Dec–May"}, color:"#8b5cf6" }
 ];
 
 const catStyle = {
@@ -77,39 +57,39 @@ const catStyle = {
 
 // ─── AI ───
 const aiData = [
-  {kw:["beach","beaches","sandy","shore"],
-    r:`<strong>Top Beaches</strong><br><br>1. <strong>Nacpan</strong> — 4km golden sand<br>2. <strong>El Nido</strong> — white sand, limestone cliffs<br>3. <strong>Balabac</strong> — Caribbean clarity<br>4. <strong>Port Barton</strong> — quiet, authentic<br>5. <strong>Malcapuya</strong> — floating sandbar`},
-  {kw:["el nido","elnido"],
-    r:`<strong>El Nido</strong><br><br>Dramatic karsts, hidden lagoons, world-class island-hopping. Tours A–D cover Big/Small Lagoon, Secret Beach, Shimizu Island.<br><br>2hr flight from Manila. Best: Nov–May. Budget: 2,000–5,000 pesos/day.`},
-  {kw:["coron"],
-    r:`<strong>Coron</strong><br><br>Kayangan Lake, Barracuda Lake, Snake Island, Seven Commandos Cave, 20 WWII shipwrecks.<br><br>1.5hr flight from Manila. Best diving: Mar–Jun. Tours: 1,800 pesos/day.`},
-  {kw:["underground","subterranean"],
-    r:`<strong>Subterranean River — UNESCO Heritage</strong><br><br>8.2km underground river through ancient limestone to the sea. 22 bat species, 75 birds.<br><br>Book 2–3 days ahead. ~1,750 pesos. No photography inside.`},
+  {kw:["beach","beaches","sandy","shore","long beach"],
+    r:`<strong>San Vicente Beaches</strong><br><br>1. <strong>Long Beach</strong> — the main 14km coastal highlight<br>2. <strong>Port Barton</strong> — calm bay, boats, relaxed village life<br>3. <strong>Inaladelan Island</strong> — bright sand and easy day-trip water<br><br>Best light: sunrise for quiet, sunset for color.`},
+  {kw:["san vicente","sanvicente","sanvic"],
+    r:`<strong>San Vicente, Palawan</strong><br><br>Focus on Long Beach, Port Barton, Boayan Island, Inaladelan Island, Pamuayan Falls, Bato ni Ningning, and Poblacion. It is quieter than El Nido or Coron, so navigation, cash, and local transport planning matter.`},
+  {kw:["port barton","barton"],
+    r:`<strong>Port Barton</strong><br><br>A calm San Vicente village for island hopping, beachfront stays, snorkeling, and slow travel. Bring cash, book boats early, and keep plans flexible for weather.`},
+  {kw:["island","islands","island hop","island-hopping"],
+    r:`<strong>Island Hopping from San Vicente</strong><br><br>Use Port Barton for German Island, Inaladelan Island, turtle-viewing areas, and reef stops. For a more remote feel, ask local operators about Boayan Island and check sea conditions first.`},
   {kw:["time","visit","weather","season","month"],
-    r:`<strong>Best Time to Visit</strong><br><br>Nov–Dec: Pleasant, fewer crowds, great diving<br>Jan–Feb: Coolest, ideal island hopping<br>Mar–May: Peak — calmest seas, most crowded<br><br>Jun–Oct: Cheaper, fewer crowds, short rain bursts<br><br>Best window: Jan–Mar`},
+    r:`<strong>Best Time for San Vicente</strong><br><br>Nov–May is the easiest window for Long Beach and Port Barton island hopping. Mar–May has calmer seas and hotter days. Jun–Oct can still work, but boat trips are more weather-dependent.`},
   {kw:["get","transport","flight","bus","ferry","travel"],
-    r:`<strong>Getting Around</strong><br><br>Manila → Puerto Princesa: 1h20 flight (2,500–6,000₱)<br>Manila → El Nido: 2hr flight (4,000–8,000₱)<br>Manila → Coron: 1h30 flight (3,000–7,000₱)<br><br>Local: Jeepneys 10–20₱, motorbikes 500–800₱/day`},
+    r:`<strong>Getting Around San Vicente</strong><br><br>Puerto Princesa → San Vicente: van or bus, usually 3–4.5 hours.<br>Poblacion → Port Barton: around 1–1.5 hours by road.<br><br>Local movement: tricycle, motorbike rental, hired van, and boat transfers for islands. Confirm schedules one day ahead.`},
   {kw:["budget","cost","money","price","cheap"],
-    r:`<strong>Budget Guide</strong><br><br>Budget: 2,000–3,500₱/day<br>Mid-range: 5,000–10,000₱/day<br>Luxury: 15,000+₱/day<br><br>Bring cash — ATMs limited outside Puerto Princesa.`},
+    r:`<strong>San Vicente Budget Guide</strong><br><br>Budget: 1,800–3,500₱/day<br>Mid-range: 4,000–8,000₱/day<br>Boat tours vary by route and group size.<br><br>Bring cash, especially for Port Barton, island stops, and small eateries.`},
   {kw:["food","eat","restaurant","dish","cuisine"],
-    r:`<strong>Must-Try</strong><br><br><strong>Kinilay</strong> — raw fish in vinegar & calamansi<br><strong>Inaruboy</strong> — fresh prawns, citrus sauce<br><strong>Crocodile meat</strong> — local delicacy<br><br>Most places cash-only. Try floating bamboo breakfast in PPS.`},
+    r:`<strong>Food Around San Vicente</strong><br><br>Look for grilled fish, kinilaw, simple beachfront carinderias, fresh fruit, and local seafood in Port Barton or Poblacion. Many small places are cash-only.`},
   {kw:["diving","snorkel","dive","coral","wreck"],
-    r:`<strong>Diving & Snorkeling</strong><br><br><strong>Coron:</strong> 20+ WWII wrecks, 18–42m depth<br><strong>El Nido:</strong> Coral gardens, beginner-friendly<br><br>2-tank dive: 3,500–5,000₱. Best: Mar–Jun, visibility to 30m`},
+    r:`<strong>Snorkeling</strong><br><br>Port Barton island-hopping is the easiest snorkeling base in San Vicente. Ask for reef stops, turtle-friendly viewing, German Island, and Inaladelan Island. Never touch coral or chase wildlife.`},
   {kw:["packing","bring","prepare","gear"],
     r:`<strong>Packing</strong><br><br>Swimsuit, quick-dry towel, waterproof case<br>Reef-safe sunscreen (mandatory in El Nido)<br>Snorkel mask, water shoes, repellent<br><br>ID, printed tickets, cash — lots of cash.`},
   {kw:["tour","tours","island hop","lagoon"],
-    r:`<strong>Island-Hopping</strong><br><br><strong>El Nido</strong> 1,500₱: Tour A (Lagoons, Secret Beach), Tour B (Taraw, Snake Island)<br><strong>Coron</strong> 1,800₱: Tour A (Kayangan, Barracuda, Snake), Tour B (Shipwrecks)<br><br>Includes boat, guide, lunch, snorkel gear.`},
+    r:`<strong>San Vicente Island-Hopping</strong><br><br>Base yourself in Port Barton for boat routes to German Island, Inaladelan Island, reef stops, and turtle-viewing areas. For Boayan, arrange a local boat and check weather before committing.`},
   {kw:["hello","hi","hey","morning","evening"],
     r:`Mabuhay — welcome. I'm <strong>tala</strong>, your Palawan concierge. Ask about destinations, timing, routes, or hidden gems.`},
   {kw:["thank","thanks","salamat"],
     r:`My pleasure. Palawan will not disappoint. If you need anything else, I'm here.`},
   {kw:["safe","safety","danger"],
     r:`Palawan is one of the safest provinces in the Philippines. Watch for strong currents, use reef-safe sunscreen, and stick with registered tour operators. Emergency: 911.`},
-  {kw:["balabac","tajong","twin lagoon"],
-    r:`<strong>Balabac — The Maldives of Palawan</strong><br><br>Tajong Bay mirror-like waters. Twin Lagoon — freshwater and saltwater separated by sandbar.<br><br>6hr bus + 1hr boat from PPS. Apr–Oct best. All cash.`}
+  {kw:["waterfall","falls","pamuayan"],
+    r:`<strong>Pamuayan Falls</strong><br><br>A freshwater stop near Port Barton with a forest path and natural pool. Go with grippy footwear, avoid heavy rain, and bring drinking water.`}
 ];
 
-const defaultR = `I'm not sure about that, but I can help with:<br><br>Best beaches · El Nido · Coron · Underground River<br>Transport · Budget · Food · Diving<br><br>Or tap any marker on the map.`;
+const defaultR = `I'm not sure about that, but I can help with:<br><br>Long Beach · Port Barton · Boayan Island · Pamuayan Falls<br>Transport · Budget · Food · Island hopping<br><br>Or tap any San Vicente marker on the map.`;
 
 function getAI(input) {
   const l = input.toLowerCase().replace(/[?.!,]/g,'').trim();
@@ -132,7 +112,7 @@ function initMap() {
   if (mapReady) return;
   mapReady = true;
 
-  map = L.map('map',{center:[10.5,119],zoom:8,zoomControl:false,attributionControl:true,fadeAnimation:true,zoomAnimation:true});
+  map = L.map('map',{center:[10.50,119.22],zoom:11,zoomControl:false,attributionControl:true,fadeAnimation:true,zoomAnimation:true});
 
   const street = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OSM &copy; CARTO',maxZoom:19,subdomains:'abcd'});
   const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'&copy; Esri',maxZoom:19});
@@ -142,6 +122,7 @@ function initMap() {
 
   L.control.zoom({position:'bottomright'}).addTo(map);
   document.getElementById('mapLayerToggle').classList.add('visible');
+  document.getElementById('mapRecenter').classList.add('visible');
 
   destinations.forEach(d=>{
     if(!markersByCat[d.category]) markersByCat[d.category]=[];
@@ -149,6 +130,7 @@ function initMap() {
     m._d=d; m.on('click',()=>openDest(d));
     markersByCat[d.category].push(m); allMarkers.push(m);
   });
+  renderDiscoverList('all');
 }
 
 function switchMapLayer(type,btn){
@@ -201,6 +183,11 @@ function openDest(d) {
   document.getElementById('deReadMore').style.display = '';
   document.getElementById('deTip').textContent = d.tip;
 
+  document.getElementById('deDirections').onclick = ()=>{
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(d.lat + ',' + d.lng)}&travelmode=driving`;
+    window.open(url,'_blank','noopener');
+  };
+
   document.getElementById('deAskTala').onclick = ()=>{
     closeDestSheet(true);
     setTimeout(()=>{
@@ -218,10 +205,11 @@ function openDest(d) {
   sheet.style.transform = '';
   sheet.className = 'dest-sheet closed';
   document.getElementById('destOverlay').classList.add('active');
+  closeDiscoverPanel();
   // Hide hero so map is interactive
   document.getElementById('heroOverlay').classList.add('hidden');
   document.getElementById('heroFade').classList.add('hidden');
-  if(map) map.flyTo([d.lat,d.lng],11,{duration:1});
+  if(map) map.flyTo([d.lat,d.lng],13,{duration:1});
 }
 
 function toggleDestSheet() {
@@ -245,6 +233,55 @@ function closeDestSheet(animate) {
   // Restore hero
   document.getElementById('heroOverlay').classList.remove('hidden');
   document.getElementById('heroFade').classList.remove('hidden');
+}
+
+// ─── DISCOVER + NAVIGATION ───
+function focusSanVicente(){
+  closeAllPanels();
+  closeDiscoverPanel();
+  if(map) map.flyTo([10.50,119.22],11,{duration:1});
+  document.querySelectorAll('.dock-item').forEach(d=>d.classList.remove('active'));
+  const mapBtn=document.querySelector('.dock-item[data-tab="map"]');
+  if(mapBtn) mapBtn.classList.add('active');
+}
+
+function renderDiscoverList(cat='all'){
+  const list=document.getElementById('discoverList');
+  if(!list) return;
+  const items=cat==='all'?destinations:destinations.filter(d=>d.category===cat);
+  list.innerHTML=items.map(d=>`
+    <button class="discover-card" onclick="openDestinationById(${d.id})">
+      <img src="${d.image}" alt="${d.name}">
+      <div class="discover-card-body">
+        <div class="discover-card-name">${d.name}</div>
+        <div class="discover-card-meta"><span>${catStyle[d.category].label}</span><span>•</span><span>${d.stats.travel}</span></div>
+      </div>
+    </button>`).join('');
+}
+
+function openDiscoverPanel(){
+  closeDestSheet(false);
+  closeTalaSheet(false);
+  document.getElementById('discoverPanel').classList.add('open');
+  document.getElementById('heroOverlay').classList.add('hidden');
+  document.getElementById('heroFade').classList.add('hidden');
+  renderDiscoverList(document.querySelector('.discover-cat.active')?.dataset.cat || 'all');
+}
+
+function closeDiscoverPanel(){
+  const panel=document.getElementById('discoverPanel');
+  if(panel) panel.classList.remove('open');
+}
+
+function selectDiscoverCategory(cat){
+  document.querySelectorAll('.discover-cat').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));
+  filterCategory(cat);
+  renderDiscoverList(cat);
+}
+
+function openDestinationById(id){
+  const d=destinations.find(item=>item.id===id);
+  if(d) openDest(d);
 }
 
 function toggleReadMore() {
@@ -413,16 +450,16 @@ function dockNav(tab){
   document.querySelector(`.dock-item[data-tab="${tab}"]`).classList.add('active');
 
   switch(tab){
-    case 'map': closeAllPanels(); document.getElementById('heroOverlay').classList.remove('hidden'); document.getElementById('heroFade').classList.remove('hidden'); break;
-    case 'discover': closeAllPanels(); if(map){filterCategory('all');} break;
+    case 'map': closeAllPanels(); closeDiscoverPanel(); document.getElementById('heroOverlay').classList.remove('hidden'); document.getElementById('heroFade').classList.remove('hidden'); if(map) map.flyTo([10.50,119.22],11,{duration:1}); break;
+    case 'discover': openDiscoverPanel(); if(map){filterCategory('all');} break;
     case 'tala': closeDestSheet(false); openTalaSheet(); break;
-    case 'saved': closeDestSheet(false); openTalaSheet(); addMsg('bot','Your saved places will appear here. Tap markers to explore, then ask tala to help you plan.'); break;
+    case 'saved': closeDiscoverPanel(); closeDestSheet(false); openTalaSheet(); addMsg('bot','Your saved San Vicente places will appear here. Tap markers like Long Beach, Port Barton, or Boayan Island, then ask tala to help plan the route.'); break;
   }
 }
 
 function filterCategory(cat){
   if(!mapReady) return;
-  if(cat==='all'){allMarkers.forEach(m=>m.addTo(map));map.flyTo([10.5,119],8,{duration:1});}
+  if(cat==='all'){allMarkers.forEach(m=>m.addTo(map));map.flyTo([10.50,119.22],11,{duration:1});}
   else{allMarkers.forEach(m=>map.removeLayer(m));const ms=markersByCat[cat]||[];ms.forEach(m=>m.addTo(map));if(ms.length) map.flyToBounds(L.featureGroup(ms).getBounds().pad(.25),{duration:1});}
 }
 
