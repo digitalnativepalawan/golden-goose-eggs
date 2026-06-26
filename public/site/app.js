@@ -1,10 +1,13 @@
 // ═══════════════════════════════════════════════════════
 // SANVIC.PH × TALA — Clean Interaction Model
 // One active layer at a time. Map is the product.
+// Data lives in Supabase (destinations, tala_responses, tala_settings).
+// Hardcoded arrays below are only the fallback used if the
+// Supabase fetch fails (offline, RLS issue, etc).
 // ═══════════════════════════════════════════════════════
 
-// ─── DATA ───
-const destinations = [
+// ─── DEFAULT/FALLBACK DATA ───
+const DEFAULT_DESTINATIONS = [
   { id:1, name:"Long Beach", lat:10.4962, lng:119.2607, category:"beaches",
     image:"assets/san-vicente-long-beach.jpg",
     description:"San Vicente's signature coastline: a long, open sweep of golden sand with gentle water, coconut edges, and quiet sections that still feel undeveloped compared with busier Palawan towns.",
@@ -47,16 +50,7 @@ const destinations = [
     stats:{rating:"4.7",travel:"Boat from Port Barton",temp:"30°C",season:"Dec–May"}, color:"#8b5cf6" }
 ];
 
-const catStyle = {
-  beaches:{label:"Beaches",color:"#0ea5e9",bg:"rgba(14,165,233,.12)"},
-  islands:{label:"Islands",color:"#8b5cf6",bg:"rgba(139,92,246,.12)"},
-  nature:{label:"Nature",color:"#22c55e",bg:"rgba(34,197,94,.12)"},
-  adventure:{label:"Adventure",color:"#ef4444",bg:"rgba(239,68,68,.12)"},
-  culture:{label:"Culture",color:"#f59e0b",bg:"rgba(245,158,11,.12)"}
-};
-
-// ─── AI ───
-const aiData = [
+const DEFAULT_TALA_DATA = [
   {kw:["beach","beaches","sandy","shore","long beach"],
     r:`<strong>San Vicente Beaches</strong><br><br>1. <strong>Long Beach</strong> — the main 14km coastal highlight<br>2. <strong>Port Barton</strong> — calm bay, boats, relaxed village life<br>3. <strong>Inaladelan Island</strong> — bright sand and easy day-trip water<br><br>Best light: sunrise for quiet, sunset for color.`},
   {kw:["san vicente","sanvicente","sanvic"],
@@ -89,8 +83,54 @@ const aiData = [
     r:`<strong>Pamuayan Falls</strong><br><br>A freshwater stop near Port Barton with a forest path and natural pool. Go with grippy footwear, avoid heavy rain, and bring drinking water.`}
 ];
 
-const defaultR = `I'm not sure about that, but I can help with:<br><br>Long Beach · Port Barton · Boayan Island · Pamuayan Falls<br>Transport · Budget · Food · Island hopping<br><br>Or tap any San Vicente marker on the map.`;
+const DEFAULT_FALLBACK_RESPONSE = `I'm not sure about that, but I can help with:<br><br>Long Beach · Port Barton · Boayan Island · Pamuayan Falls<br>Transport · Budget · Food · Island hopping<br><br>Or tap any San Vicente marker on the map.`;
 
+// ─── LIVE DATA (populated from Supabase, falls back to defaults) ───
+let destinations = [];
+let aiData = [];
+let defaultR = DEFAULT_FALLBACK_RESPONSE;
+let dataReady = false;
+
+function destRowToObj(row){
+  return {
+    id: row.id, name: row.name, lat: row.lat, lng: row.lng, category: row.category,
+    image: row.image, description: row.description, tip: row.tip, color: row.color || '#0ea5e9',
+    stats: { rating: row.rating, travel: row.travel, temp: row.temp, season: row.season }
+  };
+}
+
+async function loadDataFromSupabase(){
+  try {
+    const [destRes, talaRes, settingsRes] = await Promise.all([
+      sb.from('destinations').select('*').order('sort_order', { ascending: true }),
+      sb.from('tala_responses').select('*').order('sort_order', { ascending: true }),
+      sb.from('tala_settings').select('*').eq('key', 'default_response').maybeSingle(),
+    ]);
+
+    if (destRes.error) throw destRes.error;
+    if (talaRes.error) throw talaRes.error;
+
+    destinations = (destRes.data && destRes.data.length) ? destRes.data.map(destRowToObj) : DEFAULT_DESTINATIONS;
+    aiData = (talaRes.data && talaRes.data.length) ? talaRes.data.map(r=>({ id:r.id, kw:r.keywords, r:r.response })) : DEFAULT_TALA_DATA;
+    defaultR = (settingsRes.data && settingsRes.data.value) ? settingsRes.data.value : DEFAULT_FALLBACK_RESPONSE;
+  } catch(err) {
+    console.warn('[SANVIC] Supabase load failed, using built-in defaults:', err);
+    destinations = DEFAULT_DESTINATIONS;
+    aiData = DEFAULT_TALA_DATA;
+    defaultR = DEFAULT_FALLBACK_RESPONSE;
+  }
+  dataReady = true;
+}
+
+const catStyle = {
+  beaches:{label:"Beaches",color:"#0ea5e9",bg:"rgba(14,165,233,.12)"},
+  islands:{label:"Islands",color:"#8b5cf6",bg:"rgba(139,92,246,.12)"},
+  nature:{label:"Nature",color:"#22c55e",bg:"rgba(34,197,94,.12)"},
+  adventure:{label:"Adventure",color:"#ef4444",bg:"rgba(239,68,68,.12)"},
+  culture:{label:"Culture",color:"#f59e0b",bg:"rgba(245,158,11,.12)"}
+};
+
+// ─── AI ───
 function getAI(input) {
   const l = input.toLowerCase().replace(/[?.!,]/g,'').trim();
   for (const d of destinations) {
@@ -108,9 +148,25 @@ let map, mapReady=false;
 const markersByCat={};
 let allMarkers=[];
 
-function initMap() {
+function rebuildMarkers(){
+  if(!map) return;
+  allMarkers.forEach(m=>map.removeLayer(m));
+  allMarkers=[];
+  for(const k in markersByCat) delete markersByCat[k];
+  destinations.forEach(d=>{
+    if(!markersByCat[d.category]) markersByCat[d.category]=[];
+    const m = L.marker([d.lat,d.lng],{icon:L.divIcon({className:'',html:`<div class="mk-wrap" style="animation-delay:${Math.random()*2}s"><div class="mk-glow" style="color:${d.color}"></div><div class="mk-ring" style="border-color:${d.color}"></div><div class="mk-dot" style="background:${d.color};box-shadow:0 0 12px ${d.color}"></div></div>`,iconSize:[32,32],iconAnchor:[16,16]})}).addTo(map);
+    m._d=d; m.on('click',()=>openDest(d));
+    markersByCat[d.category].push(m); allMarkers.push(m);
+  });
+  renderDiscoverList(document.querySelector('.discover-cat.active')?.dataset.cat || 'all');
+}
+
+async function initMap() {
   if (mapReady) return;
   mapReady = true;
+
+  if(!dataReady) await loadDataFromSupabase();
 
   map = L.map('map',{center:[10.50,119.22],zoom:11,zoomControl:false,attributionControl:true,fadeAnimation:true,zoomAnimation:true});
 
@@ -124,13 +180,7 @@ function initMap() {
   document.getElementById('mapLayerToggle').classList.add('visible');
   document.getElementById('mapRecenter').classList.add('visible');
 
-  destinations.forEach(d=>{
-    if(!markersByCat[d.category]) markersByCat[d.category]=[];
-    const m = L.marker([d.lat,d.lng],{icon:L.divIcon({className:'',html:`<div class="mk-wrap" style="animation-delay:${Math.random()*2}s"><div class="mk-glow" style="color:${d.color}"></div><div class="mk-ring" style="border-color:${d.color}"></div><div class="mk-dot" style="background:${d.color};box-shadow:0 0 12px ${d.color}"></div></div>`,iconSize:[32,32],iconAnchor:[16,16]})}).addTo(map);
-    m._d=d; m.on('click',()=>openDest(d));
-    markersByCat[d.category].push(m); allMarkers.push(m);
-  });
-  renderDiscoverList('all');
+  rebuildMarkers();
 }
 
 function switchMapLayer(type,btn){
@@ -493,3 +543,323 @@ window.addEventListener('load',()=>{
     document.getElementById('talaOrbWrap').classList.remove('hidden');
   },2600);
 });
+
+// ═══════════════════════════════════════════════════════
+// ADMIN PANEL — triple-click "SANVIC.PH" brand label, PIN 5309.
+// Edits write directly to Supabase (destinations, tala_responses,
+// tala_settings) so changes show up for every visitor, synced
+// through the same Lovable Cloud database the React app uses.
+// ═══════════════════════════════════════════════════════
+const ADMIN_PIN = "5309";
+let brandClickCount = 0, brandClickTimer = null;
+let adminUnlocked = false;
+let adminTab = 'dest';
+let adminEditingDestId = null;   // null = not editing, 'new' = creating, else id
+let adminEditingTalaId = null;
+
+function adminBrandClick(){
+  brandClickCount++;
+  clearTimeout(brandClickTimer);
+  brandClickTimer = setTimeout(()=>{ brandClickCount = 0; }, 700);
+  if(brandClickCount >= 3){
+    brandClickCount = 0;
+    openAdminPin();
+  }
+}
+
+function openAdminPin(){
+  document.getElementById('adminPinInput').value = '';
+  document.getElementById('adminPinErr').textContent = '';
+  document.getElementById('adminPinOverlay').classList.add('active');
+  setTimeout(()=>document.getElementById('adminPinInput').focus(), 100);
+}
+
+function closeAdminPin(){
+  document.getElementById('adminPinOverlay').classList.remove('active');
+}
+
+function checkAdminPin(){
+  const val = document.getElementById('adminPinInput').value.trim();
+  if(val === ADMIN_PIN){
+    adminUnlocked = true;
+    closeAdminPin();
+    openAdminPanel();
+  } else {
+    document.getElementById('adminPinErr').textContent = 'Incorrect PIN';
+    document.getElementById('adminPinInput').value = '';
+  }
+}
+
+async function openAdminPanel(){
+  if(!dataReady) await loadDataFromSupabase();
+  document.getElementById('adminPanelOverlay').classList.add('active');
+  switchAdminTab(adminTab);
+}
+
+function closeAdminPanel(){
+  document.getElementById('adminPanelOverlay').classList.remove('active');
+  adminEditingDestId = null;
+  adminEditingTalaId = null;
+}
+
+function switchAdminTab(tab){
+  adminTab = tab;
+  document.getElementById('adminTabDest').classList.toggle('active', tab==='dest');
+  document.getElementById('adminTabTala').classList.toggle('active', tab==='tala');
+  adminEditingDestId = null;
+  adminEditingTalaId = null;
+  if(tab==='dest') renderAdminDest();
+  else renderAdminTala();
+}
+
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ───────────── DESTINATIONS ADMIN ─────────────
+
+function renderAdminDest(){
+  const body = document.getElementById('adminBody');
+  let html = `<button class="admin-add-btn" onclick="adminNewDest()">+ Add destination</button>`;
+
+  if(adminEditingDestId !== null){
+    html += adminDestFormHtml();
+  }
+
+  if(!destinations.length){
+    html += `<div class="admin-empty">No destinations yet.</div>`;
+  } else {
+    html += destinations.map(d=>`
+      <div class="admin-list-item">
+        <div class="admin-list-item-head">
+          <div onclick="adminEditDest(${d.id})" style="flex:1;cursor:pointer;">
+            <strong>${escapeHtml(d.name)}</strong><br>
+            <span>${escapeHtml(catStyle[d.category]?.label||d.category)} · ${escapeHtml(d.stats.travel||'')}</span>
+          </div>
+          <div class="admin-row-actions">
+            <button class="admin-mini-btn" onclick="adminEditDest(${d.id})">Edit</button>
+            <button class="admin-mini-btn danger" onclick="adminDeleteDest(${d.id})">Delete</button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+  body.innerHTML = html;
+}
+
+function adminDestFormHtml(){
+  const isNew = adminEditingDestId === 'new';
+  const d = isNew ? {name:'',lat:'',lng:'',category:'beaches',image:'',description:'',tip:'',color:'#0ea5e9',stats:{rating:'',travel:'',temp:'',season:''}} : destinations.find(x=>x.id===adminEditingDestId);
+  if(!d) return '';
+  return `
+    <div class="admin-edit-box">
+      <div class="admin-field"><label>Name</label><input id="adfName" value="${escapeHtml(d.name)}"></div>
+      <div class="admin-grid-2">
+        <div class="admin-field"><label>Latitude</label><input id="adfLat" value="${d.lat}"></div>
+        <div class="admin-field"><label>Longitude</label><input id="adfLng" value="${d.lng}"></div>
+      </div>
+      <div class="admin-grid-2">
+        <div class="admin-field"><label>Category</label>
+          <select id="adfCat">
+            ${Object.keys(catStyle).map(c=>`<option value="${c}" ${c===d.category?'selected':''}>${catStyle[c].label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="admin-field"><label>Marker color</label><input id="adfColor" value="${escapeHtml(d.color)}"></div>
+      </div>
+      <div class="admin-field"><label>Image path / URL</label><input id="adfImage" value="${escapeHtml(d.image)}"></div>
+      <div class="admin-field"><label>Description</label><textarea id="adfDesc" rows="3">${escapeHtml(d.description)}</textarea></div>
+      <div class="admin-field"><label>Tip</label><textarea id="adfTip" rows="2">${escapeHtml(d.tip)}</textarea></div>
+      <div class="admin-grid-2">
+        <div class="admin-field"><label>Rating</label><input id="adfRating" value="${escapeHtml(d.stats.rating)}"></div>
+        <div class="admin-field"><label>Travel time</label><input id="adfTravel" value="${escapeHtml(d.stats.travel)}"></div>
+      </div>
+      <div class="admin-grid-2">
+        <div class="admin-field"><label>Temp</label><input id="adfTemp" value="${escapeHtml(d.stats.temp)}"></div>
+        <div class="admin-field"><label>Season</label><input id="adfSeason" value="${escapeHtml(d.stats.season)}"></div>
+      </div>
+      <div class="admin-edit-actions">
+        <button class="admin-save-btn" onclick="adminSaveDest()">${isNew?'Create':'Save changes'}</button>
+        <button class="admin-cancel-btn" onclick="adminEditingDestId=null;renderAdminDest();">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function adminNewDest(){ adminEditingDestId='new'; renderAdminDest(); }
+function adminEditDest(id){ adminEditingDestId=id; renderAdminDest(); }
+
+async function adminSaveDest(){
+  const payload = {
+    name: document.getElementById('adfName').value.trim(),
+    lat: parseFloat(document.getElementById('adfLat').value),
+    lng: parseFloat(document.getElementById('adfLng').value),
+    category: document.getElementById('adfCat').value,
+    color: document.getElementById('adfColor').value.trim() || '#0ea5e9',
+    image: document.getElementById('adfImage').value.trim(),
+    description: document.getElementById('adfDesc').value.trim(),
+    tip: document.getElementById('adfTip').value.trim(),
+    rating: document.getElementById('adfRating').value.trim(),
+    travel: document.getElementById('adfTravel').value.trim(),
+    temp: document.getElementById('adfTemp').value.trim(),
+    season: document.getElementById('adfSeason').value.trim(),
+  };
+  if(!payload.name || isNaN(payload.lat) || isNaN(payload.lng)){
+    alert('Name, latitude, and longitude are required.');
+    return;
+  }
+
+  try {
+    if(adminEditingDestId === 'new'){
+      payload.sort_order = destinations.length;
+      const { error } = await sb.from('destinations').insert(payload);
+      if(error) throw error;
+    } else {
+      const { error } = await sb.from('destinations').update(payload).eq('id', adminEditingDestId);
+      if(error) throw error;
+    }
+    await loadDataFromSupabase();
+    adminEditingDestId = null;
+    renderAdminDest();
+    rebuildMarkers();
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+async function adminDeleteDest(id){
+  if(!confirm('Delete this destination?')) return;
+  try {
+    const { error } = await sb.from('destinations').delete().eq('id', id);
+    if(error) throw error;
+    await loadDataFromSupabase();
+    renderAdminDest();
+    rebuildMarkers();
+  } catch(err){
+    alert('Delete failed: ' + (err.message || err));
+  }
+}
+
+// ───────────── TALA ADMIN ─────────────
+
+function renderAdminTala(){
+  const body = document.getElementById('adminBody');
+  let html = `
+    <div class="admin-field">
+      <label>Fallback response (used when nothing matches)</label>
+      <textarea id="adfDefaultR" rows="3" onblur="adminSaveDefaultResponse()">${escapeHtml(defaultR)}</textarea>
+    </div>
+    <button class="admin-add-btn" onclick="adminNewTala()">+ Add response</button>`;
+
+  if(adminEditingTalaId !== null){
+    html += adminTalaFormHtml();
+  }
+
+  if(!aiData.length){
+    html += `<div class="admin-empty">No responses yet.</div>`;
+  } else {
+    html += aiData.map(item=>`
+      <div class="admin-list-item">
+        <div class="admin-list-item-head">
+          <div onclick="adminEditTala(${item.id})" style="flex:1;cursor:pointer;">
+            <strong>${escapeHtml(item.kw.join(', '))}</strong>
+          </div>
+          <div class="admin-row-actions">
+            <button class="admin-mini-btn" onclick="adminEditTala(${item.id})">Edit</button>
+            <button class="admin-mini-btn danger" onclick="adminDeleteTala(${item.id})">Delete</button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+  body.innerHTML = html;
+}
+
+function adminTalaFormHtml(){
+  const isNew = adminEditingTalaId === 'new';
+  const item = isNew ? {kw:[],r:''} : aiData.find(x=>x.id===adminEditingTalaId);
+  if(!item) return '';
+  return `
+    <div class="admin-edit-box">
+      <div class="admin-field"><label>Keywords (comma-separated)</label><input id="atfKw" value="${escapeHtml(item.kw.join(', '))}"></div>
+      <div class="admin-field"><label>Response (HTML allowed, e.g. &lt;strong&gt;, &lt;br&gt;)</label><textarea id="atfResp" rows="5">${escapeHtml(item.r)}</textarea></div>
+      <div class="admin-edit-actions">
+        <button class="admin-save-btn" onclick="adminSaveTala()">${isNew?'Create':'Save changes'}</button>
+        <button class="admin-cancel-btn" onclick="adminEditingTalaId=null;renderAdminTala();">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function adminNewTala(){ adminEditingTalaId='new'; renderAdminTala(); }
+function adminEditTala(id){ adminEditingTalaId=id; renderAdminTala(); }
+
+async function adminSaveTala(){
+  const kw = document.getElementById('atfKw').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const r = document.getElementById('atfResp').value.trim();
+  if(!kw.length || !r){
+    alert('At least one keyword and a response are required.');
+    return;
+  }
+  try {
+    if(adminEditingTalaId === 'new'){
+      const { error } = await sb.from('tala_responses').insert({ keywords: kw, response: r, sort_order: aiData.length });
+      if(error) throw error;
+    } else {
+      const { error } = await sb.from('tala_responses').update({ keywords: kw, response: r }).eq('id', adminEditingTalaId);
+      if(error) throw error;
+    }
+    await loadDataFromSupabase();
+    adminEditingTalaId = null;
+    renderAdminTala();
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+async function adminDeleteTala(id){
+  if(!confirm('Delete this response?')) return;
+  try {
+    const { error } = await sb.from('tala_responses').delete().eq('id', id);
+    if(error) throw error;
+    await loadDataFromSupabase();
+    renderAdminTala();
+  } catch(err){
+    alert('Delete failed: ' + (err.message || err));
+  }
+}
+
+async function adminSaveDefaultResponse(){
+  const val = document.getElementById('adfDefaultR').value.trim();
+  if(!val || val === defaultR) return;
+  try {
+    const { error } = await sb.from('tala_settings').upsert({ key: 'default_response', value: val });
+    if(error) throw error;
+    defaultR = val;
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+// ───────────── RESET TO DEFAULTS ─────────────
+
+async function adminResetDefaults(){
+  if(!confirm('This will erase ALL destinations and tala responses in Supabase and replace them with the original built-in defaults. Continue?')) return;
+  try {
+    await sb.from('destinations').delete().neq('id', -1);
+    await sb.from('tala_responses').delete().neq('id', -1);
+
+    const destRows = DEFAULT_DESTINATIONS.map((d,i)=>({
+      name:d.name, lat:d.lat, lng:d.lng, category:d.category, image:d.image,
+      description:d.description, tip:d.tip, color:d.color, sort_order:i,
+      rating:d.stats.rating, travel:d.stats.travel, temp:d.stats.temp, season:d.stats.season
+    }));
+    const talaRows = DEFAULT_TALA_DATA.map((t,i)=>({ keywords:t.kw, response:t.r, sort_order:i }));
+
+    await sb.from('destinations').insert(destRows);
+    await sb.from('tala_responses').insert(talaRows);
+    await sb.from('tala_settings').upsert({ key:'default_response', value: DEFAULT_FALLBACK_RESPONSE });
+
+    await loadDataFromSupabase();
+    rebuildMarkers();
+    if(adminTab==='dest') renderAdminDest(); else renderAdminTala();
+    alert('Reset complete.');
+  } catch(err){
+    alert('Reset failed: ' + (err.message || err));
+  }
+}
