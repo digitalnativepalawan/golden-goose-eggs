@@ -149,6 +149,10 @@ function getAI(input) {
 let map, mapReady=false;
 const markersByCat={};
 let allMarkers=[];
+const PIN_VISIBLE_ZOOM = 12; // pins hidden below this zoom on the default/idle map view
+let pinsCurrentlyVisible = true;
+let activeMarkerSet = []; // tracks whichever markers are "supposed" to be on the map right now (all, or a filtered category)
+let pinVisibilityOverride = false; // true once the user explicitly picks a category — keeps pins on regardless of zoom until they go back to 'All'/Map tab
 
 function rebuildMarkers(){
   if(!map) return;
@@ -157,11 +161,32 @@ function rebuildMarkers(){
   for(const k in markersByCat) delete markersByCat[k];
   destinations.forEach(d=>{
     if(!markersByCat[d.category]) markersByCat[d.category]=[];
-    const m = L.marker([d.lat,d.lng],{icon:L.divIcon({className:'',html:`<div class="mk-wrap" style="animation-delay:${Math.random()*2}s"><div class="mk-glow" style="color:${d.color}"></div><div class="mk-ring" style="border-color:${d.color}"></div><div class="mk-dot" style="background:${d.color};box-shadow:0 0 12px ${d.color}"></div></div>`,iconSize:[32,32],iconAnchor:[16,16]})}).addTo(map);
+    const m = L.marker([d.lat,d.lng],{icon:L.divIcon({className:'',html:`<div class="mk-wrap" style="animation-delay:${Math.random()*2}s"><div class="mk-glow" style="color:${d.color}"></div><div class="mk-ring" style="border-color:${d.color}"></div><div class="mk-dot" style="background:${d.color};box-shadow:0 0 12px ${d.color}"></div></div>`,iconSize:[32,32],iconAnchor:[16,16]})});
     m._d=d; m.on('click',()=>openDest(d));
     markersByCat[d.category].push(m); allMarkers.push(m);
   });
+  activeMarkerSet = allMarkers;
+  applyPinVisibility();
   renderDiscoverList(document.querySelector('.discover-cat.active')?.dataset.cat || 'all');
+}
+
+// Adds/removes activeMarkerSet from the map based on current zoom,
+// without touching which markers are "selected" by a category filter.
+// Skipped while pinVisibilityOverride is set (explicit category pick).
+function applyPinVisibility(){
+  if(!map) return;
+  const shouldShow = pinVisibilityOverride || map.getZoom() >= PIN_VISIBLE_ZOOM;
+  if(shouldShow === pinsCurrentlyVisible) {
+    // still sync membership in case activeMarkerSet changed (e.g. category filter)
+    if(shouldShow) activeMarkerSet.forEach(m=>{ if(!map.hasLayer(m)) m.addTo(map); });
+    return;
+  }
+  pinsCurrentlyVisible = shouldShow;
+  if(shouldShow){
+    activeMarkerSet.forEach(m=>m.addTo(map));
+  } else {
+    allMarkers.forEach(m=>{ if(map.hasLayer(m)) map.removeLayer(m); });
+  }
 }
 
 async function initMap() {
@@ -174,9 +199,14 @@ async function initMap() {
 
   const street = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OSM &copy; CARTO',maxZoom:19,subdomains:'abcd'});
   const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'&copy; Esri',maxZoom:19});
+  // Place-name labels (countries/provinces/municipalities/cities) drawn on top
+  // of the satellite imagery, since raw aerial photography has no text on it.
+  // Falls back gracefully (just stays empty) if this tile service is ever
+  // unavailable — it's a cosmetic overlay, never blocks the base imagery.
+  const satLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,errorTileUrl:''});
 
   street.addTo(map);
-  window._mS=street; window._mSat=sat; window._mView='street';
+  window._mS=street; window._mSat=sat; window._mSatLabels=satLabels; window._mView='street';
 
   L.control.zoom({position:'bottomright'}).addTo(map);
   document.getElementById('mapLayerToggle').classList.add('visible');
@@ -185,6 +215,8 @@ async function initMap() {
 
   initBarangayLayer();
   rebuildMarkers();
+
+  map.on('zoomend', applyPinVisibility);
 }
 
 // ─── BARANGAY BOUNDARIES ───
@@ -235,8 +267,18 @@ function switchMapLayer(type,btn){
   if(!mapReady) return;
   document.querySelectorAll('.mlt-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  if(type==='satellite'&&window._mView!=='satellite'){map.removeLayer(window._mS);window._mSat.addTo(map);window._mView='satellite';}
-  else if(type==='street'&&window._mView!=='street'){map.removeLayer(window._mSat);window._mS.addTo(map);window._mView='street';}
+  if(type==='satellite'&&window._mView!=='satellite'){
+    map.removeLayer(window._mS);
+    window._mSat.addTo(map);
+    window._mSatLabels.addTo(map);
+    window._mView='satellite';
+  }
+  else if(type==='street'&&window._mView!=='street'){
+    map.removeLayer(window._mSat);
+    map.removeLayer(window._mSatLabels);
+    window._mS.addTo(map);
+    window._mView='street';
+  }
   map.invalidateSize({animate:false});
 }
 
@@ -399,7 +441,12 @@ function closeDestSheet(animate) {
 function focusSanVicente(){
   closeAllPanels();
   closeDiscoverPanel();
-  if(map) map.flyTo([10.50,119.22],11,{duration:1});
+  if(map){
+    pinVisibilityOverride = false;
+    activeMarkerSet = allMarkers;
+    map.flyTo([10.50,119.22],11,{duration:1});
+    applyPinVisibility();
+  }
   document.querySelectorAll('.dock-item').forEach(d=>d.classList.remove('active'));
   const mapBtn=document.querySelector('.dock-item[data-tab="map"]');
   if(mapBtn) mapBtn.classList.add('active');
@@ -620,7 +667,7 @@ function dockNav(tab){
   document.querySelector(`.dock-item[data-tab="${tab}"]`).classList.add('active');
 
   switch(tab){
-    case 'map': closeAllPanels(); closeDiscoverPanel(); document.getElementById('heroOverlay').classList.remove('hidden'); document.getElementById('heroFade').classList.remove('hidden'); if(map) map.flyTo([10.50,119.22],11,{duration:1}); break;
+    case 'map': closeAllPanels(); closeDiscoverPanel(); document.getElementById('heroOverlay').classList.remove('hidden'); document.getElementById('heroFade').classList.remove('hidden'); if(map){ pinVisibilityOverride=false; activeMarkerSet=allMarkers; map.flyTo([10.50,119.22],11,{duration:1}); applyPinVisibility(); } break;
     case 'discover': openDiscoverPanel(); if(map){filterCategory('all');} break;
     case 'tala': closeDiscoverPanel(); closeDestSheet(false); openTalaSheet(); break;
     case 'saved': closeDiscoverPanel(); closeDestSheet(false); openTalaSheet(); addMsg('bot','Your saved San Vicente places will appear here. Tap markers like Long Beach, Port Barton, or Boayan Island, then ask tala to help plan the route.'); break;
@@ -629,8 +676,18 @@ function dockNav(tab){
 
 function filterCategory(cat){
   if(!mapReady) return;
-  if(cat==='all'){allMarkers.forEach(m=>m.addTo(map));map.flyTo([10.50,119.22],11,{duration:1});}
-  else{allMarkers.forEach(m=>map.removeLayer(m));const ms=markersByCat[cat]||[];ms.forEach(m=>m.addTo(map));if(ms.length) map.flyToBounds(L.featureGroup(ms).getBounds().pad(.25),{duration:1});}
+  allMarkers.forEach(m=>{ if(map.hasLayer(m)) map.removeLayer(m); });
+  if(cat==='all'){
+    activeMarkerSet = allMarkers;
+    pinVisibilityOverride = false; // back to zoom-based behavior on the default view
+    map.flyTo([10.50,119.22],11,{duration:1});
+  } else {
+    const ms=markersByCat[cat]||[];
+    activeMarkerSet = ms;
+    pinVisibilityOverride = true; // user explicitly asked for this category — always show it
+    if(ms.length) map.flyToBounds(L.featureGroup(ms).getBounds().pad(.25),{duration:1,maxZoom:15});
+  }
+  applyPinVisibility();
 }
 
 // ─── MAP LAZY LOAD ───
