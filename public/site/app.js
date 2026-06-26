@@ -1178,7 +1178,12 @@ function renderAdminTala(){
       <label>Fallback response (used when nothing matches)</label>
       <textarea id="adfDefaultR" rows="3" onblur="adminSaveDefaultResponse()">${escapeHtml(defaultR)}</textarea>
     </div>
-    <button class="admin-add-btn" onclick="adminNewTala()">+ Add response</button>`;
+    <div class="admin-grid-2" style="margin-bottom:14px;">
+      <button class="admin-add-btn" style="margin-bottom:0;" onclick="adminNewTala()">+ Add response</button>
+      <button class="admin-add-btn" style="margin-bottom:0;" onclick="document.getElementById('adfBulkFile').click()">⇧ Upload .txt files</button>
+    </div>
+    <input type="file" id="adfBulkFile" accept=".txt,text/plain" multiple style="display:none" onchange="adminHandleBulkFiles(event)">
+    <div id="adfBulkQueue"></div>`;
 
   if(adminEditingTalaId !== null){
     html += adminTalaFormHtml();
@@ -1219,6 +1224,110 @@ function adminTalaFormHtml(){
 }
 
 function adminNewTala(){ adminEditingTalaId='new'; renderAdminTala(); }
+
+// ───────────── BULK .TXT UPLOAD ─────────────
+// Reads each selected .txt file, shows it in a queue with an editable
+// keyword field (pre-filled from the filename), and lets the admin
+// save them all into tala_responses in one batch. Each file becomes
+// one response entry — the full file content is the response, and the
+// keywords typed in are what triggers it. No auto-parsing of arbitrary
+// prose into multiple entries, since that's not reliable; this keeps
+// the one unavoidable manual step (deciding trigger words) but removes
+// everything else.
+let bulkQueue = []; // { id, filename, content, keywords }
+let bulkIdCounter = 0;
+
+function guessKeywordsFromFilename(filename){
+  return filename
+    .replace(/\.txt$/i,'')
+    .replace(/^\d+[_\-\s]*/,'')   // strip leading numbers like "01_"
+    .replace(/[_\-]+/g,' ')
+    .trim();
+}
+
+function adminHandleBulkFiles(event){
+  const files = Array.from(event.target.files || []);
+  if(!files.length) return;
+
+  let pending = files.length;
+  files.forEach(file=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      bulkQueue.push({
+        id: ++bulkIdCounter,
+        filename: file.name,
+        content: e.target.result,
+        keywords: guessKeywordsFromFilename(file.name)
+      });
+      pending--;
+      if(pending === 0) renderBulkQueue();
+    };
+    reader.onerror = ()=>{
+      pending--;
+      if(pending === 0) renderBulkQueue();
+    };
+    reader.readAsText(file);
+  });
+
+  event.target.value = ''; // allow re-selecting the same file later
+}
+
+function renderBulkQueue(){
+  const container = document.getElementById('adfBulkQueue');
+  if(!container) return;
+  if(!bulkQueue.length){ container.innerHTML = ''; return; }
+
+  container.innerHTML = `
+    <div class="admin-edit-box">
+      <div class="admin-field" style="margin-bottom:8px;">
+        <label>${bulkQueue.length} file${bulkQueue.length>1?'s':''} ready — set trigger keywords for each, then save</label>
+      </div>
+      ${bulkQueue.map(item=>`
+        <div class="admin-list-item" style="margin-bottom:10px;">
+          <div style="font-size:.8rem;color:var(--white-soft);font-weight:500;margin-bottom:6px;">
+            📄 ${escapeHtml(item.filename)} <span style="color:var(--white-dim);font-size:.68rem;">(${item.content.length.toLocaleString()} chars)</span>
+          </div>
+          <div class="admin-field" style="margin-bottom:6px;">
+            <label>Trigger keywords (comma-separated — words a visitor might type that should bring up this content)</label>
+            <input value="${escapeHtml(item.keywords)}" oninput="bulkQueue.find(x=>x.id===${item.id}).keywords=this.value">
+          </div>
+          <button class="admin-mini-btn danger" onclick="bulkQueue=bulkQueue.filter(x=>x.id!==${item.id});renderBulkQueue();">Remove from queue</button>
+        </div>`).join('')}
+      <div class="admin-edit-actions">
+        <button class="admin-save-btn" id="adfBulkSaveBtn" onclick="adminSaveBulkQueue()">Save all ${bulkQueue.length} to Tala</button>
+        <button class="admin-cancel-btn" onclick="bulkQueue=[];renderBulkQueue();">Cancel</button>
+      </div>
+    </div>`;
+}
+
+async function adminSaveBulkQueue(){
+  const saveBtn = document.getElementById('adfBulkSaveBtn');
+  const invalid = bulkQueue.filter(item=>!item.keywords.trim());
+  if(invalid.length){
+    alert(`Please add at least one keyword for: ${invalid.map(i=>i.filename).join(', ')}`);
+    return;
+  }
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
+  try {
+    const rows = bulkQueue.map((item, i)=>({
+      keywords: item.keywords.split(',').map(s=>s.trim()).filter(Boolean),
+      response: escapeHtml(item.content).replace(/\n/g,'<br>'),
+      sort_order: aiData.length + i
+    }));
+    const { error } = await sb.from('tala_responses').insert(rows);
+    if(error) throw error;
+
+    bulkQueue = [];
+    await loadDataFromSupabase();
+    renderAdminTala();
+  } catch(err){
+    alert('Bulk save failed: ' + (err.message || err));
+    saveBtn.disabled = false;
+    saveBtn.textContent = `Save all ${bulkQueue.length} to Tala`;
+  }
+}
 function adminEditTala(id){ adminEditingTalaId=id; renderAdminTala(); }
 
 async function adminSaveTala(){
