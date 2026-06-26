@@ -181,8 +181,54 @@ async function initMap() {
   L.control.zoom({position:'bottomright'}).addTo(map);
   document.getElementById('mapLayerToggle').classList.add('visible');
   document.getElementById('mapRecenter').classList.add('visible');
+  document.getElementById('barangayToggle').classList.add('visible');
 
+  initBarangayLayer();
   rebuildMarkers();
+}
+
+// ─── BARANGAY BOUNDARIES ───
+// Static overlay, sourced once from official PSA/PSGC data (see
+// barangays.geojson.js). Boundaries don't change, so this is baked
+// in rather than admin-editable.
+let barangayLayer = null;
+let barangayVisible = false;
+
+function initBarangayLayer(){
+  if(typeof SAN_VICENTE_BARANGAYS === 'undefined') return;
+  barangayLayer = L.geoJSON(SAN_VICENTE_BARANGAYS, {
+    style: {
+      color: '#e8dcc8',
+      weight: 1.5,
+      opacity: 0.55,
+      fillColor: '#e8dcc8',
+      fillOpacity: 0.04,
+      dashArray: '4,4'
+    },
+    onEachFeature: (feature, layer) => {
+      if(feature.properties && feature.properties.name){
+        layer.bindTooltip(feature.properties.name, {
+          sticky: true,
+          className: 'barangay-tooltip',
+          opacity: 0.95
+        });
+      }
+    }
+  });
+  // Not added to the map yet — starts hidden until toggled on.
+}
+
+function toggleBarangayLayer(){
+  if(!barangayLayer || !map) return;
+  const btn = document.getElementById('barangayToggle');
+  barangayVisible = !barangayVisible;
+  if(barangayVisible){
+    barangayLayer.addTo(map);
+    btn.classList.add('active');
+  } else {
+    map.removeLayer(barangayLayer);
+    btn.classList.remove('active');
+  }
 }
 
 function switchMapLayer(type,btn){
