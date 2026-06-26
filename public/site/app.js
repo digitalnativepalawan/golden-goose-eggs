@@ -95,7 +95,7 @@ function destRowToObj(row){
   return {
     id: row.id, name: row.name, lat: row.lat, lng: row.lng, category: row.category,
     image: row.image, description: row.description, tip: row.tip, color: row.color || '#0ea5e9',
-    videoUrl: row.video_url || '', videoType: row.video_type || '',
+    videoUrl: row.video_url || '', videoType: row.video_type || '', featured: !!row.featured,
     stats: { rating: row.rating, travel: row.travel, temp: row.temp, season: row.season }
   };
 }
@@ -361,13 +361,23 @@ function focusSanVicente(){
 function renderDiscoverList(cat='all'){
   const list=document.getElementById('discoverList');
   if(!list) return;
-  const items=cat==='all'?destinations:destinations.filter(d=>d.category===cat);
+  let items;
+  if(cat==='all'){
+    items = destinations.filter(d=>d.featured);
+    if(!items.length) items = destinations; // fallback so Discover is never empty before anything is marked featured
+  } else {
+    items = destinations.filter(d=>d.category===cat);
+  }
+  if(!items.length){
+    list.innerHTML = `<div style="padding:20px;color:var(--white-dim);font-size:.78rem;">No spots yet.</div>`;
+    return;
+  }
   list.innerHTML=items.map(d=>`
     <button class="discover-card" onclick="openDestinationById(${d.id})">
-      <img src="${d.image}" alt="${d.name}">
+      <img src="${d.image}" alt="${d.name}" onerror="this.style.opacity=0">
       <div class="discover-card-body">
         <div class="discover-card-name">${d.name}</div>
-        <div class="discover-card-meta"><span>${catStyle[d.category].label}</span><span>•</span><span>${d.stats.travel}</span></div>
+        <div class="discover-card-meta"><span>${catStyle[d.category]?.label||d.category}</span><span>•</span><span>${d.stats.travel||''}</span></div>
       </div>
     </button>`).join('');
 }
@@ -696,7 +706,7 @@ function renderAdminDest(){
       <div class="admin-list-item">
         <div class="admin-list-item-head">
           <div onclick="adminEditDest(${d.id})" style="flex:1;cursor:pointer;">
-            <strong>${escapeHtml(d.name)}</strong>${d.videoUrl ? ' 🎬' : ''}<br>
+            <strong>${escapeHtml(d.name)}</strong>${d.featured ? ' ⭐' : ''}${d.videoUrl ? ' 🎬' : ''}<br>
             <span>${escapeHtml(catStyle[d.category]?.label||d.category)} · ${escapeHtml(d.stats.travel||'')}</span>
           </div>
           <div class="admin-row-actions">
@@ -711,11 +721,16 @@ function renderAdminDest(){
 
 function adminDestFormHtml(){
   const isNew = adminEditingDestId === 'new';
-  const d = isNew ? {name:'',lat:'',lng:'',category:'beaches',image:'',description:'',tip:'',color:'#0ea5e9',videoUrl:'',videoType:'',stats:{rating:'',travel:'',temp:'',season:''}} : destinations.find(x=>x.id===adminEditingDestId);
+  const d = isNew ? {name:'',lat:'',lng:'',category:'beaches',image:'',description:'',tip:'',color:'#0ea5e9',videoUrl:'',videoType:'',featured:false,stats:{rating:'',travel:'',temp:'',season:''}} : destinations.find(x=>x.id===adminEditingDestId);
   if(!d) return '';
   const vType = d.videoType || 'none';
   return `
     <div class="admin-edit-box">
+      <div class="admin-toggle-row">
+        <label for="adfFeatured">Featured (shows on the Discover "All" tab)</label>
+        <input type="checkbox" id="adfFeatured" ${d.featured?'checked':''}>
+      </div>
+
       <div class="admin-field"><label>Name</label><input id="adfName" value="${escapeHtml(d.name)}"></div>
 
       <div class="admin-field">
@@ -738,7 +753,15 @@ function adminDestFormHtml(){
         </div>
         <div class="admin-field"><label>Marker color</label><input id="adfColor" value="${escapeHtml(d.color)}"></div>
       </div>
-      <div class="admin-field"><label>Image path / URL</label><input id="adfImage" value="${escapeHtml(d.image)}"></div>
+
+      <div class="admin-field">
+        <label>Photo</label>
+        <input id="adfImage" value="${escapeHtml(d.image)}" placeholder="Image URL, or upload below" oninput="adminPreviewImage()">
+        <input type="file" id="adfImageFile" accept="image/jpeg,image/png,image/webp,image/gif" style="margin-top:8px;" onchange="adminUploadImageNow()">
+        <div id="adfImageUploadStatus" style="font-size:.68rem;color:var(--white-dim);margin-top:6px;"></div>
+        <img id="adfImagePreview" class="admin-img-preview" src="${escapeHtml(d.image)}" style="display:${d.image?'':'none'}" onerror="this.style.display='none'">
+      </div>
+
       <div class="admin-field"><label>Description</label><textarea id="adfDesc" rows="3">${escapeHtml(d.description)}</textarea></div>
       <div class="admin-field"><label>Tip</label><textarea id="adfTip" rows="2">${escapeHtml(d.tip)}</textarea></div>
       <div class="admin-grid-2">
@@ -782,6 +805,40 @@ function adminToggleVideoFields(){
   const type = document.getElementById('adfVideoType').value;
   document.getElementById('adfVideoYoutubeWrap').style.display = type==='youtube' ? '' : 'none';
   document.getElementById('adfVideoUploadWrap').style.display = type==='upload' ? '' : 'none';
+}
+
+function adminPreviewImage(){
+  const url = document.getElementById('adfImage').value.trim();
+  const img = document.getElementById('adfImagePreview');
+  if(url){ img.src = url; img.style.display = ''; }
+  else { img.style.display = 'none'; }
+}
+
+async function adminUploadImageNow(){
+  const fileInput = document.getElementById('adfImageFile');
+  const file = fileInput.files[0];
+  const status = document.getElementById('adfImageUploadStatus');
+  if(!file) return;
+
+  status.textContent = 'Uploading...';
+  status.style.color = 'var(--white-dim)';
+  try {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const path = `dest_${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+    const { error } = await sb.storage.from('destination-images').upload(path, file, {
+      cacheControl: '3600', upsert: false, contentType: file.type || 'image/jpeg'
+    });
+    if(error) throw error;
+
+    const { data } = sb.storage.from('destination-images').getPublicUrl(path);
+    document.getElementById('adfImage').value = data.publicUrl;
+    adminPreviewImage();
+    status.textContent = 'Uploaded.';
+    status.style.color = '#22c55e';
+  } catch(err){
+    status.textContent = 'Upload failed: ' + (err.message || err);
+    status.style.color = '#ef4444';
+  }
 }
 
 function adminParseMapsLink(){
@@ -869,6 +926,7 @@ async function adminSaveDest(){
       season: document.getElementById('adfSeason').value.trim(),
       video_url: videoType === 'none' ? null : (videoUrl || null),
       video_type: videoType === 'none' ? null : videoType,
+      featured: document.getElementById('adfFeatured').checked,
     };
     if(!payload.name || isNaN(payload.lat) || isNaN(payload.lng)){
       alert('Name, latitude, and longitude are required.');
