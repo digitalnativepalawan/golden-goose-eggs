@@ -229,7 +229,7 @@ function closeDestSheet(animate) {
   document.getElementById('destOverlay').classList.remove('active');
   currentDest = null;
   // Show tala orb again
-  document.getElementById('talaOrbWrap').classList.remove('hidden');
+  if(!talaOpen) document.getElementById('talaOrbWrap').classList.remove('hidden');
   // Restore hero
   document.getElementById('heroOverlay').classList.remove('hidden');
   document.getElementById('heroFade').classList.remove('hidden');
@@ -452,7 +452,7 @@ function dockNav(tab){
   switch(tab){
     case 'map': closeAllPanels(); closeDiscoverPanel(); document.getElementById('heroOverlay').classList.remove('hidden'); document.getElementById('heroFade').classList.remove('hidden'); if(map) map.flyTo([10.50,119.22],11,{duration:1}); break;
     case 'discover': openDiscoverPanel(); if(map){filterCategory('all');} break;
-    case 'tala': closeDestSheet(false); openTalaSheet(); break;
+    case 'tala': closeDiscoverPanel(); closeDestSheet(false); openTalaSheet(); break;
     case 'saved': closeDiscoverPanel(); closeDestSheet(false); openTalaSheet(); addMsg('bot','Your saved San Vicente places will appear here. Tap markers like Long Beach, Port Barton, or Boayan Island, then ask tala to help plan the route.'); break;
   }
 }
