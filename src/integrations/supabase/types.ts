@@ -20,6 +20,7 @@ export type Database = {
           color: string | null
           created_at: string | null
           description: string | null
+          featured: boolean | null
           id: number
           image: string | null
           lat: number
@@ -40,6 +41,7 @@ export type Database = {
           color?: string | null
           created_at?: string | null
           description?: string | null
+          featured?: boolean | null
           id?: never
           image?: string | null
           lat: number
@@ -60,6 +62,7 @@ export type Database = {
           color?: string | null
           created_at?: string | null
           description?: string | null
+          featured?: boolean | null
           id?: never
           image?: string | null
           lat?: number
