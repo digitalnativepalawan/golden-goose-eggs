@@ -14,7 +14,114 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      destinations: {
+        Row: {
+          category: string
+          color: string | null
+          created_at: string | null
+          description: string | null
+          id: number
+          image: string | null
+          lat: number
+          lng: number
+          name: string
+          rating: string | null
+          season: string | null
+          sort_order: number | null
+          temp: string | null
+          tip: string | null
+          travel: string | null
+          updated_at: string | null
+          video_type: string | null
+          video_url: string | null
+        }
+        Insert: {
+          category: string
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: never
+          image?: string | null
+          lat: number
+          lng: number
+          name: string
+          rating?: string | null
+          season?: string | null
+          sort_order?: number | null
+          temp?: string | null
+          tip?: string | null
+          travel?: string | null
+          updated_at?: string | null
+          video_type?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          category?: string
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: never
+          image?: string | null
+          lat?: number
+          lng?: number
+          name?: string
+          rating?: string | null
+          season?: string | null
+          sort_order?: number | null
+          temp?: string | null
+          tip?: string | null
+          travel?: string | null
+          updated_at?: string | null
+          video_type?: string | null
+          video_url?: string | null
+        }
+        Relationships: []
+      }
+      tala_responses: {
+        Row: {
+          created_at: string | null
+          id: number
+          keywords: string[]
+          response: string
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: never
+          keywords: string[]
+          response: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: never
+          keywords?: string[]
+          response?: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      tala_settings: {
+        Row: {
+          key: string
+          updated_at: string | null
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string | null
+          value: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
