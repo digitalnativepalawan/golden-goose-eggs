@@ -128,7 +128,8 @@ const catStyle = {
   islands:{label:"Islands",color:"#8b5cf6",bg:"rgba(139,92,246,.12)"},
   nature:{label:"Nature",color:"#22c55e",bg:"rgba(34,197,94,.12)"},
   adventure:{label:"Adventure",color:"#ef4444",bg:"rgba(239,68,68,.12)"},
-  culture:{label:"Culture",color:"#f59e0b",bg:"rgba(245,158,11,.12)"}
+  culture:{label:"Culture",color:"#f59e0b",bg:"rgba(245,158,11,.12)"},
+  stays:{label:"Stays",color:"#ec4899",bg:"rgba(236,72,153,.12)"}
 };
 
 // ─── AI ───
