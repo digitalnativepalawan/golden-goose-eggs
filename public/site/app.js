@@ -196,6 +196,24 @@ async function sendMagicLink(){
   }
 }
 
+async function signInWithProvider(provider){
+  const statusEl = document.getElementById('loginEmailStatus');
+  statusEl.textContent = `Opening ${provider} sign-in...`;
+  statusEl.style.color = 'var(--white-dim)';
+  try {
+    // Redirect to top-level URL so OAuth callback lands on the parent page, not the iframe
+    const redirectTo = (window.top && window.top.location && window.top.location.href) || window.location.href;
+    const { error } = await sb.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo }
+    });
+    if(error) throw error;
+  } catch(err){
+    statusEl.textContent = `Could not start ${provider} sign-in: ` + (err.message || err);
+    statusEl.style.color = '#ef4444';
+  }
+}
+
 async function signOutUser(){
   await sb.auth.signOut();
   closeDashboard();
