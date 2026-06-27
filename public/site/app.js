@@ -573,7 +573,7 @@ async function initMap() {
 
   L.control.zoom({position:'bottomright'}).addTo(map);
   document.getElementById('mapLayerToggle').classList.add('visible');
-  document.getElementById('mapRecenter').classList.add('visible');
+  
   document.getElementById('barangayToggle').classList.add('visible');
 
   initBarangayLayer();
