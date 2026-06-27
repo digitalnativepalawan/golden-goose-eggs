@@ -121,6 +121,33 @@ export type Database = {
           },
         ]
       }
+      pulse_categories: {
+        Row: {
+          created_at: string | null
+          icon_svg: string | null
+          id: number
+          key: string
+          label: string
+          sort_order: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          icon_svg?: string | null
+          id?: never
+          key: string
+          label: string
+          sort_order?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          icon_svg?: string | null
+          id?: never
+          key?: string
+          label?: string
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
       pulse_comments: {
         Row: {
           created_at: string | null
@@ -356,8 +383,11 @@ export type Database = {
           display_name: string | null
           favorite_categories: string[] | null
           id: string
+          is_banned: boolean | null
+          is_muted: boolean | null
           language: string | null
           last_seen: string | null
+          moderation_note: string | null
           reputation: number | null
           updated_at: string | null
           username: string | null
@@ -371,8 +401,11 @@ export type Database = {
           display_name?: string | null
           favorite_categories?: string[] | null
           id: string
+          is_banned?: boolean | null
+          is_muted?: boolean | null
           language?: string | null
           last_seen?: string | null
+          moderation_note?: string | null
           reputation?: number | null
           updated_at?: string | null
           username?: string | null
@@ -386,8 +419,11 @@ export type Database = {
           display_name?: string | null
           favorite_categories?: string[] | null
           id?: string
+          is_banned?: boolean | null
+          is_muted?: boolean | null
           language?: string | null
           last_seen?: string | null
+          moderation_note?: string | null
           reputation?: number | null
           updated_at?: string | null
           username?: string | null
@@ -423,7 +459,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      admin_delete_pulse_comment: {
+        Args: { comment_id: number }
+        Returns: undefined
+      }
+      admin_delete_pulse_post: { Args: { post_id: number }; Returns: undefined }
+      admin_set_user_moderation: {
+        Args: {
+          banned: boolean
+          muted: boolean
+          note?: string
+          target_user_id: string
+        }
+        Returns: undefined
+      }
+      admin_update_pulse_comment: {
+        Args: { comment_id: number; new_text: string }
+        Returns: undefined
+      }
+      admin_update_pulse_post: {
+        Args: { new_category: string; new_text: string; post_id: number }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
