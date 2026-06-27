@@ -895,28 +895,26 @@ function relTime(iso){
 }
 
 async function togglePulseLike(btn, postId){
-  requireAuth(async ()=>{
-    const liked = pulseLikedSet.has(postId);
-    const span = btn.querySelector('span');
-    const cur = parseInt(span.textContent, 10) || 0;
-    // Optimistic UI
-    if(liked){
-      pulseLikedSet.delete(postId);
-      btn.classList.remove('liked');
-      span.textContent = Math.max(0, cur - 1);
-      const { error } = await sb.from('pulse_likes').delete().eq('post_id', postId).eq('user_id', currentUser.id);
-      if(error){ pulseLikedSet.add(postId); btn.classList.add('liked'); span.textContent = cur; alert('Could not unlike: '+error.message); }
-    } else {
-      pulseLikedSet.add(postId);
-      btn.classList.add('liked');
-      span.textContent = cur + 1;
-      const { error } = await sb.from('pulse_likes').insert({ post_id: postId, user_id: currentUser.id });
-      if(error && error.code !== '23505'){ // ignore unique-violation
-        pulseLikedSet.delete(postId); btn.classList.remove('liked'); span.textContent = cur;
-        alert('Could not like: '+error.message);
-      }
+  const device = pulseDeviceId();
+  const liked = pulseLikedSet.has(postId);
+  const span = btn.querySelector('span');
+  const cur = parseInt(span.textContent, 10) || 0;
+  if(liked){
+    pulseLikedSet.delete(postId);
+    btn.classList.remove('liked');
+    span.textContent = Math.max(0, cur - 1);
+    const { error } = await sb.from('pulse_likes').delete().eq('post_id', postId).eq('device_id', device);
+    if(error){ pulseLikedSet.add(postId); btn.classList.add('liked'); span.textContent = cur; alert('Could not unlike: '+error.message); }
+  } else {
+    pulseLikedSet.add(postId);
+    btn.classList.add('liked');
+    span.textContent = cur + 1;
+    const { error } = await sb.from('pulse_likes').insert({ post_id: postId, device_id: device });
+    if(error && error.code !== '23505'){
+      pulseLikedSet.delete(postId); btn.classList.remove('liked'); span.textContent = cur;
+      alert('Could not like: '+error.message);
     }
-  });
+  }
 }
 
 async function renderPulseFeed(){
