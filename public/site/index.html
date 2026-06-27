@@ -53,7 +53,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
    MAP CANVAS
    ═══════════════════════════════════ */
 #map{position:fixed;inset:0;z-index:1}
-.leaflet-container{background:var(--charcoal-deep)!important}
+.leaflet-container{background:var(--charcoal-deep)!important;outline:none}
+.leaflet-container:focus{outline:none}
 
 /* Zoom control */
 .leaflet-control-zoom{border:none!important;border-radius:14px!important;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.3)!important}
