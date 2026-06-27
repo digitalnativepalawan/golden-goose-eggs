@@ -778,8 +778,10 @@ let pulseCategory = 'all';
 let pulseTab = 'feed';
 
 function openPulsePanel(){
-  document.getElementById('pulsePanel').classList.add('open');
-  renderPulseFeed();
+  requireAuth(()=>{
+    document.getElementById('pulsePanel').classList.add('open');
+    renderPulseFeed();
+  });
 }
 
 function closePulsePanel(){
@@ -848,17 +850,48 @@ function pulseCardHtml(post){
     </div>`;
 }
 
-function togglePulseLike(btn, postId){
-  requireAuth(()=>{
-    const post = PULSE_POSTS.find(p=>p.id===postId);
-    if(!post) return;
-    const liked = btn.classList.toggle('liked');
-    post.likes += liked ? 1 : -1;
-    btn.querySelector('span').textContent = post.likes;
+// Set of post IDs the current user has liked — refreshed on each feed load
+let pulseLikedSet = new Set();
+// Cache of latest feed rows by id so togglePulseLike can update counts
+let pulseFeedById = new Map();
+
+function relTime(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  const s = Math.max(1, Math.floor((Date.now() - d.getTime())/1000));
+  if(s < 60) return s+'s ago';
+  const m = Math.floor(s/60); if(m < 60) return m+'m ago';
+  const h = Math.floor(m/60); if(h < 24) return h+'h ago';
+  const days = Math.floor(h/24); if(days < 7) return days+'d ago';
+  return d.toLocaleDateString();
+}
+
+async function togglePulseLike(btn, postId){
+  requireAuth(async ()=>{
+    const liked = pulseLikedSet.has(postId);
+    const span = btn.querySelector('span');
+    const cur = parseInt(span.textContent, 10) || 0;
+    // Optimistic UI
+    if(liked){
+      pulseLikedSet.delete(postId);
+      btn.classList.remove('liked');
+      span.textContent = Math.max(0, cur - 1);
+      const { error } = await sb.from('pulse_likes').delete().eq('post_id', postId).eq('user_id', currentUser.id);
+      if(error){ pulseLikedSet.add(postId); btn.classList.add('liked'); span.textContent = cur; alert('Could not unlike: '+error.message); }
+    } else {
+      pulseLikedSet.add(postId);
+      btn.classList.add('liked');
+      span.textContent = cur + 1;
+      const { error } = await sb.from('pulse_likes').insert({ post_id: postId, user_id: currentUser.id });
+      if(error && error.code !== '23505'){ // ignore unique-violation
+        pulseLikedSet.delete(postId); btn.classList.remove('liked'); span.textContent = cur;
+        alert('Could not like: '+error.message);
+      }
+    }
   });
 }
 
-function renderPulseFeed(){
+async function renderPulseFeed(){
   const body = document.getElementById('pulseBody');
   if(!body) return;
 
@@ -867,12 +900,69 @@ function renderPulseFeed(){
     return;
   }
 
-  const posts = pulseCategory === 'all' ? PULSE_POSTS : PULSE_POSTS.filter(p=>p.cat===pulseCategory);
+  body.innerHTML = `<div class="pulse-empty">Loading…</div>`;
+
+  let query = sb.from('pulse_posts')
+    .select('id, user_id, category, text_content, image_url, location_text, tag, is_anonymous, admin_post, created_at, pulse_likes(count), pulse_comments(count)')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if(pulseCategory !== 'all') query = query.eq('category', pulseCategory);
+
+  const { data: rows, error } = await query;
+  if(error){
+    body.innerHTML = `<div class="pulse-empty">Could not load Pulse: ${escapeHtml(error.message)}</div>`;
+    return;
+  }
+
+  // Fetch traveler profiles for the post authors (no FK between tables, so do it separately)
+  const profileById = new Map();
+  const authorIds = Array.from(new Set((rows||[]).filter(r=>!r.is_anonymous && r.user_id).map(r=>r.user_id)));
+  if(authorIds.length){
+    const { data: profs } = await sb.from('traveler_profiles').select('id, display_name, avatar_url').in('id', authorIds);
+    if(profs) profs.forEach(p => profileById.set(p.id, p));
+  }
+
+  // Load the current user's likes so the heart state is correct
+  pulseLikedSet = new Set();
+  if(currentUser && rows && rows.length){
+    const ids = rows.map(r=>r.id);
+    const { data: likes } = await sb.from('pulse_likes').select('post_id').eq('user_id', currentUser.id).in('post_id', ids);
+    if(likes) likes.forEach(l => pulseLikedSet.add(l.post_id));
+  }
+
+  pulseFeedById = new Map();
+  const posts = (rows || []).map(r => {
+    const prof = profileById.get(r.user_id);
+    const name = r.is_anonymous ? 'Anonymous' : ((prof && prof.display_name) || 'Traveler');
+    const avatar = (!r.is_anonymous && prof && prof.avatar_url) || null;
+    const mapped = {
+      id: r.id,
+      cat: r.category,
+      name,
+      avatar,
+      admin: !!r.admin_post,
+      time: relTime(r.created_at),
+      text: r.text_content || '',
+      image: r.image_url || null,
+      location: r.location_text || null,
+      tag: r.tag || null,
+      likes: (r.pulse_likes && r.pulse_likes[0] && r.pulse_likes[0].count) || 0,
+      comments: (r.pulse_comments && r.pulse_comments[0] && r.pulse_comments[0].count) || 0,
+    };
+    pulseFeedById.set(r.id, mapped);
+    return mapped;
+  });
+
   if(!posts.length){
     body.innerHTML = `<div class="pulse-empty">No posts yet in this category. Be the first to share something!</div>`;
     return;
   }
   body.innerHTML = posts.map(pulseCardHtml).join('');
+  // Mark hearts that the current user has already liked
+  body.querySelectorAll('.pulse-action').forEach(btn => {
+    const m = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/togglePulseLike\(this,\s*(\d+)\)/);
+    if(m && pulseLikedSet.has(parseInt(m[1],10))) btn.classList.add('liked');
+  });
 }
 
 let pulseComposeImageDataUrl = null;
@@ -926,29 +1016,32 @@ function updatePulseComposeState(){
   postBtn.disabled = !text && !pulseComposeImageDataUrl;
 }
 
-function submitPulsePost(){
+async function submitPulsePost(){
   const text = document.getElementById('pulseComposeText').value.trim();
   if(!text && !pulseComposeImageDataUrl) return;
+  if(!currentUser){ openLoginModal(); return; }
 
   const cat = document.getElementById('pulseComposeCategory').value;
   const anon = document.getElementById('pulseComposeAnon').checked;
+  const postBtn = document.getElementById('pulseComposePostBtn');
+  postBtn.disabled = true;
 
-  const newPost = {
-    id: pulseNextPostId++,
-    cat: cat,
-    name: anon ? 'Anonymous' : 'You',
-    avatar: anon ? null : null, // no device-camera selfie yet; falls back to initials
-    time: 'Just now',
-    text: text || '',
-    image: pulseComposeImageDataUrl || null,
-    likes: 0,
-    comments: 0
-  };
+  const { error } = await sb.from('pulse_posts').insert({
+    user_id: currentUser.id,
+    category: cat || 'all',
+    text_content: text || null,
+    image_url: pulseComposeImageDataUrl || null, // TODO: upload to Storage in a follow-up
+    is_anonymous: !!anon,
+  });
 
-  PULSE_POSTS.unshift(newPost);
+  postBtn.disabled = false;
+
+  if(error){
+    alert('Could not post: ' + error.message);
+    return;
+  }
+
   closePulseCompose();
-
-  // Jump to a view where the new post is actually visible: All category, Live Feed tab.
   pulseCategory = 'all';
   pulseTab = 'feed';
   document.querySelectorAll('.pulse-cat').forEach(b=>b.classList.toggle('active', b.dataset.cat==='all'));
@@ -956,7 +1049,7 @@ function submitPulsePost(){
   document.getElementById('pulseTitle').innerHTML = `${PULSE_CATEGORIES.all.label} <span class="live-dot"></span>`;
   document.getElementById('pulseSubtitle').textContent = PULSE_CATEGORIES.all.subtitle;
 
-  renderPulseFeed();
+  await renderPulseFeed();
   document.getElementById('pulseBody').scrollTo({top:0, behavior:'smooth'});
 }
 
