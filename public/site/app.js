@@ -100,12 +100,40 @@ function destRowToObj(row){
   };
 }
 
+const DEFAULT_SUGGESTIONS = [
+  { id:1, text:"Best beaches in San Vicente" },
+  { id:2, text:"Where should I stay?" },
+  { id:3, text:"Best time to visit" },
+  { id:4, text:"Budget guide" },
+  { id:5, text:"Local hidden gems" }
+];
+
+let talaSuggestions = [];
+
+// True if today's month/day falls within [fromM/fromD, toM/toD], inclusive,
+// handling ranges that wrap across the new year (e.g. Nov 1 -> Mar 31).
+// A suggestion with no range set is always active.
+function isSuggestionActiveToday(s){
+  if(s.active_from_month==null || s.active_to_month==null) return true;
+  const now = new Date();
+  const todayKey = (now.getMonth()+1)*100 + now.getDate();
+  const fromKey = s.active_from_month*100 + (s.active_from_day||1);
+  const toKey = s.active_to_month*100 + (s.active_to_day||28);
+  if(fromKey <= toKey){
+    return todayKey >= fromKey && todayKey <= toKey;
+  } else {
+    // wraps across new year, e.g. Nov 1 -> Mar 31
+    return todayKey >= fromKey || todayKey <= toKey;
+  }
+}
+
 async function loadDataFromSupabase(){
   try {
-    const [destRes, talaRes, settingsRes] = await Promise.all([
+    const [destRes, talaRes, settingsRes, sugRes] = await Promise.all([
       sb.from('destinations').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_responses').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_settings').select('*').eq('key', 'default_response').maybeSingle(),
+      sb.from('tala_suggestions').select('*').order('sort_order', { ascending: true }),
     ]);
 
     if (destRes.error) throw destRes.error;
@@ -114,11 +142,13 @@ async function loadDataFromSupabase(){
     destinations = (destRes.data && destRes.data.length) ? destRes.data.map(destRowToObj) : DEFAULT_DESTINATIONS;
     aiData = (talaRes.data && talaRes.data.length) ? talaRes.data.map(r=>({ id:r.id, kw:r.keywords, r:r.response, cat:r.category||'knowledge' })) : DEFAULT_TALA_DATA;
     defaultR = (settingsRes.data && settingsRes.data.value) ? settingsRes.data.value : DEFAULT_FALLBACK_RESPONSE;
+    talaSuggestions = (sugRes && sugRes.data && sugRes.data.length) ? sugRes.data : DEFAULT_SUGGESTIONS;
   } catch(err) {
     console.warn('[SANVIC] Supabase load failed, using built-in defaults:', err);
     destinations = DEFAULT_DESTINATIONS;
     aiData = DEFAULT_TALA_DATA;
     defaultR = DEFAULT_FALLBACK_RESPONSE;
+    talaSuggestions = DEFAULT_SUGGESTIONS;
   }
   dataReady = true;
 }
@@ -662,6 +692,18 @@ function openTalaSheet() {
   document.getElementById('talaOverlay').classList.add('active');
   document.getElementById('talaOrbWrap').classList.add('hidden');
   closeDestSheet(false);
+  renderTalaSuggestions();
+}
+
+function renderTalaSuggestions(){
+  const container = document.getElementById('talaSugs');
+  if(!container) return;
+  const list = (talaSuggestions && talaSuggestions.length) ? talaSuggestions : DEFAULT_SUGGESTIONS;
+  const active = list.filter(isSuggestionActiveToday);
+  const shown = active.length ? active : list; // never show an empty bar
+  container.innerHTML = shown.map(s=>
+    `<button class="tala-sug" onclick="askTala(this)">${escapeHtml(s.text)}</button>`
+  ).join('');
 }
 
 function closeTalaSheet(anim) {
@@ -725,7 +767,7 @@ function toggleMute(){
 }
 
 // ─── SEARCH ───
-const placeholders=["Ask tala about beaches...","Best time to visit Palawan?","How to get to El Nido?","Hidden gems in Coron...","Budget travel tips...","Underground River details...","What to eat in Palawan..."];
+const placeholders=["Ask tala about beaches...","Best time to visit San Vicente?","How to get to San Vicente?","Hidden gems locals love...","Budget travel tips...","Best surf spots in Alimanguan...","What to eat in San Vicente..."];
 let phIdx=0,phChar=0,phDir=1;
 const heroInput=document.getElementById('heroInput');
 
@@ -1173,6 +1215,9 @@ async function adminDeleteDest(id){
 
 let talaFilterCat = 'all';
 let talaSearchQuery = '';
+let talaSuggestionsOpen = false;
+let editingSuggestionId = null;
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function talaContentLength(text){
   const len = (text||'').length;
@@ -1181,10 +1226,136 @@ function talaContentLength(text){
   return {label:'Long', cls:'long'};
 }
 
+function adminToggleSuggestionsPanel(){
+  talaSuggestionsOpen = !talaSuggestionsOpen;
+  renderAdminTala();
+}
+
+function adminSuggestionsPanelHtml(){
+  let html = `
+    <div class="admin-field" style="font-size:.7rem;color:var(--white-dim);margin-bottom:10px;">
+      These are the tappable suggestion chips shown when Tala opens. Set a date range to make one seasonal (e.g. surf season Nov 1\u2013Mar 31) \u2014 leave it blank to always show.
+    </div>
+    <button class="admin-add-btn" onclick="adminNewSuggestion()">+ Add suggestion</button>`;
+
+  if(editingSuggestionId !== null){
+    html += adminSuggestionFormHtml();
+  }
+
+  if(!talaSuggestions.length){
+    html += `<div class="admin-empty">No suggestions yet.</div>`;
+  } else {
+    html += talaSuggestions.map(s=>{
+      const active = isSuggestionActiveToday(s);
+      const rangeLabel = (s.active_from_month && s.active_to_month)
+        ? `${MONTH_NAMES[s.active_from_month-1]} ${s.active_from_day||1} \u2013 ${MONTH_NAMES[s.active_to_month-1]} ${s.active_to_day||28}`
+        : 'Always shown';
+      return `
+      <div class="admin-list-item">
+        <div class="admin-list-item-head">
+          <div onclick="adminEditSuggestion(${s.id})" style="flex:1;cursor:pointer;">
+            <div class="admin-tala-badges">
+              <span class="admin-len-pill" style="${active?'color:#5eead4;background:rgba(20,184,166,.14)':''}">${active ? 'Active now' : 'Not active now'}</span>
+              <span class="admin-len-pill">${rangeLabel}</span>
+            </div>
+            <strong>${escapeHtml(s.text)}</strong>
+          </div>
+          <div class="admin-row-actions">
+            <button class="admin-mini-btn" onclick="adminEditSuggestion(${s.id})">Edit</button>
+            <button class="admin-mini-btn danger" onclick="adminDeleteSuggestion(${s.id})">Delete</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  return html;
+}
+
+function adminSuggestionFormHtml(){
+  const isNew = editingSuggestionId === 'new';
+  const s = isNew ? {text:'',active_from_month:'',active_from_day:'',active_to_month:'',active_to_day:''} : talaSuggestions.find(x=>x.id===editingSuggestionId);
+  if(!s) return '';
+  const monthOptions = (selected)=> `<option value="">\u2014</option>` + MONTH_NAMES.map((m,i)=>`<option value="${i+1}" ${selected==i+1?'selected':''}>${m}</option>`).join('');
+  return `
+    <div class="admin-edit-box">
+      <div class="admin-field"><label>Suggestion text</label><input id="asfText" value="${escapeHtml(s.text)}" placeholder="e.g. Best beaches in San Vicente"></div>
+      <div class="admin-field" style="font-size:.68rem;color:var(--white-dim);">Optional seasonal range (leave all on \u2014 for always-on)</div>
+      <div class="admin-grid-2">
+        <div class="admin-field"><label>From month</label><select id="asfFromM">${monthOptions(s.active_from_month)}</select></div>
+        <div class="admin-field"><label>From day</label><input id="asfFromD" type="number" min="1" max="31" value="${s.active_from_day||''}"></div>
+      </div>
+      <div class="admin-grid-2">
+        <div class="admin-field"><label>To month</label><select id="asfToM">${monthOptions(s.active_to_month)}</select></div>
+        <div class="admin-field"><label>To day</label><input id="asfToD" type="number" min="1" max="31" value="${s.active_to_day||''}"></div>
+      </div>
+      <div class="admin-edit-actions">
+        <button class="admin-save-btn" onclick="adminSaveSuggestion()">${isNew?'Create':'Save changes'}</button>
+        <button class="admin-cancel-btn" onclick="editingSuggestionId=null;renderAdminTala();">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function adminNewSuggestion(){ editingSuggestionId='new'; renderAdminTala(); }
+function adminEditSuggestion(id){ editingSuggestionId=id; renderAdminTala(); }
+
+async function adminSaveSuggestion(){
+  const text = document.getElementById('asfText').value.trim();
+  if(!text){ alert('Suggestion text is required.'); return; }
+
+  const fromM = document.getElementById('asfFromM').value;
+  const fromD = document.getElementById('asfFromD').value;
+  const toM = document.getElementById('asfToM').value;
+  const toD = document.getElementById('asfToD').value;
+
+  const payload = {
+    text,
+    active_from_month: fromM ? parseInt(fromM) : null,
+    active_from_day: fromD ? parseInt(fromD) : null,
+    active_to_month: toM ? parseInt(toM) : null,
+    active_to_day: toD ? parseInt(toD) : null,
+  };
+
+  try {
+    if(editingSuggestionId === 'new'){
+      payload.sort_order = talaSuggestions.length;
+      const { error } = await sb.from('tala_suggestions').insert(payload);
+      if(error) throw error;
+    } else {
+      const { error } = await sb.from('tala_suggestions').update(payload).eq('id', editingSuggestionId);
+      if(error) throw error;
+    }
+    await loadDataFromSupabase();
+    editingSuggestionId = null;
+    renderAdminTala();
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+async function adminDeleteSuggestion(id){
+  if(!confirm('Delete this suggestion?')) return;
+  try {
+    const { error } = await sb.from('tala_suggestions').delete().eq('id', id);
+    if(error) throw error;
+    await loadDataFromSupabase();
+    renderAdminTala();
+  } catch(err){
+    alert('Delete failed: ' + (err.message || err));
+  }
+}
+
 function renderAdminTala(){
   const body = document.getElementById('adminBody');
   let html = `
-    <div class="admin-field">
+    <div class="admin-section-toggle" onclick="adminToggleSuggestionsPanel()">
+      <span>⚡ Quick suggestion chips ${talaSuggestionsOpen?'▾':'▸'}</span>
+      <span class="admin-section-count">${talaSuggestions.length}</span>
+    </div>
+    <div id="adfSuggestionsPanel" style="display:${talaSuggestionsOpen?'':'none'}">
+      ${adminSuggestionsPanelHtml()}
+    </div>
+
+    <div class="admin-field" style="margin-top:16px;">
       <label>Fallback response (used when nothing matches)</label>
       <textarea id="adfDefaultR" rows="3" onblur="adminSaveDefaultResponse()">${escapeHtml(defaultR)}</textarea>
     </div>

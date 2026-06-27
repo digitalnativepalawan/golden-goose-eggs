@@ -385,6 +385,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 .admin-cat-pill.personality{background:rgba(236,72,153,.16);color:#f9a8d4}
 .admin-len-pill{font-size:.6rem;padding:2px 8px;border-radius:8px;color:var(--white-dim);background:rgba(255,255,255,.06)}
 .admin-len-pill.long{color:#fbbf24;background:rgba(251,191,36,.12)}
+
+.admin-section-toggle{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:rgba(255,255,255,.04);border:1px solid var(--glass-border);border-radius:var(--radius-sm);cursor:pointer;font-size:.78rem;color:var(--white-soft);margin-bottom:4px}
+.admin-section-count{font-size:.66rem;color:var(--white-dim);background:rgba(255,255,255,.06);border-radius:8px;padding:2px 8px}
 .admin-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid var(--glass-border);border-radius:10px;margin-bottom:10px}
 .admin-toggle-row label{font-size:.78rem;color:var(--white-soft);font-weight:400;text-transform:none;letter-spacing:0;margin:0}
 .admin-toggle-row input[type="checkbox"]{width:38px;height:22px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,.12);border-radius:11px;position:relative;cursor:pointer;outline:none;transition:background .2s;flex-shrink:0}
@@ -545,14 +548,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
     <button class="tsh-mute" id="tshMute" onclick="toggleMute()">🔊</button>
   </div>
   <div class="tala-chat" id="talaChat">
-    <div class="tala-msg bot">Welcome. I'm <strong>tala</strong> — your personal Palawan concierge. Ask me about destinations, timing, routes, or hidden gems.</div>
+    <div class="tala-msg bot">Welcome. I'm <strong>tala</strong> — your San Vicente concierge. Ask me about destinations, timing, routes, or hidden gems.</div>
   </div>
   <div class="tala-sugs" id="talaSugs">
-    <button class="tala-sug" onclick="askTala(this)">Best beaches</button>
-    <button class="tala-sug" onclick="askTala(this)">How to reach El Nido</button>
-    <button class="tala-sug" onclick="askTala(this)">Best time to visit</button>
-    <button class="tala-sug" onclick="askTala(this)">Coron highlights</button>
-    <button class="tala-sug" onclick="askTala(this)">Budget guide</button>
   </div>
   <div class="tala-input-bar">
     <input type="text" id="talaInput" placeholder="Ask tala anything..." onkeydown="if(event.key==='Enter')sendTala()">
