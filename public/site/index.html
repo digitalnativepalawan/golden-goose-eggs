@@ -401,6 +401,32 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 .pulse-compose-anon-row input[type="checkbox"]::before{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s}
 .pulse-compose-anon-row input[type="checkbox"]:checked::before{transform:translateX(16px)}
 .pulse-compose-note{font-size:.68rem;color:var(--white-dim);margin-top:16px;line-height:1.5}
+/* Custom channel dropdown (replaces native select to avoid white menu overlay) */
+.pulse-custom-select{width:100%;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-radius:10px;border:1px solid var(--glass-border);background:rgba(255,255,255,.04);color:var(--white-soft);font-family:var(--font-body);font-size:.82rem;cursor:pointer;outline:none}
+.pulse-custom-select svg{width:14px;height:14px;color:var(--white-dim)}
+.pulse-custom-menu{margin-top:6px;background:var(--charcoal-surface);border:1px solid var(--glass-border);border-radius:10px;overflow:hidden;box-shadow:0 12px 32px rgba(0,0,0,.45);z-index:100;position:relative}
+.pulse-custom-menu button{display:block;width:100%;text-align:left;background:none;border:none;color:var(--white-soft);font-family:var(--font-body);font-size:.82rem;padding:11px 14px;cursor:pointer}
+.pulse-custom-menu button:hover,.pulse-custom-menu button.active{background:rgba(20,184,166,.14);color:var(--ocean-teal-light)}
+/* Location chip */
+.pulse-loc-chip{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:6px 10px;background:rgba(20,184,166,.14);color:#5eead4;border:1px solid rgba(20,184,166,.3);border-radius:999px;font-size:.74rem}
+.pulse-loc-chip svg{width:12px;height:12px}
+.pulse-loc-chip button{background:none;border:none;color:#5eead4;cursor:pointer;padding:0;display:flex;align-items:center}
+.pulse-loc-chip button svg{width:12px;height:12px}
+/* Location picker sheet */
+.pulse-loc-overlay{position:fixed;inset:0;z-index:100;background:rgba(2,14,38,.65);backdrop-filter:blur(3px);opacity:0;visibility:hidden;transition:all .25s}
+.pulse-loc-overlay.active{opacity:1;visibility:visible}
+.pulse-loc-sheet{position:fixed;bottom:0;left:0;right:0;z-index:101;max-height:75vh;background:var(--charcoal-surface);border-radius:var(--radius-xl) var(--radius-xl) 0 0;padding:16px 18px calc(20px + var(--safe-bottom));transform:translateY(100%);transition:transform .35s var(--ease-out-expo);box-shadow:0 -10px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+.pulse-loc-sheet.open{transform:translateY(0)}
+.pulse-loc-head{display:flex;align-items:center;justify-content:space-between;font-size:.9rem;color:var(--white-soft);font-weight:500;padding-bottom:4px}
+.pulse-loc-head button{background:none;border:none;color:var(--white-dim);cursor:pointer;padding:4px;display:flex}
+.pulse-loc-head button svg{width:18px;height:18px}
+.pulse-loc-action{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;border:1px solid var(--glass-border);background:rgba(20,184,166,.08);color:var(--ocean-teal-light);cursor:pointer;font-size:.86rem;font-family:var(--font-body)}
+.pulse-loc-action svg{width:18px;height:18px}
+.pulse-loc-divider{font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;color:var(--white-dim);margin-top:8px}
+.pulse-loc-list{display:flex;flex-direction:column;gap:4px;max-height:38vh;overflow-y:auto}
+.pulse-loc-list button{display:flex;align-items:center;gap:8px;padding:11px 12px;border-radius:8px;border:1px solid transparent;background:rgba(255,255,255,.03);color:var(--white-soft);cursor:pointer;font-size:.82rem;text-align:left;font-family:var(--font-body)}
+.pulse-loc-list button:hover{background:rgba(20,184,166,.12);border-color:rgba(20,184,166,.3)}
+.pulse-loc-clear{margin-top:6px;padding:10px;border-radius:10px;border:1px solid var(--glass-border);background:transparent;color:var(--white-dim);cursor:pointer;font-size:.78rem;font-family:var(--font-body)}
 
 /* ─── Login modal ─── */
 .login-overlay{position:fixed;inset:0;z-index:120;background:rgba(2,14,38,.65);backdrop-filter:blur(4px);opacity:0;visibility:hidden;transition:all .3s}
@@ -826,12 +852,20 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 
     <input type="file" id="pulseComposeFileInput" accept="image/*" style="display:none" onchange="handlePulseComposeImage(event)">
 
+    <div id="pulseComposeLocChip" class="pulse-loc-chip" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      <span id="pulseComposeLocChipText"></span>
+      <button type="button" onclick="clearPulseLocation()" aria-label="Clear location">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
     <div class="pulse-compose-actions-row">
       <button class="pulse-compose-attach-btn" onclick="document.getElementById('pulseComposeFileInput').click()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
         Add photo
       </button>
-      <button class="pulse-compose-attach-btn" onclick="alert('Location tagging coming soon.')">
+      <button class="pulse-compose-attach-btn" onclick="openPulseLocPicker()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
         Location
       </button>
@@ -839,23 +873,46 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 
     <div class="pulse-compose-field">
       <label>Channel</label>
-      <select id="pulseComposeCategory">
-        <option value="all">General</option>
-        <option value="hidden">Hidden Spots</option>
-        <option value="island">Island Hopping</option>
-        <option value="food">Food &amp; Nightlife</option>
-        <option value="surf">Surf Report</option>
-        <option value="events">Events Tonight</option>
-      </select>
+      <button type="button" id="pulseComposeCatBtn" class="pulse-custom-select" onclick="togglePulseCatMenu(event)">
+        <span id="pulseComposeCatLabel">General</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <input type="hidden" id="pulseComposeCategory" value="all">
+      <div id="pulseComposeCatMenu" class="pulse-custom-menu" style="display:none;">
+        <button type="button" data-val="all" data-label="General" onclick="selectPulseCat(this)">General</button>
+        <button type="button" data-val="hidden" data-label="Hidden Spots" onclick="selectPulseCat(this)">Hidden Spots</button>
+        <button type="button" data-val="island" data-label="Island Hopping" onclick="selectPulseCat(this)">Island Hopping</button>
+        <button type="button" data-val="food" data-label="Food &amp; Nightlife" onclick="selectPulseCat(this)">Food &amp; Nightlife</button>
+        <button type="button" data-val="surf" data-label="Surf Report" onclick="selectPulseCat(this)">Surf Report</button>
+        <button type="button" data-val="events" data-label="Events Tonight" onclick="selectPulseCat(this)">Events Tonight</button>
+      </div>
     </div>
 
     <div class="pulse-compose-field">
       <label>Your name (optional)</label>
-      <input type="text" id="pulseComposeName" maxlength="40" placeholder="Anonymous traveler" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:var(--white);font-size:.9rem;">
+      <input type="text" id="pulseComposeName" maxlength="40" placeholder="Anonymous traveler" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:var(--white-soft);font-size:.9rem;">
     </div>
 
     <div class="pulse-compose-note">Pulse is open to everyone — no sign-in needed. Be kind. Posts are public.</div>
   </div>
+</div>
+
+<!-- ═══ PULSE LOCATION PICKER ═══ -->
+<div class="pulse-loc-overlay" id="pulseLocOverlay" onclick="closePulseLocPicker()"></div>
+<div class="pulse-loc-sheet" id="pulseLocSheet">
+  <div class="pulse-loc-head">
+    <span>Tag a location</span>
+    <button type="button" onclick="closePulseLocPicker()" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <button type="button" class="pulse-loc-action" onclick="useCurrentLocation()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+    <span>Use my current location</span>
+  </button>
+  <div class="pulse-loc-divider">Or pick a San Vicente spot</div>
+  <div id="pulseLocList" class="pulse-loc-list"></div>
+  <button type="button" class="pulse-loc-clear" onclick="clearPulseLocation(); closePulseLocPicker();">Clear location</button>
 </div>
 
 <!-- ═══ LOGIN MODAL ═══ -->
