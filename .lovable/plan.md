@@ -1,31 +1,45 @@
 ## Goal
-Make the Pulse compose sheet visually clean (no white native dropdown shadowing the form), make the Location button actually work, and persist the chosen location with the post so it shows in the feed.
+Make Pulse feel like a real community feed: people can reply to each other, the name they type actually shows on their post, and tapping a photo opens it full-size.
 
 ## What I'll change
 
-### 1. Replace the native `<select>` channel picker with a custom dropdown
-The white overlay in your screenshot is the browser's native `<select>` menu — it ignores our dark theme. I'll swap it for a styled button + popover list (same options: General, Hidden Spots, Island Hopping, Food & Nightlife, Surf Report, Events Tonight) using existing `--charcoal-surface` / `--glass-border` tokens so it matches the rest of Pulse.
+### 1. Display name fix
+Right now even when a user types a name in "Your name (optional)", the post still renders as "Anonymous traveler". Cause: `submitPulsePost()` is sending the typed name into the wrong field (or `is_anonymous` is being set to true whenever there's no logged-in user, which overrides the name in `renderPulseFeed`).
 
-### 2. Real Location picker (Location button)
-Replace the `alert(...)` stub with a small bottom-sheet picker that offers:
-- **Use my current location** — calls `navigator.geolocation`, reverse-matches to the nearest San Vicente destination (haversine against existing `destinations` array) and tags that name. Falls back to "Near San Vicente" if outside ~30km.
-- **Pick from list** — scrollable list of San Vicente locations sourced from the existing `destinations` array (Long Beach, Port Barton, Boayan Island, Alimanguan, Bigaho Falls, Poblacion, etc.) plus a "Clear" option.
+Fix in `public/site/app.js`:
+- Read the name input value, trim it.
+- Insert `display_name: name || null` and `is_anonymous: !name` into `pulse_posts`.
+- In `renderPulseFeed`, show `post.display_name` when present, else "Anonymous traveler".
+- Same logic for comments (below).
 
-Chosen value renders as a small chip under the textarea ("📍 Long Beach ✕") so the user sees what's attached and can clear it.
+### 2. Replies / comments (real conversation)
+Today users can only like — no way to reply. The `pulse_comments` table already exists with `post_id`, `text_content`, `display_name`, `user_id` and open RLS (anon insert/select allowed from the earlier migration).
 
-### 3. Persist location with the post
-`submitPulsePost()` already inserts into `pulse_posts`. I'll add `location_text: chosenLocation || null` to the insert payload (column already exists and is already read back in `renderPulseFeed`), so newly posted items show the location pin in the feed immediately.
+Add to each feed card in `public/site/index.html` + `app.js`:
+- A "💬 Reply" button next to the heart, showing the comment count.
+- Tapping it expands an inline thread under the post: list of existing comments (name + relative time + text) and a small composer (name optional + text + Send).
+- `loadPulseComments(postId)` → `select * from pulse_comments where post_id = ... order by created_at asc`.
+- `submitPulseComment(postId)` → insert `{ post_id, text_content, display_name, is_anonymous }`, then re-render that thread and bump the count.
+- Same 30s per-device rate-limit as posts, reusing `pulseDeviceId()`.
+- Realtime: subscribe once to `pulse_comments` inserts and append to the open thread so two browsers actually see each other live. (Posts feed already polls/refetches; I'll add a realtime subscription to `pulse_posts` too so new posts appear without reopening Pulse.)
 
-### 4. Small compose polish
-- Reset chosen location, image, name, and category back to defaults on close/submit.
-- Keep the existing 30s rate-limit and "open to everyone" copy.
-- Ensure `pulse-compose-sheet` z-index sits above the blurred Pulse panel (it already does at z=99; verify the new custom-dropdown popover uses z=100 so it doesn't hide behind anything).
+### 3. Image lightbox
+Tapping a post photo currently does nothing. Add a simple full-screen viewer:
+- New `#pulseLightbox` overlay in `index.html` (dark backdrop, centered `<img>`, close on tap / Esc).
+- In `renderPulseFeed`, wire `onclick="openPulseLightbox('<url>')"` on `<img>` thumbnails.
+- `openPulseLightbox(url)` / `closePulseLightbox()` in `app.js`.
+
+### 4. Small polish
+- Reset the name input on successful post submit so the next post doesn't accidentally inherit it.
+- Show comment count on each card even when the thread is collapsed (`{count} replies`).
+- Ensure the comment composer doesn't trigger the post composer's rate-limit (separate timestamp key).
 
 ## Scope / non-goals
-- No DB migration needed — `location_text` column exists.
-- No changes to map, auth, posts schema, or feed rendering logic beyond passing `location_text` on insert.
-- Photo upload already works and stays untouched.
+- No schema changes needed — `pulse_comments` already has the columns and open policies from the earlier migration.
+- No auth changes — Pulse stays fully open; name is optional.
+- No edit/delete on comments (out of scope for this pass).
+- Map, destinations, Tala, header, splash — untouched.
 
 ## Files touched
-- `public/site/index.html` — replace `<select>` with custom dropdown markup, add location picker sheet + chip, add minimal CSS for both.
-- `public/site/app.js` — custom dropdown open/close + state, location picker functions (`openPulseLocPicker`, `useCurrentLocation`, `pickPulseLocation`, `clearPulseLocation`), include `location_text` in the insert, reset state on close.
+- `public/site/app.js` — fix display_name on insert + render, add `loadPulseComments`, `submitPulseComment`, lightbox handlers, realtime subscriptions.
+- `public/site/index.html` — reply button + inline thread template, lightbox overlay, minimal CSS using existing dark tokens.

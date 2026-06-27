@@ -858,25 +858,100 @@ function pulseCardHtml(post){
           <div class="pulse-card-text">${escapeHtml(post.text)}</div>
           ${post.tag ? `<span class="pulse-card-tag">${escapeHtml(post.tag)}</span>` : ''}
           ${post.location ? `<div class="pulse-card-location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${escapeHtml(post.location)}</div>` : ''}
-          ${post.image ? `<img class="pulse-card-image" src="${post.image}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}
+          ${post.image ? `<img class="pulse-card-image" src="${post.image}" alt="" loading="lazy" style="cursor:zoom-in" onclick="openPulseLightbox('${encodeURI(post.image).replace(/'/g, "\\'")}')" onerror="this.style.display='none'">` : ''}
           ${post.avatars ? `<div class="pulse-card-avatars">${Array.from({length:Math.min(post.avatars,3)}).map((_,i)=>`<div class="pulse-avatar-more">+</div>`).join('')}${post.avatars>3?`<div class="pulse-avatar-more">+${post.avatars-3}</div>`:''}</div>` : ''}
           <div class="pulse-card-actions">
             <button class="pulse-action" onclick="togglePulseLike(this, ${post.id})">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
               <span>${post.likes}</span>
             </button>
-            <button class="pulse-action" onclick="alert('Comments coming soon.')">
+            <button class="pulse-action" onclick="togglePulseThread(${post.id})">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-              <span>${post.comments}</span>
+              <span id="pulseCommentCount-${post.id}">${post.comments}</span>
             </button>
             <button class="pulse-more-btn" onclick="alert('Report / hide options coming soon.')">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg>
             </button>
           </div>
+          <div class="pulse-thread" id="pulseThread-${post.id}" style="display:none;"></div>
         </div>
       </div>
     </div>`;
 }
+
+async function togglePulseThread(postId){
+  const wrap = document.getElementById('pulseThread-'+postId);
+  if(!wrap) return;
+  if(wrap.style.display !== 'none'){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  wrap.innerHTML = `<div class="pulse-thread-loading">Loading replies…</div>`;
+  await renderPulseThread(postId);
+}
+
+async function renderPulseThread(postId){
+  const wrap = document.getElementById('pulseThread-'+postId);
+  if(!wrap) return;
+  const { data: rows, error } = await sb.from('pulse_comments')
+    .select('id, display_name, text_content, created_at, is_anonymous, user_id')
+    .eq('post_id', postId)
+    .order('created_at', { ascending: true });
+  if(error){ wrap.innerHTML = `<div class="pulse-thread-loading">Could not load replies: ${escapeHtml(error.message)}</div>`; return; }
+  const savedName = pulseSavedName();
+  const list = (rows||[]).map(c => {
+    const name = c.display_name || 'Anonymous traveler';
+    return `<div class="pulse-comment"><div class="pulse-comment-head"><span class="pulse-comment-name">${escapeHtml(name)}</span><span class="pulse-comment-time">${escapeHtml(relTime(c.created_at))}</span></div><div class="pulse-comment-text">${escapeHtml(c.text_content||'')}</div></div>`;
+  }).join('');
+  wrap.innerHTML = `
+    <div class="pulse-comment-list">${list || '<div class="pulse-thread-empty">No replies yet. Be the first.</div>'}</div>
+    <div class="pulse-comment-composer">
+      <input type="text" id="pulseCommentName-${postId}" maxlength="40" placeholder="Your name (optional)" value="${escapeHtml(savedName)}" class="pulse-comment-input pulse-comment-name-input">
+      <div class="pulse-comment-row">
+        <input type="text" id="pulseCommentText-${postId}" maxlength="300" placeholder="Write a reply…" class="pulse-comment-input" onkeydown="if(event.key==='Enter'){submitPulseComment(${postId})}">
+        <button class="pulse-comment-send" onclick="submitPulseComment(${postId})">Send</button>
+      </div>
+    </div>`;
+}
+
+let pulseLastCommentAt = 0;
+async function submitPulseComment(postId){
+  const txtEl = document.getElementById('pulseCommentText-'+postId);
+  const nameEl = document.getElementById('pulseCommentName-'+postId);
+  if(!txtEl) return;
+  const text = (txtEl.value||'').trim();
+  if(!text) return;
+  const now = Date.now();
+  if(now - pulseLastCommentAt < 15000){ alert('Please wait a few seconds before replying again.'); return; }
+  const name = ((nameEl && nameEl.value) || '').trim().slice(0,40) || null;
+  if(name) pulseSaveName(name);
+  txtEl.disabled = true;
+  const { error } = await sb.from('pulse_comments').insert({
+    post_id: postId,
+    user_id: currentUser ? currentUser.id : null,
+    display_name: name,
+    text_content: text.slice(0,300),
+  });
+  txtEl.disabled = false;
+  if(error){ alert('Could not reply: '+error.message); return; }
+  pulseLastCommentAt = now;
+  txtEl.value = '';
+  // bump count
+  const cntEl = document.getElementById('pulseCommentCount-'+postId);
+  if(cntEl) cntEl.textContent = (parseInt(cntEl.textContent,10)||0) + 1;
+  await renderPulseThread(postId);
+}
+
+function openPulseLightbox(url){
+  const box = document.getElementById('pulseLightbox');
+  const img = document.getElementById('pulseLightboxImg');
+  if(!box || !img) return;
+  img.src = url;
+  box.classList.add('open');
+}
+function closePulseLightbox(){
+  const box = document.getElementById('pulseLightbox');
+  if(box){ box.classList.remove('open'); const img = document.getElementById('pulseLightboxImg'); if(img) img.src=''; }
+}
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closePulseLightbox(); });
 
 // Set of post IDs the current user has liked — refreshed on each feed load
 let pulseLikedSet = new Set();
@@ -929,7 +1004,7 @@ async function renderPulseFeed(){
   body.innerHTML = `<div class="pulse-empty">Loading…</div>`;
 
   let query = sb.from('pulse_posts')
-    .select('id, user_id, category, text_content, image_url, location_text, tag, is_anonymous, admin_post, created_at, pulse_likes(count), pulse_comments(count)')
+    .select('id, user_id, category, text_content, image_url, location_text, tag, display_name, is_anonymous, admin_post, created_at, pulse_likes(count), pulse_comments(count)')
     .order('created_at', { ascending: false })
     .limit(100);
   if(pulseCategory !== 'all') query = query.eq('category', pulseCategory);
