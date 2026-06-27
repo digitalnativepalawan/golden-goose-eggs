@@ -300,6 +300,75 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 .around-empty{text-align:center;color:var(--white-dim);font-size:.78rem;padding:40px 20px}
 
 /* ═══════════════════════════════════
+   PULSE — community layer
+   ═══════════════════════════════════ */
+.pulse-panel{position:fixed;inset:0;z-index:80;background:var(--charcoal-deep);transform:translateY(100%);transition:transform .5s var(--ease-out-expo);display:flex;flex-direction:column;overflow:hidden}
+.pulse-panel.open{transform:translateY(0)}
+.pulse-head{flex-shrink:0;padding:calc(var(--safe-top) + 14px) 18px 0}
+.pulse-head-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:2px}
+.pulse-title-block{display:flex;flex-direction:column}
+.pulse-title{font-family:var(--font-display);font-size:1.7rem;font-weight:400;color:var(--white-soft);display:flex;align-items:center;gap:8px}
+.pulse-title .live-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px rgba(34,197,94,.6);animation:pulseDot 2s ease-in-out infinite}
+@keyframes pulseDot{0%,100%{opacity:1}50%{opacity:.4}}
+.pulse-subtitle{font-size:.74rem;color:var(--white-dim);margin-top:2px}
+.pulse-head-actions{display:flex;gap:8px}
+.pulse-icon-btn{width:38px;height:38px;border-radius:50%;border:1px solid var(--glass-border);background:rgba(255,255,255,.04);color:var(--white-muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.pulse-icon-btn svg{width:17px;height:17px}
+.pulse-back-btn{display:flex;align-items:center;gap:4px;color:var(--white-dim);font-size:.72rem;background:none;border:none;cursor:pointer;padding:0;margin-bottom:10px}
+.pulse-back-btn svg{width:14px;height:14px}
+
+.pulse-categories{display:flex;gap:16px;overflow-x:auto;padding:16px 18px 4px;scrollbar-width:none}
+.pulse-categories::-webkit-scrollbar{display:none}
+.pulse-cat{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:none;cursor:pointer;color:var(--white-muted);width:62px}
+.pulse-cat-icon{width:54px;height:54px;border-radius:50%;border:1.5px solid var(--glass-border);display:flex;align-items:center;justify-content:center;transition:all .25s;position:relative}
+.pulse-cat-icon svg{width:22px;height:22px;color:var(--white-muted);transition:color .25s}
+.pulse-cat.active .pulse-cat-icon{border-color:rgba(20,184,166,.5);box-shadow:0 0 16px rgba(20,184,166,.25)}
+.pulse-cat.active .pulse-cat-icon svg{color:var(--ocean-teal-light)}
+.pulse-cat.active span{color:var(--white-soft)}
+.pulse-cat span{font-size:.66rem;text-align:center;line-height:1.2}
+
+.pulse-tabs{display:flex;gap:20px;padding:14px 18px 0;border-bottom:1px solid var(--glass-border);flex-shrink:0}
+.pulse-tab{background:none;border:none;color:var(--white-dim);font-size:.78rem;padding:0 0 12px;cursor:pointer;position:relative}
+.pulse-tab.active{color:var(--white-soft)}
+.pulse-tab.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--ocean-teal-light);border-radius:2px}
+.pulse-tab.disabled{opacity:.4;cursor:default}
+
+.pulse-body{flex:1;overflow-y:auto;padding:14px 18px 100px}
+.pulse-body::-webkit-scrollbar{width:3px}
+
+.pulse-card{background:rgba(255,255,255,.045);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:14px;margin-bottom:12px;animation:pulseCardIn .4s var(--ease-out-expo)}
+@keyframes pulseCardIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.pulse-card-top{display:flex;align-items:flex-start;gap:10px}
+.pulse-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0;position:relative}
+.pulse-avatar-wrap{position:relative;flex-shrink:0}
+.pulse-avatar-wrap .online-dot{position:absolute;bottom:-1px;right:-1px;width:9px;height:9px;border-radius:50%;background:#22c55e;border:2px solid var(--charcoal-deep)}
+.pulse-avatar-icon{width:38px;height:38px;border-radius:50%;background:rgba(20,184,166,.16);color:var(--ocean-teal-light);display:flex;align-items:center;justify-content:center;font-size:.6rem;text-align:center;line-height:1.1;font-weight:500;flex-shrink:0}
+.pulse-card-meta{flex:1;min-width:0}
+.pulse-card-name-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pulse-card-name{font-size:.84rem;font-weight:500;color:var(--white-soft)}
+.pulse-card-time{font-size:.68rem;color:var(--white-dim)}
+.pulse-admin-badge{font-size:.6rem;padding:1px 7px;border-radius:8px;background:rgba(20,184,166,.16);color:#5eead4}
+.pulse-card-text{font-size:.82rem;color:var(--white-soft);line-height:1.45;margin-top:5px}
+.pulse-card-location{display:flex;align-items:center;gap:4px;font-size:.68rem;color:var(--white-dim);margin-top:6px}
+.pulse-card-location svg{width:11px;height:11px;flex-shrink:0}
+.pulse-card-tag{display:inline-block;font-size:.66rem;padding:2px 9px;border-radius:8px;background:rgba(20,184,166,.12);color:#5eead4;margin-top:6px}
+.pulse-card-image{width:100%;height:140px;object-fit:cover;border-radius:14px;margin-top:10px}
+.pulse-card-avatars{display:flex;align-items:center;margin-top:8px}
+.pulse-card-avatars img,.pulse-card-avatars .pulse-avatar-more{width:26px;height:26px;border-radius:50%;border:2px solid var(--charcoal-surface);margin-left:-8px;object-fit:cover}
+.pulse-card-avatars img:first-child,.pulse-card-avatars .pulse-avatar-more:first-child{margin-left:0}
+.pulse-avatar-more{background:rgba(255,255,255,.1);color:var(--white-muted);font-size:.6rem;display:flex;align-items:center;justify-content:center}
+.pulse-card-actions{display:flex;align-items:center;gap:16px;margin-top:10px}
+.pulse-action{display:flex;align-items:center;gap:5px;color:var(--white-dim);font-size:.74rem;background:none;border:none;cursor:pointer;padding:0}
+.pulse-action svg{width:16px;height:16px}
+.pulse-action.liked{color:var(--ocean-teal-light)}
+.pulse-more-btn{margin-left:auto;color:var(--white-dim);background:none;border:none;cursor:pointer;padding:4px}
+
+.pulse-fab{position:fixed;bottom:calc(86px + var(--safe-bottom));right:20px;z-index:81;width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,var(--ocean-teal),var(--ocean-teal-light));border:none;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(20,184,166,.35);cursor:pointer}
+.pulse-fab svg{width:22px;height:22px}
+
+.pulse-empty{text-align:center;color:var(--white-dim);font-size:.78rem;padding:50px 20px}
+
+/* ═══════════════════════════════════
    DESKTOP
    ═══════════════════════════════════ */
 @media(min-width:768px){
@@ -318,6 +387,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
   .map-barangay-toggle{top:114px;right:24px}
   .discover-panel{left:24px;right:auto;bottom:88px;width:390px}
   .around-sheet{width:400px;right:24px;left:auto;bottom:24px;border-radius:var(--radius-xl);max-height:75vh}
+  .pulse-fab{bottom:32px;right:32px}
+  .pulse-body{max-width:560px;margin:0 auto;width:100%}
+  .pulse-categories{max-width:560px;margin:0 auto;width:100%}
+  .pulse-tabs{max-width:560px;margin:0 auto;width:100%}
   .around-handle{display:none}
 }
 
@@ -465,6 +538,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
     <span>Tala</span>
   </button>
+  <button class="dock-item" onclick="dockNav('pulse')" data-tab="pulse">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 12 7 12 10 19 14 5 17 12 22 12"/></svg>
+    <span>Pulse</span>
+  </button>
   <button class="dock-item" onclick="dockNav('saved')" data-tab="saved">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
     <span>Saved</span>
@@ -579,6 +656,66 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
     <button class="around-cat" onclick="selectAroundCategory('service')" data-cat="service">Services</button>
   </div>
   <div class="around-list" id="aroundList"></div>
+</div>
+
+<!-- ═══ PULSE ═══ -->
+<div class="pulse-panel" id="pulsePanel">
+  <div class="pulse-head">
+    <div class="pulse-head-row">
+      <div class="pulse-title-block">
+        <div class="pulse-title" id="pulseTitle">Pulse <span class="live-dot"></span></div>
+        <div class="pulse-subtitle" id="pulseSubtitle">Live community in San Vicente</div>
+      </div>
+      <div class="pulse-head-actions">
+        <button class="pulse-icon-btn" onclick="alert('Search coming soon.')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
+        <button class="pulse-icon-btn" onclick="openPulseCompose()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="pulse-categories" id="pulseCategories">
+      <button class="pulse-cat active" data-cat="all" onclick="selectPulseCategory('all')">
+        <div class="pulse-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 12 7 12 10 19 14 5 17 12 22 12"/></svg></div>
+        <span>All</span>
+      </button>
+      <button class="pulse-cat" data-cat="hidden" onclick="selectPulseCategory('hidden')">
+        <div class="pulse-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+        <span>Hidden Spots</span>
+      </button>
+      <button class="pulse-cat" data-cat="island" onclick="selectPulseCategory('island')">
+        <div class="pulse-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18s2-2 5-2 4 2 7 2 5-2 5-2"/><path d="M4 14 12 3l4 4-3 3"/><path d="M12 10 5 14"/></svg></div>
+        <span>Island Hopping</span>
+      </button>
+      <button class="pulse-cat" data-cat="food" onclick="selectPulseCategory('food')">
+        <div class="pulse-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v7a4 4 0 0 0 8 0V2"/><line x1="12" y1="13" x2="12" y2="22"/><path d="M5 2v4"/><path d="M19 2v20"/></svg></div>
+        <span>Food &amp; Nightlife</span>
+      </button>
+      <button class="pulse-cat" data-cat="surf" onclick="selectPulseCategory('surf')">
+        <div class="pulse-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 16s2-3 5-3 4 2 6 2 4-3 9-1"/><path d="M2 21c2-1 4-1 6 0s4 1 6 0 4-1 8 0"/><path d="M14 3 5 13"/></svg></div>
+        <span>Surf Report</span>
+      </button>
+      <button class="pulse-cat" data-cat="events" onclick="selectPulseCategory('events')">
+        <div class="pulse-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M12 14.5l1 1.5h2l-1.5 1.3.5 1.7-1.8-1-1.8 1 .5-1.7L9.4 16h2z"/></svg></div>
+        <span>Events Tonight</span>
+      </button>
+    </div>
+
+    <div class="pulse-tabs" id="pulseTabs">
+      <button class="pulse-tab active" data-tab="feed" onclick="selectPulseTab('feed')">Live Feed</button>
+      <button class="pulse-tab disabled" onclick="alert('Channels are coming soon.')">Channels</button>
+      <button class="pulse-tab disabled" onclick="alert('Nearby is coming soon.')">Nearby</button>
+      <button class="pulse-tab disabled" onclick="alert('Rooms are coming soon.')">Rooms</button>
+    </div>
+  </div>
+
+  <div class="pulse-body" id="pulseBody"></div>
+
+  <button class="pulse-fab" onclick="openPulseCompose()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
 </div>
 
 <!-- ═══ ADMIN ═══ -->

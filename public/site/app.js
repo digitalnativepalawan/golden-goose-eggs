@@ -320,6 +320,7 @@ function closeAllPanels() {
   closeDestSheet(false);
   closeTalaSheet(false);
   closeAroundMePanel();
+  closePulsePanel();
 }
 
 // ─── DESTINATION SHEET ───
@@ -421,6 +422,137 @@ function renderAroundList(){
       </div>
       <div class="around-card-dist">${escapeHtml(p.dist)}</div>
     </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+// PULSE — live community layer (UI/mock-data phase).
+// Posts below are realistic placeholder content matching the
+// approved design mockups. No real posting/accounts yet — that's
+// a deliberate follow-up phase once user identity exists. The
+// "Create Post" button and category/tab structure are wired up
+// so the real data layer can slot in later without changing the
+// UI shell.
+// ═══════════════════════════════════════════════════════
+
+const PULSE_CATEGORIES = {
+  all:    { label: 'Pulse',          subtitle: 'Live community in San Vicente' },
+  hidden: { label: 'Hidden Spots',   subtitle: 'Secret places, shared by locals.' },
+  island: { label: 'Island Hopping', subtitle: 'Plan. Connect. Explore together.' },
+  food:   { label: 'Food & Nightlife', subtitle: 'Where to eat, drink, and dance tonight.' },
+  surf:   { label: 'Surf Report',    subtitle: 'Conditions, sessions, and swells.' },
+  events: { label: 'Events Tonight', subtitle: "What's happening around San Vicente." }
+};
+
+const PULSE_POSTS = [
+  { id:1, cat:'food', name:'Alex', time:'3m ago', text:'Fresh tuna arrived at the market!', location:'Poblacion Public Market', image:'https://images.unsplash.com/photo-1544943910-4c1dc44aab44?w=600&q=70', likes:12, comments:5 },
+  { id:2, cat:'hidden', name:'Sophie', time:'8m ago', text:'Crystal clear water today at Bigaho Falls 💧', location:'Bigaho Falls', image:'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?w=600&q=70', likes:18, comments:7 },
+  { id:3, cat:'island', name:'Jon', time:'12m ago', text:'Looking for 2 more people to share a private boat tomorrow.', tag:'Island Hopping', avatars:3, likes:6, comments:3 },
+  { id:4, cat:'all', name:'Local Guide – Jun', time:'15m ago', admin:true, text:'If you\'re heading to Port Barton, bring cash. ATM offline.', location:'Port Barton', likes:9, comments:2 },
+  { id:5, cat:'all', name:'Maya', time:'18m ago', text:'Best sunset right now at Long Beach 🌅 Come and join!', location:'Long Beach', image:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=70', likes:24, comments:11 },
+  { id:6, cat:'surf', name:'Diego', time:'24m ago', text:'Clean 2-3ft sets at Alimanguan this morning, light offshore wind. Good for beginners right now.', location:'Alimanguan Beach', likes:15, comments:4 },
+  { id:7, cat:'events', name:'Beach Bar Co.', time:'35m ago', admin:true, text:'Live acoustic set tonight from 7pm, free entry. Come early for sunset seats.', location:'Long Beach', likes:21, comments:6 },
+  { id:8, cat:'food', name:'Pia', time:'41m ago', text:'Night market has the best halo-halo right now, ube version is back 🍧', location:'Poblacion Night Market', likes:14, comments:3 },
+  { id:9, cat:'hidden', name:'Marco', time:'52m ago', text:'Found a quiet tide pool past the rocks at Bato ni Ningning, perfect for sunset photos and almost nobody there.', location:'Bato ni Ningning', likes:19, comments:8 },
+  { id:10, cat:'island', name:'Tara', time:'1h ago', text:'Anyone heading to Port Barton this weekend? Let\'s share a ride and explore together!', location:'Port Barton', image:'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=600&q=70', likes:8, comments:6 },
+  { id:11, cat:'all', name:'Carlos', time:'1h ago', text:'Lost a small black drone near Long Beach this afternoon. If found please message — happy to reward!', location:'Long Beach', likes:5, comments:9 },
+  { id:12, cat:'surf', name:'Diego', time:'2h ago', text:'Tide is dropping fast, current picking up past the point. Be careful past 5pm today.', location:'Alimanguan Beach', likes:11, comments:1 }
+];
+
+let pulseCategory = 'all';
+let pulseTab = 'feed';
+
+function openPulsePanel(){
+  document.getElementById('pulsePanel').classList.add('open');
+  renderPulseFeed();
+}
+
+function closePulsePanel(){
+  const panel = document.getElementById('pulsePanel');
+  if(panel) panel.classList.remove('open');
+}
+
+function selectPulseCategory(cat){
+  pulseCategory = cat;
+  document.querySelectorAll('.pulse-cat').forEach(b=>b.classList.toggle('active', b.dataset.cat===cat));
+  const meta = PULSE_CATEGORIES[cat] || PULSE_CATEGORIES.all;
+  document.getElementById('pulseTitle').innerHTML = `${meta.label} <span class="live-dot"></span>`;
+  document.getElementById('pulseSubtitle').textContent = meta.subtitle;
+  renderPulseFeed();
+}
+
+function selectPulseTab(tab){
+  pulseTab = tab;
+  document.querySelectorAll('.pulse-tab').forEach(b=>{
+    if(!b.classList.contains('disabled')) b.classList.toggle('active', b.dataset.tab===tab);
+  });
+  renderPulseFeed();
+}
+
+function pulseCardHtml(post){
+  const avatarHtml = post.admin
+    ? `<div class="pulse-avatar-icon">Local<br>Guide</div>`
+    : `<div class="pulse-avatar-wrap"><div class="pulse-avatar-icon" style="background:rgba(255,255,255,.08);color:var(--white-muted);">${escapeHtml(post.name.slice(0,2).toUpperCase())}</div><span class="online-dot"></span></div>`;
+
+  return `
+    <div class="pulse-card">
+      <div class="pulse-card-top">
+        ${avatarHtml}
+        <div class="pulse-card-meta">
+          <div class="pulse-card-name-row">
+            <span class="pulse-card-name">${escapeHtml(post.name)}</span>
+            <span class="pulse-card-time">${escapeHtml(post.time)}</span>
+            ${post.admin ? '<span class="pulse-admin-badge">Admin</span>' : ''}
+          </div>
+          <div class="pulse-card-text">${escapeHtml(post.text)}</div>
+          ${post.tag ? `<span class="pulse-card-tag">${escapeHtml(post.tag)}</span>` : ''}
+          ${post.location ? `<div class="pulse-card-location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${escapeHtml(post.location)}</div>` : ''}
+          ${post.image ? `<img class="pulse-card-image" src="${post.image}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}
+          ${post.avatars ? `<div class="pulse-card-avatars">${Array.from({length:Math.min(post.avatars,3)}).map((_,i)=>`<div class="pulse-avatar-more">+</div>`).join('')}${post.avatars>3?`<div class="pulse-avatar-more">+${post.avatars-3}</div>`:''}</div>` : ''}
+          <div class="pulse-card-actions">
+            <button class="pulse-action" onclick="togglePulseLike(this, ${post.id})">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              <span>${post.likes}</span>
+            </button>
+            <button class="pulse-action" onclick="alert('Comments coming soon.')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+              <span>${post.comments}</span>
+            </button>
+            <button class="pulse-more-btn" onclick="alert('Report / hide options coming soon.')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function togglePulseLike(btn, postId){
+  const post = PULSE_POSTS.find(p=>p.id===postId);
+  if(!post) return;
+  const liked = btn.classList.toggle('liked');
+  post.likes += liked ? 1 : -1;
+  btn.querySelector('span').textContent = post.likes;
+}
+
+function renderPulseFeed(){
+  const body = document.getElementById('pulseBody');
+  if(!body) return;
+
+  if(pulseTab !== 'feed'){
+    body.innerHTML = `<div class="pulse-empty">This view is coming soon.</div>`;
+    return;
+  }
+
+  const posts = pulseCategory === 'all' ? PULSE_POSTS : PULSE_POSTS.filter(p=>p.cat===pulseCategory);
+  if(!posts.length){
+    body.innerHTML = `<div class="pulse-empty">No posts yet in this category. Be the first to share something!</div>`;
+    return;
+  }
+  body.innerHTML = posts.map(pulseCardHtml).join('');
+}
+
+function openPulseCompose(){
+  alert('Posting will be available once visitor accounts are set up. For now, Pulse shows sample community activity.');
 }
 
 function getYoutubeId(url){
@@ -810,9 +942,10 @@ function dockNav(tab){
 
   switch(tab){
     case 'map': closeAllPanels(); closeDiscoverPanel(); document.getElementById('heroOverlay').classList.remove('hidden'); document.getElementById('heroFade').classList.remove('hidden'); if(map){ pinVisibilityOverride=false; activeMarkerSet=allMarkers; map.flyTo([10.50,119.22],11,{duration:1}); applyPinVisibility(); } break;
-    case 'discover': openDiscoverPanel(); if(map){filterCategory('all');} break;
-    case 'tala': closeDiscoverPanel(); closeDestSheet(false); openTalaSheet(); break;
-    case 'saved': closeDiscoverPanel(); closeDestSheet(false); openTalaSheet(); addMsg('bot','Your saved San Vicente places will appear here. Tap markers like Long Beach, Port Barton, or Boayan Island, then ask tala to help plan the route.'); break;
+    case 'discover': closePulsePanel(); openDiscoverPanel(); if(map){filterCategory('all');} break;
+    case 'tala': closeDiscoverPanel(); closeDestSheet(false); closePulsePanel(); openTalaSheet(); break;
+    case 'pulse': closeDiscoverPanel(); closeDestSheet(false); closeTalaSheet(false); openPulsePanel(); break;
+    case 'saved': closeDiscoverPanel(); closeDestSheet(false); closePulsePanel(); openTalaSheet(); addMsg('bot','Your saved San Vicente places will appear here. Tap markers like Long Beach, Port Barton, or Boayan Island, then ask tala to help plan the route.'); break;
   }
 }
 
