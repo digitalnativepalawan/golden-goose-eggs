@@ -201,8 +201,9 @@ async function signInWithProvider(provider){
   statusEl.textContent = `Opening ${provider} sign-in...`;
   statusEl.style.color = 'var(--white-dim)';
   try {
-    // Redirect to top-level URL so OAuth callback lands on the parent page, not the iframe
-    const redirectTo = (window.top && window.top.location && window.top.location.href) || window.location.href;
+    // Use the iframe's own URL — accessing window.top across origins (e.g. in the Lovable editor) throws
+    let redirectTo = window.location.href;
+    try { if (window.top && window.top !== window.self) redirectTo = window.top.location.href; } catch(_) {}
     const { error } = await sb.auth.signInWithOAuth({
       provider,
       options: { redirectTo }
