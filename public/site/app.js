@@ -797,11 +797,20 @@ let pulseCategory = 'all';
 let pulseTab = 'feed';
 
 function openPulsePanel(){
-  requireAuth(()=>{
-    document.getElementById('pulsePanel').classList.add('open');
-    renderPulseFeed();
-  });
+  document.getElementById('pulsePanel').classList.add('open');
+  renderPulseFeed();
 }
+
+// Stable per-browser ID used to attribute likes & rate-limit posting (no auth).
+function pulseDeviceId(){
+  try{
+    let id = localStorage.getItem('pulse_device_id');
+    if(!id){ id = 'd_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('pulse_device_id', id); }
+    return id;
+  }catch(_){ return 'd_anon'; }
+}
+function pulseSavedName(){ try{ return localStorage.getItem('pulse_display_name') || ''; }catch(_){ return ''; } }
+function pulseSaveName(n){ try{ if(n) localStorage.setItem('pulse_display_name', n); }catch(_){ } }
 
 function closePulsePanel(){
   const panel = document.getElementById('pulsePanel');
