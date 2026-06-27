@@ -1077,7 +1077,7 @@ async function renderPulseFeed(){
   const profileById = new Map();
   const authorIds = Array.from(new Set((rows||[]).filter(r=>!r.is_anonymous && r.user_id).map(r=>r.user_id)));
   if(authorIds.length){
-    const { data: profs } = await sb.from('traveler_profiles').select('id, display_name, avatar_url').in('id', authorIds);
+    const { data: profs } = await sb.rpc('get_public_profiles', { _ids: authorIds });
     if(profs) profs.forEach(p => profileById.set(p.id, p));
   }
 

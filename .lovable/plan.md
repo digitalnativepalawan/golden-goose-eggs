@@ -1,73 +1,46 @@
-## Objective
-Add a **Light Street** map option to the existing Map/Satellite toggle without breaking the current interface or code. Boundary lines, labels, tooltips, and floating UI must remain readable and visually uniform regardless of which base tile layer is active.
+# Security hardening — real findings only
 
-## Current State
-- **Street mode**: CartoDB `dark_all` tiles (dark background)
-- **Satellite mode**: Esri imagery + Esri label overlay (dark background)
-- **Barangay boundaries**: light sand (`#e8dcc8`) dashed lines at 55% opacity
-- **Tooltips/attribution**: dark glass (`var(--glass-bg-heavy)`) with light text
-- **Markers**: highly saturated colored dots with glow/shadow — readable on both light and dark
-- **Floating UI** (sheets, dock, hero, bottom nav): self-contained dark-glass panels that do not depend on tile color for contrast
+The scanner found 31 items. After triage against how your app actually uses the database, **6 are real "anyone on the internet can vandalize your app" bugs**. The rest are either by-design (open Pulse) or stylistic warnings. This plan fixes only the real ones, with zero app-behavior changes for normal users.
 
-## Proposed Implementation
+## What gets fixed
 
-### 1. Third Tile Layer
-Add CartoDB `light_all` as the "Light" base layer:
-```js
-const light = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', ...)
-```
-This is the exact same provider as the current dark street layer, so attribution, maxZoom, and reliability are identical.
+### 1. `destinations` table — anyone can wipe or rewrite the map
+Currently any anonymous visitor can DELETE every San Vicente location or change names/coords. **Fix:** keep public read, restrict INSERT/UPDATE/DELETE to admin role only (via existing `has_role`-style check). Your site only reads this table from `app.js`, so nothing breaks.
 
-### 2. Three-Button Toggle
-Change the layer toggle from a 2-button Map/Satellite switch to a 3-pill group:
-- **Light** (new)
-- **Dark** (renamed from "Map"; same existing `dark_all` tiles)
-- **Satellite** (existing)
+### 2. `tala_responses`, `tala_settings`, `tala_suggestions` — anyone can poison the chatbot
+Same pattern: public can rewrite Tala's answers and prompts. **Fix:** public read stays, writes locked to admin.
 
-The `.map-layer-toggle` container already uses a pill layout with `gap:4px` and `border-radius:9999px`, so a third button fits without layout changes.
+### 3. `pulse_categories` — anyone can delete/rename channels
+Channels (Tips, Sightings, etc.) can be wiped by any visitor. **Fix:** public read, admin-only writes.
 
-### 3. Dynamic Overlay Styling via Scoped CSS Class
-When the user selects **Light**, apply a `.map-light` class to the `#map` container (or `<body>`). All map-native overlay styles then have scoped alternates:
+### 4. Storage buckets `destination-images` + `destination-videos` — anyone can upload or delete files
+Right now a script can fill your storage quota or replace destination photos with anything. **Fix:** keep public READ (so images still load on the map), restrict INSERT/UPDATE/DELETE to admin.
 
-| Element | Dark Mode (default) | Light Mode (`.map-light` scoped) |
-|---------|----------------------|-----------------------------------|
-| Barangay boundary stroke | `#e8dcc8`, opacity 0.55 | `var(--charcoal)`, opacity 0.45 |
-| Barangay boundary fill | `#e8dcc8`, opacity 0.04 | `var(--charcoal)`, opacity 0.03 |
-| Barangay tooltip | dark glass, light text | dark glass, light text **+ stronger shadow** (no text inversion needed; dark tooltips pop fine on light tiles) |
-| Leaflet attribution | dark glass, light text | light tinted background (`rgba(255,255,255,0.85)`), dark text (`var(--charcoal)`), dark link color |
-| Marker glow / ring | unchanged — saturated colors with radial glow work on any background | unchanged |
+### 5. `traveler_profiles.moderation_note` is publicly readable
+Internal staff notes (ban/mute reasons) leak to anyone who queries the table. **Fix:** create a public-safe view `traveler_profiles_public` that excludes `moderation_note` and `is_banned`/`is_muted` flags; restrict the base table's SELECT to the owner + admins. Update `app.js` reads of profiles to use the view.
 
-**Why not a full app light theme?**
-The floating UI (bottom sheets, dock, hero search, Pulse panels) are all dark-glass overlays. Their readability is driven by their own opaque/blurred backgrounds, not the map tiles beneath them. Changing them to light would require rewriting ~80% of the CSS and break the established brand identity. We only adjust elements that sit *directly on the map tiles* (boundaries, attribution, tooltips).
+### 6. Admin role infrastructure (prerequisite for 1–5)
+Add the standard `app_role` enum + `user_roles` table + `has_role()` SECURITY DEFINER function (per Lovable's user-roles pattern). Without this there's no way to express "admin only" in policies. No UI for granting admin yet — first admin gets seeded by user_id via a one-off migration statement you approve.
 
-### 4. Barangay Boundary Line Update
-The boundary layer is created once in `initBarangayLayer()` with a static `L.geoJSON` style object. To make it reactive to map mode changes, convert the style to a **function** that reads a CSS custom property or a global JS flag:
+## What I'm deliberately NOT changing
 
-```js
-style: (feature) => ({
-  color: isLightMode() ? '#06122a' : '#e8dcc8',
-  weight: 1.5,
-  opacity: isLightMode() ? 0.45 : 0.55,
-  fillColor: isLightMode() ? '#06122a' : '#e8dcc8',
-  fillOpacity: isLightMode() ? 0.03 : 0.04,
-  dashArray: '4,4'
-})
-```
+- **Pulse open-write policies** (posts/comments/likes "anyone can insert") — you explicitly chose this design after the magic-link spam fiasco. The scanner flags them as warns; they stay.
+- **`anyone can delete any like`** — same Pulse design tradeoff; revisit only if you want device-id enforcement later.
+- **SECURITY DEFINER function warnings** — these are your `admin_*` RPCs. They're guarded by being admin-only callable after step 6 (we'll REVOKE EXECUTE from anon/authenticated and GRANT only to admins).
+- **`.env` "leak"** — already explained: that's the publishable key, designed to be public.
+- **localStorage / token validation / rate limiting** — non-issues or platform-level, not changing.
 
-Then call `barangayLayer.setStyle(...)` inside `switchMapLayer()` whenever the mode changes. This is a standard Leaflet API call and is non-breaking.
+## Technical details
 
-### 5. Non-Breaking Code Changes
-- `switchMapLayer(type, btn)` gains a third branch for `light` that adds/removes the `light` tile layer and sets `window._mView = 'light'`.
-- `initMap()` initializes the `light` tile layer alongside `street` and `sat`, but does not add it to the map.
-- No changes to marker rendering, Pulse, Tala, dashboard, auth, or data loading.
-- No database migrations.
+One migration containing, in order:
+1. `CREATE TYPE app_role AS ENUM ('admin','moderator','user')`
+2. `CREATE TABLE user_roles (user_id, role)` + GRANTs + RLS + `has_role()` SECURITY DEFINER
+3. DROP + recreate write policies on `destinations`, `tala_responses`, `tala_settings`, `tala_suggestions`, `pulse_categories` → `USING (has_role(auth.uid(),'admin'))`
+4. DROP + recreate `storage.objects` policies for the two buckets, same admin gate on write
+5. `CREATE VIEW traveler_profiles_public` excluding moderation columns; tighten base-table SELECT
+6. REVOKE EXECUTE on `admin_*` functions from anon/authenticated; GRANT to a custom admin role
+7. Optional seed line (commented, you fill in your user_id) to make yourself the first admin
 
-## Acceptance Criteria
-1. Tapping the new **Light** button switches the base tiles to a light street map.
-2. Tapping **Dark** returns to the current dark CartoDB street map.
-3. Tapping **Satellite** works exactly as before.
-4. Barangay boundary lines remain visible and readable on all three modes.
-5. Barangay tooltips remain readable on all three modes.
-6. Leaflet attribution text is readable on all three modes.
-7. All existing UI (sheets, dock, markers, Pulse, search) continues to function identically.
-8. No layout shifts, no broken event handlers, no console errors.
+After migration, single small edit in `public/site/app.js` to swap any direct `traveler_profiles` reads to `traveler_profiles_public`.
+
+No frontend behavior changes for end users. Admin actions (which currently have no UI anyway) will require being logged in as an admin — we can build that UI later if you want.
