@@ -1008,29 +1008,32 @@ function updatePulseComposeState(){
   postBtn.disabled = !text && !pulseComposeImageDataUrl;
 }
 
-function submitPulsePost(){
+async function submitPulsePost(){
   const text = document.getElementById('pulseComposeText').value.trim();
   if(!text && !pulseComposeImageDataUrl) return;
+  if(!currentUser){ openLoginModal(); return; }
 
   const cat = document.getElementById('pulseComposeCategory').value;
   const anon = document.getElementById('pulseComposeAnon').checked;
+  const postBtn = document.getElementById('pulseComposePostBtn');
+  postBtn.disabled = true;
 
-  const newPost = {
-    id: pulseNextPostId++,
-    cat: cat,
-    name: anon ? 'Anonymous' : 'You',
-    avatar: anon ? null : null, // no device-camera selfie yet; falls back to initials
-    time: 'Just now',
-    text: text || '',
-    image: pulseComposeImageDataUrl || null,
-    likes: 0,
-    comments: 0
-  };
+  const { error } = await sb.from('pulse_posts').insert({
+    user_id: currentUser.id,
+    category: cat || 'all',
+    text_content: text || null,
+    image_url: pulseComposeImageDataUrl || null, // TODO: upload to Storage in a follow-up
+    is_anonymous: !!anon,
+  });
 
-  PULSE_POSTS.unshift(newPost);
+  postBtn.disabled = false;
+
+  if(error){
+    alert('Could not post: ' + error.message);
+    return;
+  }
+
   closePulseCompose();
-
-  // Jump to a view where the new post is actually visible: All category, Live Feed tab.
   pulseCategory = 'all';
   pulseTab = 'feed';
   document.querySelectorAll('.pulse-cat').forEach(b=>b.classList.toggle('active', b.dataset.cat==='all'));
@@ -1038,7 +1041,7 @@ function submitPulsePost(){
   document.getElementById('pulseTitle').innerHTML = `${PULSE_CATEGORIES.all.label} <span class="live-dot"></span>`;
   document.getElementById('pulseSubtitle').textContent = PULSE_CATEGORIES.all.subtitle;
 
-  renderPulseFeed();
+  await renderPulseFeed();
   document.getElementById('pulseBody').scrollTo({top:0, behavior:'smooth'});
 }
 
