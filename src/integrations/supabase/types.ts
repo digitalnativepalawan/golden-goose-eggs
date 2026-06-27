@@ -80,8 +80,179 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string | null
+          id: number
+          read: boolean | null
+          related_post_id: number | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string | null
+          id?: never
+          read?: boolean | null
+          related_post_id?: number | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string | null
+          id?: never
+          read?: boolean | null
+          related_post_id?: number | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_related_post_id_fkey"
+            columns: ["related_post_id"]
+            isOneToOne: false
+            referencedRelation: "pulse_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pulse_comments: {
+        Row: {
+          created_at: string | null
+          id: number
+          post_id: number
+          text_content: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: never
+          post_id: number
+          text_content: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: never
+          post_id?: number
+          text_content?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pulse_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "pulse_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pulse_likes: {
+        Row: {
+          created_at: string | null
+          id: number
+          post_id: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: never
+          post_id: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: never
+          post_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pulse_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "pulse_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pulse_posts: {
+        Row: {
+          admin_post: boolean | null
+          category: string
+          created_at: string | null
+          id: number
+          image_url: string | null
+          is_anonymous: boolean | null
+          location_text: string | null
+          tag: string | null
+          text_content: string | null
+          user_id: string | null
+        }
+        Insert: {
+          admin_post?: boolean | null
+          category?: string
+          created_at?: string | null
+          id?: never
+          image_url?: string | null
+          is_anonymous?: boolean | null
+          location_text?: string | null
+          tag?: string | null
+          text_content?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          admin_post?: boolean | null
+          category?: string
+          created_at?: string | null
+          id?: never
+          image_url?: string | null
+          is_anonymous?: boolean | null
+          location_text?: string | null
+          tag?: string | null
+          text_content?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      saved_places: {
+        Row: {
+          created_at: string | null
+          destination_id: number | null
+          id: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          destination_id?: number | null
+          id?: never
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          destination_id?: number | null
+          id?: never
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_places_destination_id_fkey"
+            columns: ["destination_id"]
+            isOneToOne: false
+            referencedRelation: "destinations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tala_responses: {
         Row: {
+          category: string | null
           created_at: string | null
           id: number
           keywords: string[]
@@ -90,6 +261,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          category?: string | null
           created_at?: string | null
           id?: never
           keywords: string[]
@@ -98,6 +270,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          category?: string | null
           created_at?: string | null
           id?: never
           keywords?: string[]
@@ -122,6 +295,114 @@ export type Database = {
           key?: string
           updated_at?: string | null
           value?: string
+        }
+        Relationships: []
+      }
+      tala_suggestions: {
+        Row: {
+          active_from_day: number | null
+          active_from_month: number | null
+          active_to_day: number | null
+          active_to_month: number | null
+          created_at: string | null
+          id: number
+          sort_order: number | null
+          text: string
+          updated_at: string | null
+        }
+        Insert: {
+          active_from_day?: number | null
+          active_from_month?: number | null
+          active_to_day?: number | null
+          active_to_month?: number | null
+          created_at?: string | null
+          id?: never
+          sort_order?: number | null
+          text: string
+          updated_at?: string | null
+        }
+        Update: {
+          active_from_day?: number | null
+          active_from_month?: number | null
+          active_to_day?: number | null
+          active_to_month?: number | null
+          created_at?: string | null
+          id?: never
+          sort_order?: number | null
+          text?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      traveler_profiles: {
+        Row: {
+          avatar_url: string | null
+          badges: string[] | null
+          bio: string | null
+          country: string | null
+          created_at: string | null
+          display_name: string | null
+          favorite_categories: string[] | null
+          id: string
+          language: string | null
+          last_seen: string | null
+          reputation: number | null
+          updated_at: string | null
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          badges?: string[] | null
+          bio?: string | null
+          country?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          favorite_categories?: string[] | null
+          id: string
+          language?: string | null
+          last_seen?: string | null
+          reputation?: number | null
+          updated_at?: string | null
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          badges?: string[] | null
+          bio?: string | null
+          country?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          favorite_categories?: string[] | null
+          id?: string
+          language?: string | null
+          last_seen?: string | null
+          reputation?: number | null
+          updated_at?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          email_notifications: boolean | null
+          push_notifications: boolean | null
+          theme: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          email_notifications?: boolean | null
+          push_notifications?: boolean | null
+          theme?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          email_notifications?: boolean | null
+          push_notifications?: boolean | null
+          theme?: string | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
