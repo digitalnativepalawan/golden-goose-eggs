@@ -561,6 +561,7 @@ async function initMap() {
   map = L.map('map',{center:[10.50,119.22],zoom:11,zoomControl:false,attributionControl:true,fadeAnimation:true,zoomAnimation:true});
 
   const street = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OSM &copy; CARTO',maxZoom:19,subdomains:'abcd'});
+  const light = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OSM &copy; CARTO',maxZoom:19,subdomains:'abcd'});
   const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'&copy; Esri',maxZoom:19});
   // Place-name labels (countries/provinces/municipalities/cities) drawn on top
   // of the satellite imagery, since raw aerial photography has no text on it.
@@ -569,7 +570,7 @@ async function initMap() {
   const satLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,errorTileUrl:''});
 
   street.addTo(map);
-  window._mS=street; window._mSat=sat; window._mSatLabels=satLabels; window._mView='street';
+  window._mS=street; window._mLight=light; window._mSat=sat; window._mSatLabels=satLabels; window._mView='street';
 
   L.control.zoom({position:'bottomright'}).addTo(map);
   document.getElementById('mapLayerToggle').classList.add('visible');
@@ -626,22 +627,49 @@ function toggleBarangayLayer(){
   }
 }
 
+function getBarangayStyle(){
+  const isLight = window._mView === 'light';
+  return {
+    color: isLight ? '#06122a' : '#e8dcc8',
+    weight: 1.5,
+    opacity: isLight ? 0.45 : 0.55,
+    fillColor: isLight ? '#06122a' : '#e8dcc8',
+    fillOpacity: isLight ? 0.03 : 0.04,
+    dashArray: '4,4'
+  };
+}
+
+function updateBarangayStyle(){
+  if(!barangayLayer) return;
+  barangayLayer.setStyle(getBarangayStyle());
+}
+
 function switchMapLayer(type,btn){
   if(!mapReady) return;
   document.querySelectorAll('.mlt-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  if(type==='satellite'&&window._mView!=='satellite'){
-    map.removeLayer(window._mS);
-    window._mSat.addTo(map);
-    window._mSatLabels.addTo(map);
-    window._mView='satellite';
-  }
-  else if(type==='street'&&window._mView!=='street'){
+
+  const was = window._mView;
+  if(was === type) return;
+
+  if(was === 'street') map.removeLayer(window._mS);
+  else if(was === 'light') map.removeLayer(window._mLight);
+  else if(was === 'satellite'){
     map.removeLayer(window._mSat);
     map.removeLayer(window._mSatLabels);
-    window._mS.addTo(map);
-    window._mView='street';
   }
+
+  if(type === 'street') window._mS.addTo(map);
+  else if(type === 'light') window._mLight.addTo(map);
+  else if(type === 'satellite'){
+    window._mSat.addTo(map);
+    window._mSatLabels.addTo(map);
+  }
+
+  window._mView = type;
+  if(type === 'light') document.body.classList.add('map-light');
+  else document.body.classList.remove('map-light');
+  updateBarangayStyle();
   map.invalidateSize({animate:false});
 }
 

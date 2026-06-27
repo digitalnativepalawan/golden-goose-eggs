@@ -113,6 +113,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 .barangay-tooltip::before{display:none}
 .mlt-icon{font-size:.82rem}
 
+/* Light map mode overlay adjustments */
+.map-light .barangay-tooltip{box-shadow:0 6px 24px rgba(0,0,0,.45)!important}
+.map-light .leaflet-control-attribution{background:rgba(255,255,255,.85)!important;color:var(--charcoal)!important}
+.map-light .leaflet-control-attribution a{color:var(--ocean-teal)!important}
+
 /* ═══════════════════════════════════
    BOTTOM DOCK NAV (4 items)
    ═══════════════════════════════════ */
@@ -629,7 +634,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 
 <!-- ═══ LAYER TOGGLE ═══ -->
 <div class="map-layer-toggle" id="mapLayerToggle">
-  <button class="mlt-btn active" onclick="switchMapLayer('street',this)"><span class="mlt-icon">◧</span> Map</button>
+  <button class="mlt-btn" onclick="switchMapLayer('light',this)"><span class="mlt-icon">☼</span> Light</button>
+  <button class="mlt-btn active" onclick="switchMapLayer('street',this)"><span class="mlt-icon">◧</span> Dark</button>
   <button class="mlt-btn" onclick="switchMapLayer('satellite',this)"><span class="mlt-icon">◉</span> Satellite</button>
 </div>
 <button class="map-barangay-toggle" id="barangayToggle" onclick="toggleBarangayLayer()">⬡ Barangays</button>
