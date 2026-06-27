@@ -919,6 +919,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
   </div>
 </div>
 
+<!-- ═══ PULSE IMAGE LIGHTBOX ═══ -->
+<div class="pulse-lightbox" id="pulseLightbox" onclick="closePulseLightbox()">
+  <button class="pulse-lightbox-close" type="button" aria-label="Close" onclick="event.stopPropagation();closePulseLightbox()">×</button>
+  <img id="pulseLightboxImg" src="" alt="" onclick="event.stopPropagation()">
+</div>
+
 <!-- ═══ PULSE LOCATION PICKER ═══ -->
 <div class="pulse-loc-overlay" id="pulseLocOverlay" onclick="closePulseLocPicker()"></div>
 <div class="pulse-loc-sheet" id="pulseLocSheet">
