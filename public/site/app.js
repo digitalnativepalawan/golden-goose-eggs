@@ -444,18 +444,19 @@ const PULSE_CATEGORIES = {
 };
 
 const PULSE_POSTS = [
-  { id:1, cat:'food', name:'Alex', time:'3m ago', text:'Fresh tuna arrived at the market!', location:'Poblacion Public Market', image:'https://images.unsplash.com/photo-1544943910-4c1dc44aab44?w=600&q=70', likes:12, comments:5 },
-  { id:2, cat:'hidden', name:'Sophie', time:'8m ago', text:'Crystal clear water today at Bigaho Falls 💧', location:'Bigaho Falls', image:'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?w=600&q=70', likes:18, comments:7 },
-  { id:3, cat:'island', name:'Jon', time:'12m ago', text:'Looking for 2 more people to share a private boat tomorrow.', tag:'Island Hopping', avatars:3, likes:6, comments:3 },
+  { id:1, cat:'food', name:'Alex', avatar:'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=100&h=100&fit=crop&q=70', time:'3m ago', text:'Fresh tuna arrived at the market!', location:'Poblacion Public Market', image:'assets/pulse/street-food-skewers.jpg', likes:12, comments:5 },
+  { id:2, cat:'hidden', name:'Sophie', avatar:'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&q=70', time:'8m ago', text:'Crystal clear water today at Bigaho Falls 💧', location:'Bigaho Falls', image:'assets/pulse/kayak-lagoon.jpg', likes:18, comments:7 },
+  { id:3, cat:'island', name:'Jon', avatar:'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&q=70', time:'12m ago', text:'Looking for 2 more people to share a private boat tomorrow.', tag:'Island Hopping', avatars:3, likes:6, comments:3 },
   { id:4, cat:'all', name:'Local Guide – Jun', time:'15m ago', admin:true, text:'If you\'re heading to Port Barton, bring cash. ATM offline.', location:'Port Barton', likes:9, comments:2 },
-  { id:5, cat:'all', name:'Maya', time:'18m ago', text:'Best sunset right now at Long Beach 🌅 Come and join!', location:'Long Beach', image:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=70', likes:24, comments:11 },
-  { id:6, cat:'surf', name:'Diego', time:'24m ago', text:'Clean 2-3ft sets at Alimanguan this morning, light offshore wind. Good for beginners right now.', location:'Alimanguan Beach', likes:15, comments:4 },
+  { id:5, cat:'all', name:'Maya', avatar:'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop&q=70', time:'18m ago', text:'Best sunset right now at Long Beach 🌅 Come and join!', location:'Long Beach', image:'assets/pulse/island-boats-beach.jpg', likes:24, comments:11 },
+  { id:6, cat:'surf', name:'Diego', avatar:'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop&q=70', time:'24m ago', text:'Clean 2-3ft sets at Alimanguan this morning, light offshore wind. Good for beginners right now.', location:'Alimanguan Beach', likes:15, comments:4 },
   { id:7, cat:'events', name:'Beach Bar Co.', time:'35m ago', admin:true, text:'Live acoustic set tonight from 7pm, free entry. Come early for sunset seats.', location:'Long Beach', likes:21, comments:6 },
-  { id:8, cat:'food', name:'Pia', time:'41m ago', text:'Night market has the best halo-halo right now, ube version is back 🍧', location:'Poblacion Night Market', likes:14, comments:3 },
-  { id:9, cat:'hidden', name:'Marco', time:'52m ago', text:'Found a quiet tide pool past the rocks at Bato ni Ningning, perfect for sunset photos and almost nobody there.', location:'Bato ni Ningning', likes:19, comments:8 },
-  { id:10, cat:'island', name:'Tara', time:'1h ago', text:'Anyone heading to Port Barton this weekend? Let\'s share a ride and explore together!', location:'Port Barton', image:'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=600&q=70', likes:8, comments:6 },
-  { id:11, cat:'all', name:'Carlos', time:'1h ago', text:'Lost a small black drone near Long Beach this afternoon. If found please message — happy to reward!', location:'Long Beach', likes:5, comments:9 },
-  { id:12, cat:'surf', name:'Diego', time:'2h ago', text:'Tide is dropping fast, current picking up past the point. Be careful past 5pm today.', location:'Alimanguan Beach', likes:11, comments:1 }
+  { id:8, cat:'food', name:'Pia', avatar:'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&q=70', time:'41m ago', text:'Night market has the best halo-halo right now, ube version is back 🍧', location:'Poblacion Night Market', image:'assets/pulse/bulalo-boodle.jpg', likes:14, comments:3 },
+  { id:9, cat:'hidden', name:'Marco', avatar:'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&q=70', time:'52m ago', text:'Found a quiet tide pool past the rocks at Bato ni Ningning, perfect for sunset photos and almost nobody there.', location:'Bato ni Ningning', likes:19, comments:8 },
+  { id:10, cat:'island', name:'Tara', avatar:'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop&q=70', time:'1h ago', text:'Anyone heading to Port Barton this weekend? Let\'s share a ride and explore together!', location:'Port Barton', image:'assets/pulse/island-boats-aerial.jpg', likes:8, comments:6 },
+  { id:11, cat:'all', name:'Carlos', avatar:'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=100&h=100&fit=crop&q=70', time:'1h ago', text:'Lost a small black drone near Long Beach this afternoon. If found please message — happy to reward!', location:'Long Beach', likes:5, comments:9 },
+  { id:12, cat:'surf', name:'Diego', avatar:'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop&q=70', time:'2h ago', text:'Tide is dropping fast, current picking up past the point. Be careful past 5pm today.', location:'Alimanguan Beach', likes:11, comments:1 },
+  { id:13, cat:'food', name:'Reyna', avatar:'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop&q=70', time:'3h ago', text:'Boodle fight with the whole barangay tonight! Bring your appetite, everyone\'s welcome 🐟', location:'Poblacion', image:'assets/pulse/boodle-fight-fish.jpg', likes:27, comments:9 }
 ];
 
 let pulseCategory = 'all';
@@ -469,6 +470,7 @@ function openPulsePanel(){
 function closePulsePanel(){
   const panel = document.getElementById('pulsePanel');
   if(panel) panel.classList.remove('open');
+  closePulseCompose();
 }
 
 function selectPulseCategory(cat){
@@ -489,9 +491,14 @@ function selectPulseTab(tab){
 }
 
 function pulseCardHtml(post){
-  const avatarHtml = post.admin
-    ? `<div class="pulse-avatar-icon">Local<br>Guide</div>`
-    : `<div class="pulse-avatar-wrap"><div class="pulse-avatar-icon" style="background:rgba(255,255,255,.08);color:var(--white-muted);">${escapeHtml(post.name.slice(0,2).toUpperCase())}</div><span class="online-dot"></span></div>`;
+  let avatarHtml;
+  if(post.admin){
+    avatarHtml = `<div class="pulse-avatar-icon">Local<br>Guide</div>`;
+  } else if(post.avatar){
+    avatarHtml = `<div class="pulse-avatar-wrap"><img class="pulse-avatar" src="${post.avatar}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<div class=&quot;pulse-avatar-icon&quot; style=&quot;background:rgba(255,255,255,.08);color:var(--white-muted);&quot;>${escapeHtml(post.name.slice(0,2).toUpperCase())}</div>'"><span class="online-dot"></span></div>`;
+  } else {
+    avatarHtml = `<div class="pulse-avatar-wrap"><div class="pulse-avatar-icon" style="background:rgba(255,255,255,.08);color:var(--white-muted);">${escapeHtml(post.name.slice(0,2).toUpperCase())}</div><span class="online-dot"></span></div>`;
+  }
 
   return `
     <div class="pulse-card">
@@ -551,8 +558,87 @@ function renderPulseFeed(){
   body.innerHTML = posts.map(pulseCardHtml).join('');
 }
 
+let pulseComposeImageDataUrl = null;
+let pulseNextPostId = 1000; // mock IDs for session-local posts, won't collide with seeded 1-12
+
 function openPulseCompose(){
-  alert('Posting will be available once visitor accounts are set up. For now, Pulse shows sample community activity.');
+  document.getElementById('pulseComposeText').value = '';
+  document.getElementById('pulseComposeCategory').value = pulseCategory !== 'all' ? pulseCategory : 'all';
+  document.getElementById('pulseComposeAnon').checked = false;
+  removePulseComposeImage();
+  updatePulseComposeState();
+  document.getElementById('pulseComposeOverlay').classList.add('active');
+  document.getElementById('pulseComposeSheet').classList.add('open');
+}
+
+function closePulseCompose(){
+  document.getElementById('pulseComposeOverlay').classList.remove('active');
+  document.getElementById('pulseComposeSheet').classList.remove('open');
+}
+
+function handlePulseComposeImage(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){
+    alert('Please choose an image file.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    pulseComposeImageDataUrl = e.target.result;
+    document.getElementById('pulseComposeImagePreview').src = pulseComposeImageDataUrl;
+    document.getElementById('pulseComposeImagePreviewWrap').style.display = '';
+    updatePulseComposeState();
+  };
+  reader.readAsDataURL(file);
+}
+
+function removePulseComposeImage(){
+  pulseComposeImageDataUrl = null;
+  document.getElementById('pulseComposeImagePreview').src = '';
+  document.getElementById('pulseComposeImagePreviewWrap').style.display = 'none';
+  document.getElementById('pulseComposeFileInput').value = '';
+  updatePulseComposeState();
+}
+
+function updatePulseComposeState(){
+  const text = document.getElementById('pulseComposeText').value.trim();
+  const postBtn = document.getElementById('pulseComposePostBtn');
+  postBtn.disabled = !text && !pulseComposeImageDataUrl;
+}
+
+function submitPulsePost(){
+  const text = document.getElementById('pulseComposeText').value.trim();
+  if(!text && !pulseComposeImageDataUrl) return;
+
+  const cat = document.getElementById('pulseComposeCategory').value;
+  const anon = document.getElementById('pulseComposeAnon').checked;
+
+  const newPost = {
+    id: pulseNextPostId++,
+    cat: cat,
+    name: anon ? 'Anonymous' : 'You',
+    avatar: anon ? null : null, // no device-camera selfie yet; falls back to initials
+    time: 'Just now',
+    text: text || '',
+    image: pulseComposeImageDataUrl || null,
+    likes: 0,
+    comments: 0
+  };
+
+  PULSE_POSTS.unshift(newPost);
+  closePulseCompose();
+
+  // Jump to a view where the new post is actually visible: All category, Live Feed tab.
+  pulseCategory = 'all';
+  pulseTab = 'feed';
+  document.querySelectorAll('.pulse-cat').forEach(b=>b.classList.toggle('active', b.dataset.cat==='all'));
+  document.querySelectorAll('.pulse-tab').forEach(b=>{ if(!b.classList.contains('disabled')) b.classList.toggle('active', b.dataset.tab==='feed'); });
+  document.getElementById('pulseTitle').innerHTML = `${PULSE_CATEGORIES.all.label} <span class="live-dot"></span>`;
+  document.getElementById('pulseSubtitle').textContent = PULSE_CATEGORIES.all.subtitle;
+
+  renderPulseFeed();
+  document.getElementById('pulseBody').scrollTo({top:0, behavior:'smooth'});
 }
 
 function getYoutubeId(url){
