@@ -948,11 +948,11 @@ async function renderPulseFeed(){
     if(profs) profs.forEach(p => profileById.set(p.id, p));
   }
 
-  // Load the current user's likes so the heart state is correct
+  // Load this device's likes so the heart state is correct
   pulseLikedSet = new Set();
-  if(currentUser && rows && rows.length){
+  if(rows && rows.length){
     const ids = rows.map(r=>r.id);
-    const { data: likes } = await sb.from('pulse_likes').select('post_id').eq('user_id', currentUser.id).in('post_id', ids);
+    const { data: likes } = await sb.from('pulse_likes').select('post_id').eq('device_id', pulseDeviceId()).in('post_id', ids);
     if(likes) likes.forEach(l => pulseLikedSet.add(l.post_id));
   }
 
