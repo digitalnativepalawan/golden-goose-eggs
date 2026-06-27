@@ -995,15 +995,14 @@ let pulseComposeImageDataUrl = null;
 let pulseNextPostId = 1000; // mock IDs for session-local posts, won't collide with seeded 1-12
 
 function openPulseCompose(){
-  requireAuth(()=>{
-    document.getElementById('pulseComposeText').value = '';
-    document.getElementById('pulseComposeCategory').value = pulseCategory !== 'all' ? pulseCategory : 'all';
-    document.getElementById('pulseComposeAnon').checked = false;
-    removePulseComposeImage();
-    updatePulseComposeState();
-    document.getElementById('pulseComposeOverlay').classList.add('active');
-    document.getElementById('pulseComposeSheet').classList.add('open');
-  });
+  document.getElementById('pulseComposeText').value = '';
+  document.getElementById('pulseComposeCategory').value = pulseCategory !== 'all' ? pulseCategory : 'all';
+  const nameEl = document.getElementById('pulseComposeName');
+  if(nameEl) nameEl.value = pulseSavedName();
+  removePulseComposeImage();
+  updatePulseComposeState();
+  document.getElementById('pulseComposeOverlay').classList.add('active');
+  document.getElementById('pulseComposeSheet').classList.add('open');
 }
 
 function closePulseCompose(){
