@@ -796,7 +796,7 @@ function renderAroundList(){
 // UI shell.
 // ═══════════════════════════════════════════════════════
 
-const PULSE_CATEGORIES = {
+let PULSE_CATEGORIES = {
   all:    { label: 'Pulse',          subtitle: 'Live community in San Vicente' },
   hidden: { label: 'Hidden Spots',   subtitle: 'Secret places, shared by locals.' },
   island: { label: 'Island Hopping', subtitle: 'Plan. Connect. Explore together.' },
@@ -804,6 +804,22 @@ const PULSE_CATEGORIES = {
   surf:   { label: 'Surf Report',    subtitle: 'Conditions, sessions, and swells.' },
   events: { label: 'Events Tonight', subtitle: "What's happening around San Vicente." }
 };
+
+// Loads admin-edited category labels from Supabase, overlaying them
+// onto the hardcoded defaults above (subtitles + icons stay as
+// designed; only the label text is admin-editable for now).
+async function loadPulseCategoriesFromDB(){
+  try {
+    const { data: cats, error } = await sb.from('pulse_categories').select('key, label');
+    if(error) throw error;
+    (cats||[]).forEach(c=>{
+      if(PULSE_CATEGORIES[c.key]) PULSE_CATEGORIES[c.key].label = c.label;
+      else PULSE_CATEGORIES[c.key] = { label: c.label, subtitle: '' };
+    });
+  } catch(err){
+    console.warn('[SANVIC] Could not load pulse categories from DB, using defaults:', err);
+  }
+}
 
 const PULSE_POSTS = [
   { id:1, cat:'food', name:'Alex', avatar:'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=100&h=100&fit=crop&q=70', time:'3m ago', text:'Fresh tuna arrived at the market!', location:'Poblacion Public Market', image:'assets/pulse/street-food-skewers.jpg', likes:12, comments:5 },
@@ -826,7 +842,20 @@ let pulseTab = 'feed';
 
 function openPulsePanel(){
   document.getElementById('pulsePanel').classList.add('open');
+  loadPulseCategoriesFromDB().then(applyPulseCategoryLabelsToChips);
   renderPulseFeed();
+}
+
+// Updates the visible label under each category icon to match
+// whatever's currently in PULSE_CATEGORIES (which may have been
+// overlaid with admin-edited labels from the DB).
+function applyPulseCategoryLabelsToChips(){
+  document.querySelectorAll('.pulse-cat').forEach(btn=>{
+    const key = btn.dataset.cat;
+    const meta = PULSE_CATEGORIES[key];
+    const span = btn.querySelector('span');
+    if(meta && span) span.textContent = meta.label;
+  });
 }
 
 // Stable per-browser ID used to attribute likes & rate-limit posting (no auth).
@@ -1790,10 +1819,12 @@ function switchAdminTab(tab){
   adminTab = tab;
   document.getElementById('adminTabDest').classList.toggle('active', tab==='dest');
   document.getElementById('adminTabTala').classList.toggle('active', tab==='tala');
+  document.getElementById('adminTabPulse').classList.toggle('active', tab==='pulse');
   adminEditingDestId = null;
   adminEditingTalaId = null;
   if(tab==='dest') renderAdminDest();
-  else renderAdminTala();
+  else if(tab==='tala') renderAdminTala();
+  else renderAdminPulse();
 }
 
 function escapeHtml(s){
@@ -2512,5 +2543,273 @@ async function adminResetDefaults(){
     alert('Reset complete.');
   } catch(err){
     alert('Reset failed: ' + (err.message || err));
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// PULSE ADMIN — moderate posts/comments, mute/ban users,
+// manage category chips. Uses security-definer RPC functions
+// (admin_delete_pulse_post etc.) to bypass per-user RLS, since
+// this admin panel is PIN-gated, not Supabase-Auth-gated — same
+// trust model as the rest of this admin panel.
+// ═══════════════════════════════════════════════════════
+let pulseAdminSubTab = 'posts';
+let pulseAdminEditingPostId = null;
+
+function renderAdminPulse(){
+  const body = document.getElementById('adminBody');
+  body.innerHTML = `
+    <div class="admin-tala-filters">
+      <button class="admin-cat-tab ${pulseAdminSubTab==='posts'?'active':''}" onclick="adminPulseSetSubTab('posts')">Posts</button>
+      <button class="admin-cat-tab ${pulseAdminSubTab==='categories'?'active':''}" onclick="adminPulseSetSubTab('categories')">Categories</button>
+      <button class="admin-cat-tab ${pulseAdminSubTab==='users'?'active':''}" onclick="adminPulseSetSubTab('users')">Users</button>
+    </div>
+    <div id="adminPulseBody"><div class="admin-empty">Loading…</div></div>`;
+
+  if(pulseAdminSubTab === 'posts') renderAdminPulsePosts();
+  else if(pulseAdminSubTab === 'categories') renderAdminPulseCategories();
+  else renderAdminPulseUsers();
+}
+
+function adminPulseSetSubTab(tab){
+  pulseAdminSubTab = tab;
+  pulseAdminEditingPostId = null;
+  renderAdminPulse();
+}
+
+// ───────────── POSTS (edit / delete any post or comment) ─────────────
+
+async function renderAdminPulsePosts(){
+  const body = document.getElementById('adminPulseBody');
+  try {
+    const { data: posts, error } = await sb.from('pulse_posts')
+      .select('id, user_id, category, text_content, image_url, location_text, display_name, is_anonymous, admin_post, created_at, pulse_comments(count)')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if(error) throw error;
+
+    if(!posts || !posts.length){
+      body.innerHTML = `<div class="admin-empty">No Pulse posts yet.</div>`;
+      return;
+    }
+
+    body.innerHTML = posts.map(p=>{
+      const isEditing = pulseAdminEditingPostId === p.id;
+      const commentCount = (p.pulse_comments && p.pulse_comments[0] && p.pulse_comments[0].count) || 0;
+      const authorLabel = p.is_anonymous ? 'Anonymous' : (p.display_name || 'Traveler');
+      return `
+      <div class="admin-list-item">
+        <div class="admin-list-item-head">
+          <div style="flex:1;">
+            <div class="admin-tala-badges">
+              <span class="admin-cat-pill knowledge">${escapeHtml(p.category||'all')}</span>
+              ${p.admin_post ? '<span class="admin-cat-pill personality">Admin post</span>' : ''}
+              <span class="admin-len-pill">${commentCount} comment${commentCount===1?'':'s'}</span>
+            </div>
+            <strong>${escapeHtml(authorLabel)}</strong> · <span style="color:var(--white-dim);font-size:.7rem;">${new Date(p.created_at).toLocaleString()}</span>
+            ${isEditing ? `
+              <div class="admin-field" style="margin-top:8px;"><textarea id="adminPulsePostText-${p.id}" rows="3">${escapeHtml(p.text_content||'')}</textarea></div>
+              <div class="admin-field"><label>Category</label><input id="adminPulsePostCat-${p.id}" value="${escapeHtml(p.category||'')}"></div>
+              <div class="admin-edit-actions">
+                <button class="admin-save-btn" onclick="adminPulseSavePost(${p.id})">Save</button>
+                <button class="admin-cancel-btn" onclick="pulseAdminEditingPostId=null;renderAdminPulsePosts();">Cancel</button>
+              </div>
+            ` : `<div style="margin-top:6px;font-size:.82rem;color:var(--white-soft);">${escapeHtml(p.text_content||'(no text)')}</div>`}
+            ${p.image_url ? `<img src="${p.image_url}" style="max-width:120px;border-radius:8px;margin-top:8px;display:block;" onerror="this.style.display='none'">` : ''}
+          </div>
+          ${!isEditing ? `
+          <div class="admin-row-actions">
+            <button class="admin-mini-btn" onclick="pulseAdminEditingPostId=${p.id};renderAdminPulsePosts();">Edit</button>
+            <button class="admin-mini-btn danger" onclick="adminPulseDeletePost(${p.id})">Delete</button>
+          </div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(err){
+    body.innerHTML = `<div class="admin-empty">Could not load posts: ${escapeHtml(err.message||String(err))}</div>`;
+  }
+}
+
+async function adminPulseSavePost(postId){
+  const text = document.getElementById(`adminPulsePostText-${postId}`).value.trim();
+  const cat = document.getElementById(`adminPulsePostCat-${postId}`).value.trim();
+  try {
+    const { error } = await sb.rpc('admin_update_pulse_post', { post_id: postId, new_text: text, new_category: cat });
+    if(error) throw error;
+    pulseAdminEditingPostId = null;
+    renderAdminPulsePosts();
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+async function adminPulseDeletePost(postId){
+  if(!confirm('Delete this post and all its comments/likes? This cannot be undone.')) return;
+  try {
+    const { error } = await sb.rpc('admin_delete_pulse_post', { post_id: postId });
+    if(error) throw error;
+    renderAdminPulsePosts();
+  } catch(err){
+    alert('Delete failed: ' + (err.message || err));
+  }
+}
+
+// ───────────── CATEGORIES ─────────────
+
+let pulseAdminEditingCatId = null;
+
+async function renderAdminPulseCategories(){
+  const body = document.getElementById('adminPulseBody');
+  try {
+    const { data: cats, error } = await sb.from('pulse_categories').select('*').order('sort_order');
+    if(error) throw error;
+
+    let html = `<button class="admin-add-btn" onclick="pulseAdminEditingCatId='new';renderAdminPulseCategories();">+ Add category</button>`;
+
+    if(pulseAdminEditingCatId !== null){
+      const isNew = pulseAdminEditingCatId === 'new';
+      const c = isNew ? {key:'',label:'',sort_order:(cats||[]).length} : cats.find(x=>x.id===pulseAdminEditingCatId);
+      if(c){
+        html += `
+        <div class="admin-edit-box">
+          <div class="admin-field"><label>Key (used in code, lowercase, no spaces)</label><input id="catfKey" value="${escapeHtml(c.key)}" ${isNew?'':'disabled'}></div>
+          <div class="admin-field"><label>Label (shown to users)</label><input id="catfLabel" value="${escapeHtml(c.label)}"></div>
+          <div class="admin-edit-actions">
+            <button class="admin-save-btn" onclick="adminPulseSaveCategory(${isNew?"'new'":c.id})">${isNew?'Create':'Save changes'}</button>
+            <button class="admin-cancel-btn" onclick="pulseAdminEditingCatId=null;renderAdminPulseCategories();">Cancel</button>
+          </div>
+        </div>`;
+      }
+    }
+
+    html += (cats||[]).map(c=>`
+      <div class="admin-list-item">
+        <div class="admin-list-item-head">
+          <div style="flex:1;">
+            <strong>${escapeHtml(c.label)}</strong> <span style="color:var(--white-dim);font-size:.7rem;">(${escapeHtml(c.key)})</span>
+          </div>
+          <div class="admin-row-actions">
+            <button class="admin-mini-btn" onclick="pulseAdminEditingCatId=${c.id};renderAdminPulseCategories();">Edit</button>
+            ${c.key!=='all' ? `<button class="admin-mini-btn danger" onclick="adminPulseDeleteCategory(${c.id})">Delete</button>` : ''}
+          </div>
+        </div>
+      </div>`).join('');
+
+    body.innerHTML = html;
+  } catch(err){
+    body.innerHTML = `<div class="admin-empty">Could not load categories: ${escapeHtml(err.message||String(err))}</div>`;
+  }
+}
+
+async function adminPulseSaveCategory(id){
+  const key = document.getElementById('catfKey').value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
+  const label = document.getElementById('catfLabel').value.trim();
+  if(!key || !label){ alert('Key and label are both required.'); return; }
+  try {
+    if(id === 'new'){
+      const { error } = await sb.from('pulse_categories').insert({ key, label, sort_order: 999 });
+      if(error) throw error;
+    } else {
+      const { error } = await sb.from('pulse_categories').update({ label }).eq('id', id);
+      if(error) throw error;
+    }
+    pulseAdminEditingCatId = null;
+    renderAdminPulseCategories();
+    refreshPulseCategoryChips();
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+async function adminPulseDeleteCategory(id){
+  if(!confirm('Delete this category? Existing posts tagged with it will keep their tag, but it will no longer appear as a filter chip.')) return;
+  try {
+    const { error } = await sb.from('pulse_categories').delete().eq('id', id);
+    if(error) throw error;
+    renderAdminPulseCategories();
+    refreshPulseCategoryChips();
+  } catch(err){
+    alert('Delete failed: ' + (err.message || err));
+  }
+}
+
+// Called from admin after saving/deleting a category, so any open
+// Pulse panel picks up the new label immediately.
+async function refreshPulseCategoryChips(){
+  await loadPulseCategoriesFromDB();
+  applyPulseCategoryLabelsToChips();
+}
+
+// ───────────── USERS (mute / ban) ─────────────
+
+async function renderAdminPulseUsers(){
+  const body = document.getElementById('adminPulseBody');
+  body.innerHTML = `
+    <input class="admin-tala-search" id="pulseUserSearch" placeholder="Search by name or email..." oninput="adminPulseSearchUsers(this.value)">
+    <div id="pulseUserResults"><div class="admin-empty">Type a name to search for a traveler.</div></div>`;
+}
+
+let pulseUserSearchTimer = null;
+function adminPulseSearchUsers(q){
+  clearTimeout(pulseUserSearchTimer);
+  pulseUserSearchTimer = setTimeout(()=>doAdminPulseSearchUsers(q), 300);
+}
+
+async function doAdminPulseSearchUsers(q){
+  const results = document.getElementById('pulseUserResults');
+  q = q.trim();
+  if(!q){ results.innerHTML = `<div class="admin-empty">Type a name to search for a traveler.</div>`; return; }
+  try {
+    const { data: users, error } = await sb.from('traveler_profiles')
+      .select('id, display_name, is_muted, is_banned, moderation_note')
+      .ilike('display_name', `%${q}%`)
+      .limit(20);
+    if(error) throw error;
+
+    if(!users || !users.length){
+      results.innerHTML = `<div class="admin-empty">No travelers found matching "${escapeHtml(q)}".</div>`;
+      return;
+    }
+
+    results.innerHTML = users.map(u=>`
+      <div class="admin-list-item">
+        <div class="admin-list-item-head">
+          <div style="flex:1;">
+            <strong>${escapeHtml(u.display_name||'(no name)')}</strong>
+            <div class="admin-tala-badges" style="margin-top:4px;">
+              ${u.is_muted ? '<span class="admin-cat-pill personality">Muted</span>' : ''}
+              ${u.is_banned ? '<span class="admin-cat-pill personality" style="background:rgba(239,68,68,.16);color:#fca5a5;">Banned</span>' : ''}
+              ${!u.is_muted && !u.is_banned ? '<span class="admin-cat-pill knowledge">Active</span>' : ''}
+            </div>
+          </div>
+          <div class="admin-row-actions">
+            <button class="admin-mini-btn" onclick="adminPulseToggleMute('${u.id}', ${!u.is_muted})">${u.is_muted?'Unmute':'Mute'}</button>
+            <button class="admin-mini-btn danger" onclick="adminPulseToggleBan('${u.id}', ${!u.is_banned})">${u.is_banned?'Unban':'Ban'}</button>
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(err){
+    results.innerHTML = `<div class="admin-empty">Search failed: ${escapeHtml(err.message||String(err))}</div>`;
+  }
+}
+
+async function adminPulseToggleMute(userId, muted){
+  try {
+    const { error } = await sb.rpc('admin_set_user_moderation', { target_user_id: userId, muted, banned: false, note: null });
+    if(error) throw error;
+    doAdminPulseSearchUsers(document.getElementById('pulseUserSearch').value);
+  } catch(err){
+    alert('Action failed: ' + (err.message || err));
+  }
+}
+
+async function adminPulseToggleBan(userId, banned){
+  if(banned && !confirm('Ban this traveler? They will be unable to post or comment in Pulse.')) return;
+  try {
+    const { error } = await sb.rpc('admin_set_user_moderation', { target_user_id: userId, muted: false, banned, note: null });
+    if(error) throw error;
+    doAdminPulseSearchUsers(document.getElementById('pulseUserSearch').value);
+  } catch(err){
+    alert('Action failed: ' + (err.message || err));
   }
 }
