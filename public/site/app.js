@@ -112,7 +112,7 @@ async function loadDataFromSupabase(){
     if (talaRes.error) throw talaRes.error;
 
     destinations = (destRes.data && destRes.data.length) ? destRes.data.map(destRowToObj) : DEFAULT_DESTINATIONS;
-    aiData = (talaRes.data && talaRes.data.length) ? talaRes.data.map(r=>({ id:r.id, kw:r.keywords, r:r.response })) : DEFAULT_TALA_DATA;
+    aiData = (talaRes.data && talaRes.data.length) ? talaRes.data.map(r=>({ id:r.id, kw:r.keywords, r:r.response, cat:r.category||'knowledge' })) : DEFAULT_TALA_DATA;
     defaultR = (settingsRes.data && settingsRes.data.value) ? settingsRes.data.value : DEFAULT_FALLBACK_RESPONSE;
   } catch(err) {
     console.warn('[SANVIC] Supabase load failed, using built-in defaults:', err);
@@ -1171,6 +1171,16 @@ async function adminDeleteDest(id){
 
 // ───────────── TALA ADMIN ─────────────
 
+let talaFilterCat = 'all';
+let talaSearchQuery = '';
+
+function talaContentLength(text){
+  const len = (text||'').length;
+  if(len < 150) return {label:'Short', cls:'short'};
+  if(len < 500) return {label:'Medium', cls:'medium'};
+  return {label:'Long', cls:'long'};
+}
+
 function renderAdminTala(){
   const body = document.getElementById('adminBody');
   let html = `
@@ -1189,13 +1199,41 @@ function renderAdminTala(){
     html += adminTalaFormHtml();
   }
 
-  if(!aiData.length){
-    html += `<div class="admin-empty">No responses yet.</div>`;
+  // Filter tabs + search
+  const counts = { all: aiData.length, personality: aiData.filter(i=>(i.cat||'knowledge')==='personality').length, knowledge: aiData.filter(i=>(i.cat||'knowledge')==='knowledge').length };
+  html += `
+    <div class="admin-tala-filters">
+      <button class="admin-cat-tab ${talaFilterCat==='all'?'active':''}" onclick="adminSetTalaFilter('all')">All <span>${counts.all}</span></button>
+      <button class="admin-cat-tab personality ${talaFilterCat==='personality'?'active':''}" onclick="adminSetTalaFilter('personality')">Personality <span>${counts.personality}</span></button>
+      <button class="admin-cat-tab knowledge ${talaFilterCat==='knowledge'?'active':''}" onclick="adminSetTalaFilter('knowledge')">Knowledge <span>${counts.knowledge}</span></button>
+    </div>
+    <input class="admin-tala-search" placeholder="Search keywords or content..." value="${escapeHtml(talaSearchQuery)}" oninput="adminSetTalaSearch(this.value)">`;
+
+  // Apply filter + search
+  let items = aiData;
+  if(talaFilterCat !== 'all') items = items.filter(i=>(i.cat||'knowledge')===talaFilterCat);
+  if(talaSearchQuery.trim()){
+    const q = talaSearchQuery.trim().toLowerCase();
+    items = items.filter(i=>
+      i.kw.join(' ').toLowerCase().includes(q) ||
+      (i.r||'').toLowerCase().includes(q)
+    );
+  }
+
+  if(!items.length){
+    html += `<div class="admin-empty">${aiData.length ? 'No matches for this filter/search.' : 'No responses yet.'}</div>`;
   } else {
-    html += aiData.map(item=>`
+    html += items.map(item=>{
+      const cat = item.cat || 'knowledge';
+      const len = talaContentLength(item.r);
+      return `
       <div class="admin-list-item">
         <div class="admin-list-item-head">
           <div onclick="adminEditTala(${item.id})" style="flex:1;cursor:pointer;">
+            <div class="admin-tala-badges">
+              <span class="admin-cat-pill ${cat}">${cat==='personality'?'Personality':'Knowledge'}</span>
+              <span class="admin-len-pill ${len.cls}">${len.label}</span>
+            </div>
             <strong>${escapeHtml(item.kw.join(', '))}</strong>
           </div>
           <div class="admin-row-actions">
@@ -1203,17 +1241,44 @@ function renderAdminTala(){
             <button class="admin-mini-btn danger" onclick="adminDeleteTala(${item.id})">Delete</button>
           </div>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
   body.innerHTML = html;
 }
 
+function adminSetTalaFilter(cat){
+  talaFilterCat = cat;
+  renderAdminTala();
+}
+
+function adminSetTalaSearch(val){
+  talaSearchQuery = val;
+  // Re-render just the list portion would be ideal, but re-running the
+  // full render is simple and fast enough at this data size. Preserve
+  // focus by not fully replacing the search input itself on every key.
+  const body = document.getElementById('adminBody');
+  const scrollPos = body.scrollTop;
+  renderAdminTala();
+  body.scrollTop = scrollPos;
+  const input = document.querySelector('.admin-tala-search');
+  if(input){ input.focus(); input.setSelectionRange(val.length, val.length); }
+}
+
 function adminTalaFormHtml(){
   const isNew = adminEditingTalaId === 'new';
-  const item = isNew ? {kw:[],r:''} : aiData.find(x=>x.id===adminEditingTalaId);
+  const item = isNew ? {kw:[],r:'',cat:'knowledge'} : aiData.find(x=>x.id===adminEditingTalaId);
   if(!item) return '';
+  const cat = item.cat || 'knowledge';
   return `
     <div class="admin-edit-box">
+      <div class="admin-field">
+        <label>Category</label>
+        <select id="atfCat">
+          <option value="knowledge" ${cat==='knowledge'?'selected':''}>Knowledge (facts about San Vicente)</option>
+          <option value="personality" ${cat==='personality'?'selected':''}>Personality (how Tala talks/acts)</option>
+        </select>
+      </div>
       <div class="admin-field"><label>Keywords (comma-separated)</label><input id="atfKw" value="${escapeHtml(item.kw.join(', '))}"></div>
       <div class="admin-field"><label>Response (HTML allowed, e.g. &lt;strong&gt;, &lt;br&gt;)</label><textarea id="atfResp" rows="5">${escapeHtml(item.r)}</textarea></div>
       <div class="admin-edit-actions">
@@ -1280,12 +1345,19 @@ function renderBulkQueue(){
   container.innerHTML = `
     <div class="admin-edit-box">
       <div class="admin-field" style="margin-bottom:8px;">
-        <label>${bulkQueue.length} file${bulkQueue.length>1?'s':''} ready — set trigger keywords for each, then save</label>
+        <label>${bulkQueue.length} file${bulkQueue.length>1?'s':''} ready — set category + trigger keywords for each, then save</label>
       </div>
       ${bulkQueue.map(item=>`
         <div class="admin-list-item" style="margin-bottom:10px;">
           <div style="font-size:.8rem;color:var(--white-soft);font-weight:500;margin-bottom:6px;">
             📄 ${escapeHtml(item.filename)} <span style="color:var(--white-dim);font-size:.68rem;">(${item.content.length.toLocaleString()} chars)</span>
+          </div>
+          <div class="admin-field" style="margin-bottom:6px;">
+            <label>Category</label>
+            <select onchange="bulkQueue.find(x=>x.id===${item.id}).category=this.value">
+              <option value="knowledge" ${item.category!=='personality'?'selected':''}>Knowledge (facts about San Vicente)</option>
+              <option value="personality" ${item.category==='personality'?'selected':''}>Personality (how Tala talks/acts)</option>
+            </select>
           </div>
           <div class="admin-field" style="margin-bottom:6px;">
             <label>Trigger keywords (comma-separated — words a visitor might type that should bring up this content)</label>
@@ -1314,6 +1386,7 @@ async function adminSaveBulkQueue(){
     const rows = bulkQueue.map((item, i)=>({
       keywords: item.keywords.split(',').map(s=>s.trim()).filter(Boolean),
       response: escapeHtml(item.content).replace(/\n/g,'<br>'),
+      category: item.category || 'knowledge',
       sort_order: aiData.length + i
     }));
     const { error } = await sb.from('tala_responses').insert(rows);
@@ -1333,16 +1406,17 @@ function adminEditTala(id){ adminEditingTalaId=id; renderAdminTala(); }
 async function adminSaveTala(){
   const kw = document.getElementById('atfKw').value.split(',').map(s=>s.trim()).filter(Boolean);
   const r = document.getElementById('atfResp').value.trim();
+  const cat = document.getElementById('atfCat').value;
   if(!kw.length || !r){
     alert('At least one keyword and a response are required.');
     return;
   }
   try {
     if(adminEditingTalaId === 'new'){
-      const { error } = await sb.from('tala_responses').insert({ keywords: kw, response: r, sort_order: aiData.length });
+      const { error } = await sb.from('tala_responses').insert({ keywords: kw, response: r, category: cat, sort_order: aiData.length });
       if(error) throw error;
     } else {
-      const { error } = await sb.from('tala_responses').update({ keywords: kw, response: r }).eq('id', adminEditingTalaId);
+      const { error } = await sb.from('tala_responses').update({ keywords: kw, response: r, category: cat }).eq('id', adminEditingTalaId);
       if(error) throw error;
     }
     await loadDataFromSupabase();

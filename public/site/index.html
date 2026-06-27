@@ -367,6 +367,24 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 .admin-foot button{flex:1;padding:10px;border-radius:var(--radius-pill);border:1px solid var(--glass-border);background:rgba(255,255,255,.04);color:var(--white-muted);font-size:.72rem;cursor:pointer}
 .admin-foot button.reset{color:#ef4444;border-color:rgba(239,68,68,.2)}
 .admin-empty{text-align:center;color:var(--white-dim);font-size:.78rem;padding:30px 0}
+
+.admin-tala-filters{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.admin-cat-tab{border:1px solid var(--glass-border);border-radius:var(--radius-pill);padding:6px 12px;background:rgba(255,255,255,.04);color:var(--white-muted);font-size:.7rem;cursor:pointer;display:flex;align-items:center;gap:5px}
+.admin-cat-tab span{font-size:.62rem;color:var(--white-dim);background:rgba(255,255,255,.08);border-radius:8px;padding:1px 6px}
+.admin-cat-tab.active{background:rgba(20,184,166,.14);border-color:rgba(20,184,166,.3);color:var(--white-soft)}
+.admin-cat-tab.active span{background:rgba(20,184,166,.25);color:var(--white-soft)}
+.admin-cat-tab.personality.active{background:rgba(236,72,153,.14);border-color:rgba(236,72,153,.3)}
+.admin-cat-tab.personality.active span{background:rgba(236,72,153,.25)}
+.admin-tala-search{width:100%;padding:9px 14px;border-radius:var(--radius-pill);border:1px solid var(--glass-border);background:rgba(255,255,255,.04);color:var(--white-soft);font-family:var(--font-body);font-size:.78rem;outline:none;margin-bottom:14px}
+.admin-tala-search:focus{border-color:rgba(20,184,166,.3)}
+.admin-tala-search::placeholder{color:var(--white-dim)}
+
+.admin-tala-badges{display:flex;gap:6px;margin-bottom:6px}
+.admin-cat-pill{font-size:.6rem;letter-spacing:.03em;text-transform:uppercase;padding:2px 8px;border-radius:8px;font-weight:500}
+.admin-cat-pill.knowledge{background:rgba(20,184,166,.16);color:#5eead4}
+.admin-cat-pill.personality{background:rgba(236,72,153,.16);color:#f9a8d4}
+.admin-len-pill{font-size:.6rem;padding:2px 8px;border-radius:8px;color:var(--white-dim);background:rgba(255,255,255,.06)}
+.admin-len-pill.long{color:#fbbf24;background:rgba(251,191,36,.12)}
 .admin-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid var(--glass-border);border-radius:10px;margin-bottom:10px}
 .admin-toggle-row label{font-size:.78rem;color:var(--white-soft);font-weight:400;text-transform:none;letter-spacing:0;margin:0}
 .admin-toggle-row input[type="checkbox"]{width:38px;height:22px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,.12);border-radius:11px;position:relative;cursor:pointer;outline:none;transition:background .2s;flex-shrink:0}
