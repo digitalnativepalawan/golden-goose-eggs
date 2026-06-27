@@ -958,9 +958,9 @@ async function renderPulseFeed(){
 
   pulseFeedById = new Map();
   const posts = (rows || []).map(r => {
-    const prof = profileById.get(r.user_id);
-    const name = r.is_anonymous ? 'Anonymous' : ((prof && prof.display_name) || 'Traveler');
-    const avatar = (!r.is_anonymous && prof && prof.avatar_url) || null;
+    const prof = r.user_id ? profileById.get(r.user_id) : null;
+    const name = r.display_name || (prof && prof.display_name) || 'Anonymous traveler';
+    const avatar = (prof && prof.avatar_url) || null;
     const mapped = {
       id: r.id,
       cat: r.category,
