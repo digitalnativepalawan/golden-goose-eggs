@@ -126,6 +126,7 @@ export type Database = {
           created_at: string | null
           display_name: string | null
           id: number
+          is_anonymous: boolean
           post_id: number
           text_content: string
           user_id: string | null
@@ -134,6 +135,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id?: never
+          is_anonymous?: boolean
           post_id: number
           text_content: string
           user_id?: string | null
@@ -142,6 +144,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id?: never
+          is_anonymous?: boolean
           post_id?: number
           text_content?: string
           user_id?: string | null
