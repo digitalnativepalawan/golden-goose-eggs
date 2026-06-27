@@ -91,6 +91,320 @@ let aiData = [];
 let defaultR = DEFAULT_FALLBACK_RESPONSE;
 let dataReady = false;
 
+// ═══════════════════════════════════════════════════════
+// AUTHENTICATION — Supabase Auth, Email Magic Link only for
+// now. Google/Apple need real OAuth app registrations on
+// Anthropic/David's end before they can be wired up; the login
+// modal already has buttons for them so adding the providers
+// later is just a few lines, not a redesign.
+// ═══════════════════════════════════════════════════════
+let currentUser = null;       // Supabase auth user object, or null if signed out
+let currentProfile = null;    // row from traveler_profiles, or null
+let pendingProtectedAction = null; // a function to re-run automatically after successful login
+
+async function initAuth(){
+  const { data: { session } } = await sb.auth.getSession();
+  if(session){
+    currentUser = session.user;
+    await loadTravelerProfile();
+  }
+
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if(event === 'SIGNED_IN' && session){
+      currentUser = session.user;
+      await loadTravelerProfile();
+      closeLoginModal();
+      updateAuthUI();
+      if(pendingProtectedAction){
+        const fn = pendingProtectedAction;
+        pendingProtectedAction = null;
+        fn();
+      }
+    } else if(event === 'SIGNED_OUT'){
+      currentUser = null;
+      currentProfile = null;
+      updateAuthUI();
+    }
+  });
+
+  updateAuthUI();
+}
+
+async function loadTravelerProfile(){
+  if(!currentUser) return;
+  try {
+    const { data, error } = await sb.from('traveler_profiles').select('*').eq('id', currentUser.id).maybeSingle();
+    if(error) throw error;
+    currentProfile = data;
+    // Touch last_seen, best-effort, don't block on it
+    sb.from('traveler_profiles').update({ last_seen: new Date().toISOString() }).eq('id', currentUser.id);
+  } catch(err){
+    console.warn('[SANVIC] Failed to load traveler profile:', err);
+  }
+}
+
+function isLoggedIn(){
+  return !!currentUser;
+}
+
+// Call this to gate any action that requires login. If logged in,
+// runs `action` immediately. If not, opens the login modal and
+// queues `action` to run automatically right after sign-in.
+function requireAuth(action){
+  if(isLoggedIn()){
+    action();
+  } else {
+    pendingProtectedAction = action;
+    openLoginModal();
+  }
+}
+
+function openLoginModal(){
+  document.getElementById('loginModalOverlay').classList.add('active');
+  document.getElementById('loginModalSheet').classList.add('open');
+  document.getElementById('loginEmailStatus').textContent = '';
+  document.getElementById('loginEmailInput').value = '';
+}
+
+function closeLoginModal(){
+  document.getElementById('loginModalOverlay').classList.remove('active');
+  document.getElementById('loginModalSheet').classList.remove('open');
+  pendingProtectedAction = null; // closing without logging in cancels the queued action
+}
+
+async function sendMagicLink(){
+  const email = document.getElementById('loginEmailInput').value.trim();
+  const statusEl = document.getElementById('loginEmailStatus');
+  if(!email || !email.includes('@')){
+    statusEl.textContent = 'Please enter a valid email address.';
+    statusEl.style.color = '#ef4444';
+    return;
+  }
+  statusEl.textContent = 'Sending link...';
+  statusEl.style.color = 'var(--white-dim)';
+  try {
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.href }
+    });
+    if(error) throw error;
+    statusEl.textContent = `Check your email — we sent a link to ${email}.`;
+    statusEl.style.color = '#5eead4';
+  } catch(err){
+    statusEl.textContent = 'Could not send link: ' + (err.message || err);
+    statusEl.style.color = '#ef4444';
+  }
+}
+
+async function signOutUser(){
+  await sb.auth.signOut();
+  closeDashboard();
+}
+
+function updateAuthUI(){
+  // Bell/notification icon and avatar swap in the hero or dock area
+  // could go here later; for now this drives the dashboard's own
+  // header state and the dock "Saved" tab behavior.
+  const dashAvatarWrap = document.getElementById('dashUserAvatarWrap');
+  if(dashAvatarWrap){
+    if(isLoggedIn() && currentProfile){
+      dashAvatarWrap.style.display = '';
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// TRAVELER DASHBOARD
+// ═══════════════════════════════════════════════════════
+let dashSection = 'overview';
+
+function openDashboard(){
+  requireAuth(()=>{
+    closeAllPanels();
+    document.getElementById('dashboardPanel').classList.add('open');
+    renderDashProfileCard();
+    selectDashSection('overview');
+  });
+}
+
+function closeDashboard(){
+  document.getElementById('dashboardPanel').classList.remove('open');
+}
+
+function renderDashProfileCard(){
+  const nameEl = document.getElementById('dashUserName');
+  const initialEl = document.getElementById('dashUserInitial');
+  const avatarWrap = document.getElementById('dashUserAvatarWrap');
+  if(!currentUser) return;
+
+  const displayName = (currentProfile && currentProfile.display_name) || currentUser.email.split('@')[0];
+  nameEl.textContent = `Hello, ${displayName}`;
+
+  if(currentProfile && currentProfile.avatar_url){
+    avatarWrap.innerHTML = `<img src="${currentProfile.avatar_url}" alt="">`;
+  } else {
+    initialEl.textContent = displayName.slice(0,1).toUpperCase();
+  }
+}
+
+function selectDashSection(section){
+  dashSection = section;
+  document.querySelectorAll('.dash-nav-item').forEach(b=>b.classList.toggle('active', b.dataset.section===section));
+  const body = document.getElementById('dashSectionBody');
+  body.innerHTML = `<div class="dash-empty-state">Loading...</div>`;
+
+  switch(section){
+    case 'overview': renderDashOverview(); break;
+    case 'saved': renderDashSaved(); break;
+    case 'bookings': body.innerHTML = `<div class="dash-section-title">Bookings</div><div class="dash-empty-state">Booking management is coming in a future update.</div>`; break;
+    case 'trips': body.innerHTML = `<div class="dash-section-title">My Trips</div><div class="dash-empty-state">Trip planning is coming in a future update.</div>`; break;
+    case 'activity': renderDashActivity(); break;
+    case 'messages': body.innerHTML = `<div class="dash-section-title">Messages</div><div class="dash-empty-state">Direct messages between travelers are coming soon.</div>`; break;
+    case 'settings': renderDashSettings(); break;
+  }
+}
+
+async function renderDashOverview(){
+  const body = document.getElementById('dashSectionBody');
+  try {
+    const { data: saved } = await sb.from('saved_places').select('id').eq('user_id', currentUser.id);
+    const { data: posts } = await sb.from('pulse_posts').select('id').eq('user_id', currentUser.id);
+    body.innerHTML = `
+      <div class="dash-section-title">Overview</div>
+      <div class="admin-grid-2" style="margin-bottom:14px;">
+        <div class="dash-empty-state" style="padding:18px;">
+          <div style="font-size:1.4rem;color:var(--ocean-teal-light);font-weight:600;">${(saved||[]).length}</div>
+          <div style="font-size:.7rem;margin-top:4px;">Saved places</div>
+        </div>
+        <div class="dash-empty-state" style="padding:18px;">
+          <div style="font-size:1.4rem;color:var(--ocean-teal-light);font-weight:600;">${(posts||[]).length}</div>
+          <div style="font-size:.7rem;margin-top:4px;">Pulse posts</div>
+        </div>
+      </div>
+      <div class="dash-empty-state">Trip planning and richer activity history are coming in a future update.</div>`;
+  } catch(err){
+    body.innerHTML = `<div class="dash-empty-state">Couldn't load your overview right now.</div>`;
+  }
+}
+
+async function renderDashSaved(){
+  const body = document.getElementById('dashSectionBody');
+  try {
+    const { data, error } = await sb.from('saved_places')
+      .select('id, destination_id, destinations(name, image, category)')
+      .eq('user_id', currentUser.id)
+      .order('created_at', { ascending: false });
+    if(error) throw error;
+
+    if(!data || !data.length){
+      body.innerHTML = `<div class="dash-section-title">Saved Places</div><div class="dash-empty-state">You haven't saved any places yet. Tap the bookmark on a destination to save it here.</div>`;
+      return;
+    }
+
+    body.innerHTML = `<div class="dash-section-title">Saved Places</div>` + data.map(row=>{
+      const d = row.destinations;
+      if(!d) return '';
+      return `
+      <div class="around-card" style="margin-bottom:10px;cursor:pointer;" onclick="closeDashboard();openDestinationById(${row.destination_id})">
+        <img src="${d.image}" alt="" style="width:50px;height:50px;border-radius:10px;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'">
+        <div class="around-card-body">
+          <div class="around-card-name">${escapeHtml(d.name)}</div>
+          <div class="around-card-meta">${escapeHtml(catStyle[d.category]?.label||d.category)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(err){
+    body.innerHTML = `<div class="dash-empty-state">Couldn't load saved places right now.</div>`;
+  }
+}
+
+async function renderDashActivity(){
+  const body = document.getElementById('dashSectionBody');
+  try {
+    const { data, error } = await sb.from('pulse_posts')
+      .select('id, text_content, category, created_at')
+      .eq('user_id', currentUser.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if(error) throw error;
+
+    if(!data || !data.length){
+      body.innerHTML = `<div class="dash-section-title">Activity</div><div class="dash-empty-state">Your Pulse posts and saves will show up here.</div>`;
+      return;
+    }
+
+    body.innerHTML = `<div class="dash-section-title">Activity</div>` + data.map(p=>`
+      <div class="around-card" style="margin-bottom:10px;">
+        <div class="around-card-icon">📍</div>
+        <div class="around-card-body">
+          <div class="around-card-name">${escapeHtml((p.text_content||'').slice(0,60))}${(p.text_content||'').length>60?'…':''}</div>
+          <div class="around-card-meta">${new Date(p.created_at).toLocaleDateString()}</div>
+        </div>
+      </div>`).join('');
+  } catch(err){
+    body.innerHTML = `<div class="dash-empty-state">Couldn't load activity right now.</div>`;
+  }
+}
+
+async function renderDashSettings(){
+  const body = document.getElementById('dashSectionBody');
+  body.innerHTML = `
+    <div class="dash-section-title">Settings</div>
+    <div class="admin-field"><label>Display name</label><input id="dashSettingsName" value="${escapeHtml((currentProfile&&currentProfile.display_name)||'')}"></div>
+    <div class="admin-field"><label>Bio</label><textarea id="dashSettingsBio" rows="3">${escapeHtml((currentProfile&&currentProfile.bio)||'')}</textarea></div>
+    <button class="admin-save-btn" onclick="saveDashSettings()">Save changes</button>`;
+}
+
+async function saveDashSettings(){
+  const display_name = document.getElementById('dashSettingsName').value.trim();
+  const bio = document.getElementById('dashSettingsBio').value.trim();
+  try {
+    const { error } = await sb.from('traveler_profiles').update({ display_name, bio, updated_at: new Date().toISOString() }).eq('id', currentUser.id);
+    if(error) throw error;
+    currentProfile = { ...currentProfile, display_name, bio };
+    renderDashProfileCard();
+    alert('Saved.');
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+// ─── Save / unsave a destination (requires login) ───
+async function toggleSavePlace(destinationId, btnEl){
+  requireAuth(async ()=>{
+    try {
+      const { data: existing } = await sb.from('saved_places').select('id').eq('user_id', currentUser.id).eq('destination_id', destinationId).maybeSingle();
+      if(existing){
+        await sb.from('saved_places').delete().eq('id', existing.id);
+        if(btnEl) btnEl.classList.remove('saved');
+      } else {
+        await sb.from('saved_places').insert({ user_id: currentUser.id, destination_id: destinationId });
+        if(btnEl) btnEl.classList.add('saved');
+      }
+    } catch(err){
+      alert('Could not update saved places: ' + (err.message || err));
+    }
+  });
+}
+
+function handleDestSaveClick(){
+  if(!currentDest) return;
+  toggleSavePlace(currentDest.id, document.getElementById('deSaveBtn'));
+}
+
+async function refreshDestSaveButton(destinationId){
+  const btn = document.getElementById('deSaveBtn');
+  if(!btn) return;
+  btn.classList.remove('saved');
+  if(!isLoggedIn()) return; // anonymous visitors always see the un-saved state
+  try {
+    const { data } = await sb.from('saved_places').select('id').eq('user_id', currentUser.id).eq('destination_id', destinationId).maybeSingle();
+    if(data) btn.classList.add('saved');
+  } catch(err){
+    // fail silently — save state is a nice-to-have, not critical path
+  }
+}
+
 function destRowToObj(row){
   return {
     id: row.id, name: row.name, lat: row.lat, lng: row.lng, category: row.category,
@@ -321,6 +635,7 @@ function closeAllPanels() {
   closeTalaSheet(false);
   closeAroundMePanel();
   closePulsePanel();
+  closeDashboard();
 }
 
 // ─── DESTINATION SHEET ───
@@ -534,11 +849,13 @@ function pulseCardHtml(post){
 }
 
 function togglePulseLike(btn, postId){
-  const post = PULSE_POSTS.find(p=>p.id===postId);
-  if(!post) return;
-  const liked = btn.classList.toggle('liked');
-  post.likes += liked ? 1 : -1;
-  btn.querySelector('span').textContent = post.likes;
+  requireAuth(()=>{
+    const post = PULSE_POSTS.find(p=>p.id===postId);
+    if(!post) return;
+    const liked = btn.classList.toggle('liked');
+    post.likes += liked ? 1 : -1;
+    btn.querySelector('span').textContent = post.likes;
+  });
 }
 
 function renderPulseFeed(){
@@ -562,13 +879,15 @@ let pulseComposeImageDataUrl = null;
 let pulseNextPostId = 1000; // mock IDs for session-local posts, won't collide with seeded 1-12
 
 function openPulseCompose(){
-  document.getElementById('pulseComposeText').value = '';
-  document.getElementById('pulseComposeCategory').value = pulseCategory !== 'all' ? pulseCategory : 'all';
-  document.getElementById('pulseComposeAnon').checked = false;
-  removePulseComposeImage();
-  updatePulseComposeState();
-  document.getElementById('pulseComposeOverlay').classList.add('active');
-  document.getElementById('pulseComposeSheet').classList.add('open');
+  requireAuth(()=>{
+    document.getElementById('pulseComposeText').value = '';
+    document.getElementById('pulseComposeCategory').value = pulseCategory !== 'all' ? pulseCategory : 'all';
+    document.getElementById('pulseComposeAnon').checked = false;
+    removePulseComposeImage();
+    updatePulseComposeState();
+    document.getElementById('pulseComposeOverlay').classList.add('active');
+    document.getElementById('pulseComposeSheet').classList.add('open');
+  });
 }
 
 function closePulseCompose(){
@@ -692,6 +1011,7 @@ function parseGoogleMapsUrl(url){
 function openDest(d) {
   currentDest = d;
   const cat = catStyle[d.category];
+  refreshDestSaveButton(d.id);
 
   // Compact
   document.getElementById('dcImg').src = d.image;
@@ -1031,7 +1351,7 @@ function dockNav(tab){
     case 'discover': closePulsePanel(); openDiscoverPanel(); if(map){filterCategory('all');} break;
     case 'tala': closeDiscoverPanel(); closeDestSheet(false); closePulsePanel(); openTalaSheet(); break;
     case 'pulse': closeDiscoverPanel(); closeDestSheet(false); closeTalaSheet(false); openPulsePanel(); break;
-    case 'saved': closeDiscoverPanel(); closeDestSheet(false); closePulsePanel(); openTalaSheet(); addMsg('bot','Your saved San Vicente places will appear here. Tap markers like Long Beach, Port Barton, or Boayan Island, then ask tala to help plan the route.'); break;
+    case 'saved': closeDiscoverPanel(); closeDestSheet(false); closePulsePanel(); closeTalaSheet(false); openDashboard(); break;
   }
 }
 
@@ -1074,6 +1394,7 @@ window.addEventListener('load',()=>{
   setTimeout(()=>{document.getElementById('splash').classList.add('hidden');},2200);
   setTimeout(animPlaceholder,2800);
   setTimeout(loadVoices,800);
+  initAuth();
 
   // Show dock & orb after splash
   setTimeout(()=>{
