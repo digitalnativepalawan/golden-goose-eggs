@@ -1041,22 +1041,32 @@ function updatePulseComposeState(){
   postBtn.disabled = !text && !pulseComposeImageDataUrl;
 }
 
+let pulseLastPostAt = 0;
 async function submitPulsePost(){
   const text = document.getElementById('pulseComposeText').value.trim();
   if(!text && !pulseComposeImageDataUrl) return;
-  if(!currentUser){ openLoginModal(); return; }
+
+  // Light client-side rate limit: 1 post per 30s per device.
+  const now = Date.now();
+  if(now - pulseLastPostAt < 30000){
+    alert('Please wait a few seconds before posting again.');
+    return;
+  }
 
   const cat = document.getElementById('pulseComposeCategory').value;
-  const anon = document.getElementById('pulseComposeAnon').checked;
+  const nameEl = document.getElementById('pulseComposeName');
+  const displayName = ((nameEl && nameEl.value) || '').trim().slice(0, 40) || null;
+  if(displayName) pulseSaveName(displayName);
   const postBtn = document.getElementById('pulseComposePostBtn');
   postBtn.disabled = true;
 
   const { error } = await sb.from('pulse_posts').insert({
-    user_id: currentUser.id,
+    user_id: currentUser ? currentUser.id : null,
+    display_name: displayName,
     category: cat || 'all',
-    text_content: text || null,
-    image_url: pulseComposeImageDataUrl || null, // TODO: upload to Storage in a follow-up
-    is_anonymous: !!anon,
+    text_content: text ? text.slice(0, 500) : null,
+    image_url: pulseComposeImageDataUrl || null,
+    is_anonymous: !currentUser,
   });
 
   postBtn.disabled = false;
@@ -1065,6 +1075,7 @@ async function submitPulsePost(){
     alert('Could not post: ' + error.message);
     return;
   }
+  pulseLastPostAt = now;
 
   closePulseCompose();
   pulseCategory = 'all';
