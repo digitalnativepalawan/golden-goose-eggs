@@ -627,7 +627,7 @@ async function initMap() {
 // barangays.geojson.js). Boundaries don't change, so this is baked
 // in rather than admin-editable.
 let barangayLayer = null;
-let barangayVisible = false;
+let barangayVisible = true;
 
 function initBarangayLayer(){
   if(typeof SAN_VICENTE_BARANGAYS === 'undefined') return;
@@ -650,7 +650,12 @@ function initBarangayLayer(){
       }
     }
   });
-  // Not added to the map yet — starts hidden until toggled on.
+  // Visible by default on first load — it's a quick, clear signal of
+  // what the app covers (San Vicente's barangays), then the user can
+  // hide it via the toggle if they want a cleaner map.
+  barangayLayer.addTo(map);
+  const btn = document.getElementById('barangayToggle');
+  if(btn) btn.classList.add('active');
 }
 
 function toggleBarangayLayer(){
