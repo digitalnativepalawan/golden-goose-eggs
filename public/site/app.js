@@ -1373,15 +1373,27 @@ const WEATHER_CACHE_MS = 10 * 60 * 1000; // 10 minutes
 
 // Open-Meteo WMO weather codes -> a small label + simple inline SVG icon.
 // Codes grouped into the handful of states that matter for a quick glance.
+// severity: 'calm' (default/fine), 'caution' (rain/drizzle/fog — be aware),
+// 'severe' (storms/heavy showers — clear safety signal for boats/beach plans)
 function weatherCodeToDisplay(code){
-  if(code === 0) return { label: 'Clear', icon: 'sun' };
-  if([1,2,3].includes(code)) return { label: 'Partly cloudy', icon: 'cloud-sun' };
-  if([45,48].includes(code)) return { label: 'Foggy', icon: 'cloud' };
-  if([51,53,55,56,57].includes(code)) return { label: 'Drizzle', icon: 'cloud-drizzle' };
-  if([61,63,65,66,67,80,81,82].includes(code)) return { label: 'Rain', icon: 'cloud-rain' };
-  if([95,96,99].includes(code)) return { label: 'Storms', icon: 'cloud-lightning' };
-  if([71,73,75,77,85,86].includes(code)) return { label: 'Showers', icon: 'cloud-rain' };
-  return { label: 'Cloudy', icon: 'cloud' };
+  if(code === 0) return { label: 'Clear', icon: 'sun', severity: 'calm' };
+  if([1,2,3].includes(code)) return { label: 'Partly cloudy', icon: 'cloud-sun', severity: 'calm' };
+  if([45,48].includes(code)) return { label: 'Foggy', icon: 'cloud', severity: 'caution' };
+  if([51,53,55,56,57].includes(code)) return { label: 'Drizzle', icon: 'cloud-drizzle', severity: 'caution' };
+  if([61,63,66,80].includes(code)) return { label: 'Rain', icon: 'cloud-rain', severity: 'caution' };
+  if([65,67,81,82].includes(code)) return { label: 'Heavy rain', icon: 'cloud-rain', severity: 'severe' };
+  if([95,96,99].includes(code)) return { label: 'Thunderstorms', icon: 'cloud-lightning', severity: 'severe' };
+  if([71,73,75,77,85,86].includes(code)) return { label: 'Showers', icon: 'cloud-rain', severity: 'caution' };
+  return { label: 'Cloudy', icon: 'cloud', severity: 'calm' };
+}
+
+// Strong wind escalates severity even on an otherwise calm-coded day —
+// relevant for boats/island-hopping, which this app cares about a lot.
+function escalateForWind(severity, windKmh){
+  if(windKmh == null) return severity;
+  if(windKmh >= 50) return 'severe';
+  if(windKmh >= 30 && severity === 'calm') return 'caution';
+  return severity;
 }
 
 const WEATHER_ICONS = {
@@ -1391,7 +1403,8 @@ const WEATHER_ICONS = {
   'cloud-drizzle': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 15a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.6A4 4 0 0 0 6 15h11.5z"/><line x1="8" y1="19" x2="8" y2="21"/><line x1="12" y1="19" x2="12" y2="21"/><line x1="16" y1="19" x2="16" y2="21"/></svg>',
   'cloud-rain': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 13a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.6A4 4 0 0 0 4.5 13h11.5z"/><line x1="8" y1="19" x2="8" y2="21"/><line x1="12" y1="19" x2="12" y2="21"/><line x1="16" y1="19" x2="16" y2="21"/></svg>',
   'cloud-lightning': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 13a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.6A4 4 0 0 0 6 13h11.5z"/><polyline points="13 14 11 18 14 18 12 22"/></svg>',
-  sunset: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="9" x2="12" y2="2"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="19.78" y1="10.22" x2="18.36" y2="11.64"/><line x1="1" y1="18" x2="23" y2="18"/><polyline points="8 6 12 2 16 6"/></svg>'
+  sunset: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="9" x2="12" y2="2"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="19.78" y1="10.22" x2="18.36" y2="11.64"/><line x1="1" y1="18" x2="23" y2="18"/><polyline points="8 6 12 2 16 6"/></svg>',
+  warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
 };
 
 async function initHeroWeather(){
@@ -1401,17 +1414,18 @@ async function initHeroWeather(){
       renderHeroWeather(cached);
       return;
     }
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${SANVIC_LAT}&longitude=${SANVIC_LNG}&current=temperature_2m,weather_code&daily=sunset&timezone=Asia%2FManila`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${SANVIC_LAT}&longitude=${SANVIC_LNG}&current=temperature_2m,weather_code,wind_speed_10m&daily=sunset&timezone=Asia%2FManila`;
     const res = await fetch(url);
     if(!res.ok) throw new Error('Weather request failed');
     const data = await res.json();
 
     const temp = data.current && data.current.temperature_2m;
     const code = data.current && data.current.weather_code;
+    const wind = data.current && data.current.wind_speed_10m;
     const sunsetIso = data.daily && data.daily.sunset && data.daily.sunset[0];
     if(temp == null || code == null) throw new Error('Unexpected weather response shape');
 
-    const payload = { temp, code, sunsetIso, fetchedAt: Date.now() };
+    const payload = { temp, code, wind, sunsetIso, fetchedAt: Date.now() };
     setWeatherCache(payload);
     renderHeroWeather(payload);
   } catch(err){
@@ -1440,21 +1454,30 @@ function renderHeroWeather(payload){
   const widget = document.getElementById('heroWeather');
   if(!widget) return;
 
-  const { label, icon } = weatherCodeToDisplay(payload.code);
+  const { label, icon, severity: baseSeverity } = weatherCodeToDisplay(payload.code);
+  const severity = escalateForWind(baseSeverity, payload.wind);
   const tempC = Math.round(payload.temp);
 
-  document.getElementById('hwTemp').innerHTML = `${WEATHER_ICONS[icon]}${tempC}°C`;
-  document.getElementById('hwCondition').textContent = label;
+  widget.classList.remove('wx-calm','wx-caution','wx-severe');
+  widget.classList.add(`wx-${severity}`);
+
+  let html = '';
+  if(severity !== 'calm'){
+    const alertText = severity === 'severe' ? 'Rough conditions' : 'Be aware';
+    html += `<span class="hw-item hw-alert-label">${WEATHER_ICONS.warning}${alertText}</span><span class="hw-dot"></span>`;
+  }
+
+  html += `<span class="hw-item">${WEATHER_ICONS[icon]}${tempC}°C</span>`;
+  html += `<span class="hw-dot"></span><span class="hw-item">${escapeHtml(label)}</span>`;
 
   if(payload.sunsetIso){
     const sunsetDate = new Date(payload.sunsetIso);
     const timeStr = sunsetDate.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true });
-    document.getElementById('hwSunset').innerHTML = `${WEATHER_ICONS.sunset}Sunset ${timeStr}`;
-  } else {
-    document.getElementById('hwSunset').style.display = 'none';
+    html += `<span class="hw-dot"></span><span class="hw-item">${WEATHER_ICONS.sunset}Sunset ${timeStr}</span>`;
   }
 
-  widget.style.display = '';
+  widget.innerHTML = html;
+  widget.style.display = 'inline-flex';
 }
 
 function getYoutubeId(url){
