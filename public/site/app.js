@@ -929,7 +929,7 @@ async function renderPulseFeed(){
   body.innerHTML = `<div class="pulse-empty">Loading…</div>`;
 
   let query = sb.from('pulse_posts')
-    .select('id, user_id, category, text_content, image_url, location_text, tag, is_anonymous, admin_post, created_at, pulse_likes(count), pulse_comments(count)')
+    .select('id, user_id, category, text_content, image_url, location_text, tag, display_name, is_anonymous, admin_post, created_at, pulse_likes(count), pulse_comments(count)')
     .order('created_at', { ascending: false })
     .limit(100);
   if(pulseCategory !== 'all') query = query.eq('category', pulseCategory);
