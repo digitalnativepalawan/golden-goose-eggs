@@ -903,7 +903,7 @@ async function renderPulseFeed(){
   body.innerHTML = `<div class="pulse-empty">Loading…</div>`;
 
   let query = sb.from('pulse_posts')
-    .select('id, user_id, category, text_content, image_url, location_text, tag, is_anonymous, admin_post, created_at, pulse_likes(count), pulse_comments(count), traveler_profiles:user_id(display_name, avatar_url)')
+    .select('id, user_id, category, text_content, image_url, location_text, tag, is_anonymous, admin_post, created_at, pulse_likes(count), pulse_comments(count)')
     .order('created_at', { ascending: false })
     .limit(100);
   if(pulseCategory !== 'all') query = query.eq('category', pulseCategory);
@@ -912,6 +912,14 @@ async function renderPulseFeed(){
   if(error){
     body.innerHTML = `<div class="pulse-empty">Could not load Pulse: ${escapeHtml(error.message)}</div>`;
     return;
+  }
+
+  // Fetch traveler profiles for the post authors (no FK between tables, so do it separately)
+  const profileById = new Map();
+  const authorIds = Array.from(new Set((rows||[]).filter(r=>!r.is_anonymous && r.user_id).map(r=>r.user_id)));
+  if(authorIds.length){
+    const { data: profs } = await sb.from('traveler_profiles').select('id, display_name, avatar_url').in('id', authorIds);
+    if(profs) profs.forEach(p => profileById.set(p.id, p));
   }
 
   // Load the current user's likes so the heart state is correct
@@ -924,7 +932,7 @@ async function renderPulseFeed(){
 
   pulseFeedById = new Map();
   const posts = (rows || []).map(r => {
-    const prof = r.traveler_profiles;
+    const prof = profileById.get(r.user_id);
     const name = r.is_anonymous ? 'Anonymous' : ((prof && prof.display_name) || 'Traveler');
     const avatar = (!r.is_anonymous && prof && prof.avatar_url) || null;
     const mapped = {
