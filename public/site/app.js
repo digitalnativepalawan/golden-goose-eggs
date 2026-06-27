@@ -85,10 +85,15 @@ const DEFAULT_TALA_DATA = [
 
 const DEFAULT_FALLBACK_RESPONSE = `I'm not sure about that, but I can help with:<br><br>Long Beach · Port Barton · Boayan Island · Pamuayan Falls<br>Transport · Budget · Food · Island hopping<br><br>Or tap any San Vicente marker on the map.`;
 
+const DEFAULT_HERO_TITLE = `Discover Palawan<br><em>Differently.</em>`;
+const DEFAULT_HERO_SUBTITLE = ``;
+
 // ─── LIVE DATA (populated from Supabase, falls back to defaults) ───
 let destinations = [];
 let aiData = [];
 let defaultR = DEFAULT_FALLBACK_RESPONSE;
+let heroTitle = DEFAULT_HERO_TITLE;
+let heroSubtitle = DEFAULT_HERO_SUBTITLE;
 let dataReady = false;
 
 // ═══════════════════════════════════════════════════════
@@ -462,11 +467,12 @@ function isSuggestionActiveToday(s){
 
 async function loadDataFromSupabase(){
   try {
-    const [destRes, talaRes, settingsRes, sugRes] = await Promise.all([
+    const [destRes, talaRes, settingsRes, sugRes, siteRes] = await Promise.all([
       sb.from('destinations').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_responses').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_settings').select('*').eq('key', 'default_response').maybeSingle(),
       sb.from('tala_suggestions').select('*').order('sort_order', { ascending: true }),
+      sb.from('site_settings').select('*').in('key', ['hero_title', 'hero_subtitle']),
     ]);
 
     if (destRes.error) throw destRes.error;
@@ -476,14 +482,30 @@ async function loadDataFromSupabase(){
     aiData = (talaRes.data && talaRes.data.length) ? talaRes.data.map(r=>({ id:r.id, kw:r.keywords, r:r.response, cat:r.category||'knowledge' })) : DEFAULT_TALA_DATA;
     defaultR = (settingsRes.data && settingsRes.data.value) ? settingsRes.data.value : DEFAULT_FALLBACK_RESPONSE;
     talaSuggestions = (sugRes && sugRes.data && sugRes.data.length) ? sugRes.data : DEFAULT_SUGGESTIONS;
+
+    const siteRows = (siteRes && siteRes.data) ? siteRes.data : [];
+    const titleRow = siteRows.find(r => r.key === 'hero_title');
+    const subRow = siteRows.find(r => r.key === 'hero_subtitle');
+    heroTitle = (titleRow && titleRow.value) ? titleRow.value : DEFAULT_HERO_TITLE;
+    heroSubtitle = (subRow && subRow.value != null) ? subRow.value : DEFAULT_HERO_SUBTITLE;
   } catch(err) {
     console.warn('[SANVIC] Supabase load failed, using built-in defaults:', err);
     destinations = DEFAULT_DESTINATIONS;
     aiData = DEFAULT_TALA_DATA;
     defaultR = DEFAULT_FALLBACK_RESPONSE;
     talaSuggestions = DEFAULT_SUGGESTIONS;
+    heroTitle = DEFAULT_HERO_TITLE;
+    heroSubtitle = DEFAULT_HERO_SUBTITLE;
   }
+  applyHeroText();
   dataReady = true;
+}
+
+function applyHeroText(){
+  const titleEl = document.getElementById('heroHeadline');
+  const subEl = document.getElementById('heroSubtitle');
+  if(titleEl) titleEl.innerHTML = heroTitle;
+  if(subEl) subEl.innerHTML = heroSubtitle;
 }
 
 const catStyle = {
@@ -558,7 +580,24 @@ async function initMap() {
 
   if(!dataReady) await loadDataFromSupabase();
 
-  map = L.map('map',{center:[10.50,119.22],zoom:11,zoomControl:false,attributionControl:true,fadeAnimation:true,zoomAnimation:true});
+  // Palawan island/province bounding box (covers Calamianes in the
+  // north down to Balabac in the south), padded slightly. Locks the
+  // viewport so users can pan/zoom out only as far as the island —
+  // never to the rest of the globe.
+  const PALAWAN_BOUNDS = L.latLngBounds([6.5, 116.6], [12.9, 121.0]);
+
+  map = L.map('map',{
+    center:[10.50,119.22],
+    zoom:11,
+    minZoom:8,
+    zoomControl:false,
+    attributionControl:true,
+    fadeAnimation:true,
+    zoomAnimation:true,
+    maxBounds:PALAWAN_BOUNDS,
+    maxBoundsViscosity:1.0,
+    worldCopyJump:false
+  });
 
   const street = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OSM &copy; CARTO',maxZoom:19,subdomains:'abcd'});
   const light = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OSM &copy; CARTO',maxZoom:19,subdomains:'abcd'});
@@ -1820,10 +1859,12 @@ function switchAdminTab(tab){
   document.getElementById('adminTabDest').classList.toggle('active', tab==='dest');
   document.getElementById('adminTabTala').classList.toggle('active', tab==='tala');
   document.getElementById('adminTabPulse').classList.toggle('active', tab==='pulse');
+  document.getElementById('adminTabSite').classList.toggle('active', tab==='site');
   adminEditingDestId = null;
   adminEditingTalaId = null;
   if(tab==='dest') renderAdminDest();
   else if(tab==='tala') renderAdminTala();
+  else if(tab==='site') renderAdminSite();
   else renderAdminPulse();
 }
 
@@ -2239,6 +2280,51 @@ async function adminDeleteSuggestion(id){
     alert('Delete failed: ' + (err.message || err));
   }
 }
+
+// ───────────── SITE SETTINGS ADMIN (hero title/subtitle) ─────────────
+
+function renderAdminSite(){
+  const body = document.getElementById('adminBody');
+  body.innerHTML = `
+    <div class="admin-field" style="margin-top:4px;">
+      <label>Hero title (shown over the map — basic HTML like &lt;br&gt; and &lt;em&gt; allowed)</label>
+      <textarea id="adsHeroTitle" rows="2" onblur="adminSaveHeroTitle()">${escapeHtml(heroTitle)}</textarea>
+    </div>
+    <div class="admin-field">
+      <label>Hero subtitle (optional, smaller line under the title)</label>
+      <textarea id="adsHeroSubtitle" rows="2" onblur="adminSaveHeroSubtitle()">${escapeHtml(heroSubtitle)}</textarea>
+    </div>
+    <div class="admin-empty" style="margin-top:6px;">Saves automatically when you click away from a field. Changes appear for every visitor.</div>`;
+}
+
+async function adminSaveHeroTitle(){
+  const val = document.getElementById('adsHeroTitle').value.trim();
+  if(val === heroTitle) return;
+  const finalVal = val || DEFAULT_HERO_TITLE;
+  try {
+    const { error } = await sb.from('site_settings').upsert({ key: 'hero_title', value: finalVal });
+    if(error) throw error;
+    heroTitle = finalVal;
+    applyHeroText();
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+async function adminSaveHeroSubtitle(){
+  const val = document.getElementById('adsHeroSubtitle').value.trim();
+  if(val === heroSubtitle) return;
+  try {
+    const { error } = await sb.from('site_settings').upsert({ key: 'hero_subtitle', value: val });
+    if(error) throw error;
+    heroSubtitle = val;
+    applyHeroText();
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+// ───────────── TALA ADMIN ─────────────
 
 function renderAdminTala(){
   const body = document.getElementById('adminBody');
