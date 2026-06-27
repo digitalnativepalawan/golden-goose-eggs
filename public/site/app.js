@@ -797,11 +797,20 @@ let pulseCategory = 'all';
 let pulseTab = 'feed';
 
 function openPulsePanel(){
-  requireAuth(()=>{
-    document.getElementById('pulsePanel').classList.add('open');
-    renderPulseFeed();
-  });
+  document.getElementById('pulsePanel').classList.add('open');
+  renderPulseFeed();
 }
+
+// Stable per-browser ID used to attribute likes & rate-limit posting (no auth).
+function pulseDeviceId(){
+  try{
+    let id = localStorage.getItem('pulse_device_id');
+    if(!id){ id = 'd_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('pulse_device_id', id); }
+    return id;
+  }catch(_){ return 'd_anon'; }
+}
+function pulseSavedName(){ try{ return localStorage.getItem('pulse_display_name') || ''; }catch(_){ return ''; } }
+function pulseSaveName(n){ try{ if(n) localStorage.setItem('pulse_display_name', n); }catch(_){ } }
 
 function closePulsePanel(){
   const panel = document.getElementById('pulsePanel');
@@ -886,28 +895,26 @@ function relTime(iso){
 }
 
 async function togglePulseLike(btn, postId){
-  requireAuth(async ()=>{
-    const liked = pulseLikedSet.has(postId);
-    const span = btn.querySelector('span');
-    const cur = parseInt(span.textContent, 10) || 0;
-    // Optimistic UI
-    if(liked){
-      pulseLikedSet.delete(postId);
-      btn.classList.remove('liked');
-      span.textContent = Math.max(0, cur - 1);
-      const { error } = await sb.from('pulse_likes').delete().eq('post_id', postId).eq('user_id', currentUser.id);
-      if(error){ pulseLikedSet.add(postId); btn.classList.add('liked'); span.textContent = cur; alert('Could not unlike: '+error.message); }
-    } else {
-      pulseLikedSet.add(postId);
-      btn.classList.add('liked');
-      span.textContent = cur + 1;
-      const { error } = await sb.from('pulse_likes').insert({ post_id: postId, user_id: currentUser.id });
-      if(error && error.code !== '23505'){ // ignore unique-violation
-        pulseLikedSet.delete(postId); btn.classList.remove('liked'); span.textContent = cur;
-        alert('Could not like: '+error.message);
-      }
+  const device = pulseDeviceId();
+  const liked = pulseLikedSet.has(postId);
+  const span = btn.querySelector('span');
+  const cur = parseInt(span.textContent, 10) || 0;
+  if(liked){
+    pulseLikedSet.delete(postId);
+    btn.classList.remove('liked');
+    span.textContent = Math.max(0, cur - 1);
+    const { error } = await sb.from('pulse_likes').delete().eq('post_id', postId).eq('device_id', device);
+    if(error){ pulseLikedSet.add(postId); btn.classList.add('liked'); span.textContent = cur; alert('Could not unlike: '+error.message); }
+  } else {
+    pulseLikedSet.add(postId);
+    btn.classList.add('liked');
+    span.textContent = cur + 1;
+    const { error } = await sb.from('pulse_likes').insert({ post_id: postId, device_id: device });
+    if(error && error.code !== '23505'){
+      pulseLikedSet.delete(postId); btn.classList.remove('liked'); span.textContent = cur;
+      alert('Could not like: '+error.message);
     }
-  });
+  }
 }
 
 async function renderPulseFeed(){
@@ -941,19 +948,19 @@ async function renderPulseFeed(){
     if(profs) profs.forEach(p => profileById.set(p.id, p));
   }
 
-  // Load the current user's likes so the heart state is correct
+  // Load this device's likes so the heart state is correct
   pulseLikedSet = new Set();
-  if(currentUser && rows && rows.length){
+  if(rows && rows.length){
     const ids = rows.map(r=>r.id);
-    const { data: likes } = await sb.from('pulse_likes').select('post_id').eq('user_id', currentUser.id).in('post_id', ids);
+    const { data: likes } = await sb.from('pulse_likes').select('post_id').eq('device_id', pulseDeviceId()).in('post_id', ids);
     if(likes) likes.forEach(l => pulseLikedSet.add(l.post_id));
   }
 
   pulseFeedById = new Map();
   const posts = (rows || []).map(r => {
-    const prof = profileById.get(r.user_id);
-    const name = r.is_anonymous ? 'Anonymous' : ((prof && prof.display_name) || 'Traveler');
-    const avatar = (!r.is_anonymous && prof && prof.avatar_url) || null;
+    const prof = r.user_id ? profileById.get(r.user_id) : null;
+    const name = r.display_name || (prof && prof.display_name) || 'Anonymous traveler';
+    const avatar = (prof && prof.avatar_url) || null;
     const mapped = {
       id: r.id,
       cat: r.category,
@@ -988,15 +995,14 @@ let pulseComposeImageDataUrl = null;
 let pulseNextPostId = 1000; // mock IDs for session-local posts, won't collide with seeded 1-12
 
 function openPulseCompose(){
-  requireAuth(()=>{
-    document.getElementById('pulseComposeText').value = '';
-    document.getElementById('pulseComposeCategory').value = pulseCategory !== 'all' ? pulseCategory : 'all';
-    document.getElementById('pulseComposeAnon').checked = false;
-    removePulseComposeImage();
-    updatePulseComposeState();
-    document.getElementById('pulseComposeOverlay').classList.add('active');
-    document.getElementById('pulseComposeSheet').classList.add('open');
-  });
+  document.getElementById('pulseComposeText').value = '';
+  document.getElementById('pulseComposeCategory').value = pulseCategory !== 'all' ? pulseCategory : 'all';
+  const nameEl = document.getElementById('pulseComposeName');
+  if(nameEl) nameEl.value = pulseSavedName();
+  removePulseComposeImage();
+  updatePulseComposeState();
+  document.getElementById('pulseComposeOverlay').classList.add('active');
+  document.getElementById('pulseComposeSheet').classList.add('open');
 }
 
 function closePulseCompose(){
@@ -1035,22 +1041,32 @@ function updatePulseComposeState(){
   postBtn.disabled = !text && !pulseComposeImageDataUrl;
 }
 
+let pulseLastPostAt = 0;
 async function submitPulsePost(){
   const text = document.getElementById('pulseComposeText').value.trim();
   if(!text && !pulseComposeImageDataUrl) return;
-  if(!currentUser){ openLoginModal(); return; }
+
+  // Light client-side rate limit: 1 post per 30s per device.
+  const now = Date.now();
+  if(now - pulseLastPostAt < 30000){
+    alert('Please wait a few seconds before posting again.');
+    return;
+  }
 
   const cat = document.getElementById('pulseComposeCategory').value;
-  const anon = document.getElementById('pulseComposeAnon').checked;
+  const nameEl = document.getElementById('pulseComposeName');
+  const displayName = ((nameEl && nameEl.value) || '').trim().slice(0, 40) || null;
+  if(displayName) pulseSaveName(displayName);
   const postBtn = document.getElementById('pulseComposePostBtn');
   postBtn.disabled = true;
 
   const { error } = await sb.from('pulse_posts').insert({
-    user_id: currentUser.id,
+    user_id: currentUser ? currentUser.id : null,
+    display_name: displayName,
     category: cat || 'all',
-    text_content: text || null,
-    image_url: pulseComposeImageDataUrl || null, // TODO: upload to Storage in a follow-up
-    is_anonymous: !!anon,
+    text_content: text ? text.slice(0, 500) : null,
+    image_url: pulseComposeImageDataUrl || null,
+    is_anonymous: !currentUser,
   });
 
   postBtn.disabled = false;
@@ -1059,6 +1075,7 @@ async function submitPulsePost(){
     alert('Could not post: ' + error.message);
     return;
   }
+  pulseLastPostAt = now;
 
   closePulseCompose();
   pulseCategory = 'all';
