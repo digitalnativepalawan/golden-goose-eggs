@@ -778,8 +778,10 @@ let pulseCategory = 'all';
 let pulseTab = 'feed';
 
 function openPulsePanel(){
-  document.getElementById('pulsePanel').classList.add('open');
-  renderPulseFeed();
+  requireAuth(()=>{
+    document.getElementById('pulsePanel').classList.add('open');
+    renderPulseFeed();
+  });
 }
 
 function closePulsePanel(){
