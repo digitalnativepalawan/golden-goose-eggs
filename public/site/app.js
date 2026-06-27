@@ -994,12 +994,16 @@ async function renderPulseFeed(){
 let pulseComposeImageDataUrl = null;
 let pulseNextPostId = 1000; // mock IDs for session-local posts, won't collide with seeded 1-12
 
+let pulseComposeLocation = null;
+
 function openPulseCompose(){
   document.getElementById('pulseComposeText').value = '';
-  document.getElementById('pulseComposeCategory').value = pulseCategory !== 'all' ? pulseCategory : 'all';
+  const initCat = pulseCategory !== 'all' ? pulseCategory : 'all';
+  setPulseCat(initCat);
   const nameEl = document.getElementById('pulseComposeName');
   if(nameEl) nameEl.value = pulseSavedName();
   removePulseComposeImage();
+  clearPulseLocation();
   updatePulseComposeState();
   document.getElementById('pulseComposeOverlay').classList.add('active');
   document.getElementById('pulseComposeSheet').classList.add('open');
@@ -1008,6 +1012,93 @@ function openPulseCompose(){
 function closePulseCompose(){
   document.getElementById('pulseComposeOverlay').classList.remove('active');
   document.getElementById('pulseComposeSheet').classList.remove('open');
+  document.getElementById('pulseComposeCatMenu').style.display = 'none';
+  closePulseLocPicker();
+}
+
+// ── Custom channel dropdown ──
+function togglePulseCatMenu(e){
+  if(e) e.stopPropagation();
+  const menu = document.getElementById('pulseComposeCatMenu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+function selectPulseCat(btn){
+  setPulseCat(btn.dataset.val, btn.dataset.label);
+  document.getElementById('pulseComposeCatMenu').style.display = 'none';
+}
+function setPulseCat(val, label){
+  document.getElementById('pulseComposeCategory').value = val;
+  if(!label){
+    const btn = document.querySelector(`#pulseComposeCatMenu button[data-val="${val}"]`);
+    label = btn ? btn.dataset.label : 'General';
+  }
+  document.getElementById('pulseComposeCatLabel').textContent = label;
+  document.querySelectorAll('#pulseComposeCatMenu button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.val === val);
+  });
+}
+document.addEventListener('click', (e)=>{
+  const menu = document.getElementById('pulseComposeCatMenu');
+  const btn = document.getElementById('pulseComposeCatBtn');
+  if(menu && menu.style.display === 'block' && !menu.contains(e.target) && e.target !== btn && !btn.contains(e.target)){
+    menu.style.display = 'none';
+  }
+});
+
+// ── Location picker ──
+function openPulseLocPicker(){
+  const list = document.getElementById('pulseLocList');
+  const items = (Array.isArray(destinations) && destinations.length ? destinations : []).slice().sort((a,b)=> a.name.localeCompare(b.name));
+  list.innerHTML = items.map(d=>`
+    <button type="button" onclick="pickPulseLocation('${escapeHtml(d.name).replace(/'/g,"\\'")}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;color:var(--ocean-teal-light)"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      ${escapeHtml(d.name)}
+    </button>
+  `).join('');
+  document.getElementById('pulseLocOverlay').classList.add('active');
+  document.getElementById('pulseLocSheet').classList.add('open');
+}
+function closePulseLocPicker(){
+  const o = document.getElementById('pulseLocOverlay');
+  const s = document.getElementById('pulseLocSheet');
+  if(o) o.classList.remove('active');
+  if(s) s.classList.remove('open');
+}
+function pickPulseLocation(name){
+  pulseComposeLocation = name;
+  const chip = document.getElementById('pulseComposeLocChip');
+  document.getElementById('pulseComposeLocChipText').textContent = name;
+  chip.style.display = 'inline-flex';
+  closePulseLocPicker();
+}
+function clearPulseLocation(){
+  pulseComposeLocation = null;
+  const chip = document.getElementById('pulseComposeLocChip');
+  if(chip) chip.style.display = 'none';
+}
+function useCurrentLocation(){
+  if(!navigator.geolocation){
+    alert('Geolocation is not available on this device.');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition((pos)=>{
+    const { latitude:lat, longitude:lng } = pos.coords;
+    const items = Array.isArray(destinations) ? destinations : [];
+    let best = null, bestKm = Infinity;
+    const toRad = (d)=> d * Math.PI / 180;
+    for(const d of items){
+      if(typeof d.lat !== 'number' || typeof d.lng !== 'number') continue;
+      const dLat = toRad(d.lat - lat), dLng = toRad(d.lng - lng);
+      const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat))*Math.cos(toRad(d.lat))*Math.sin(dLng/2)**2;
+      const km = 2 * 6371 * Math.asin(Math.sqrt(a));
+      if(km < bestKm){ bestKm = km; best = d; }
+    }
+    if(best && bestKm <= 5) pickPulseLocation(best.name);
+    else if(best && bestKm <= 30) pickPulseLocation(`Near ${best.name}`);
+    else pickPulseLocation('Near San Vicente');
+  }, (err)=>{
+    alert('Could not get your location: ' + (err.message || 'permission denied'));
+  }, { enableHighAccuracy:true, timeout:8000, maximumAge:60000 });
 }
 
 function handlePulseComposeImage(event){
