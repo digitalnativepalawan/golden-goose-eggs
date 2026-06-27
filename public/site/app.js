@@ -1157,6 +1157,7 @@ async function submitPulsePost(){
     category: cat || 'all',
     text_content: text ? text.slice(0, 500) : null,
     image_url: pulseComposeImageDataUrl || null,
+    location_text: pulseComposeLocation || null,
     is_anonymous: !currentUser,
   });
 
