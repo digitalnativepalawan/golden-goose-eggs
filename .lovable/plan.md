@@ -1,49 +1,36 @@
-## Root causes
+## Goal
+Make Pulse fully open — anyone can read, post, like, and comment without signing in. Remove every auth gate around Pulse.
 
-I traced "no one can post or chat in Pulse" to three independent issues, not just RLS:
+## Why this is simple
+Pulse is a public community feed for San Vicente travelers. Forcing magic-link/Google/Apple just to drop a comment kills participation. We'll let anyone post anonymously; identity is optional.
 
-1. **Missing GRANTs on Pulse tables.** RLS policies on `pulse_posts`, `pulse_comments`, `pulse_likes` are actually correct (`INSERT WITH CHECK (auth.uid() = user_id)`, public `SELECT`, owner `UPDATE/DELETE`). But `information_schema.role_table_grants` returns **zero rows** for all three tables — `authenticated`, `anon`, and `service_role` have no privileges at all. PostgREST denies the request before RLS even runs, so every read and insert fails with a permission error. This is the primary blocker.
-2. **`pulse_likes.user_id` is nullable.** The `INSERT WITH CHECK (auth.uid() = user_id)` policy fails silently when the client omits `user_id`, because `null = uuid` evaluates to null/false. Needs `NOT NULL`.
-3. **Pulse code never touches the database.** `submitPulsePost()` only pushes to an in-memory `PULSE_POSTS` array; `renderPulseFeed()` renders that same hardcoded array; `togglePulseLike()` only toggles a CSS class. Even with GRANTs fixed, nothing would persist or appear across sessions. And `openPulsePanel()` has no `requireAuth` gate, so a signed-out user can open Compose and hit a confusing failure.
+## Why the Google Client ID prompt appeared (FYI)
+In Backend → Users → Auth Settings → Google, you toggled **"Your own credentials"**, which requires you to register an app in Google Cloud Console and paste a Client ID + Secret. The **"Managed by Lovable"** option right above it needs zero setup — Lovable provides the credentials. After this plan, you won't need either, because we're removing sign-in from Pulse entirely.
 
-Magic-link auth itself (`sb.auth.signInWithOtp` with `emailRedirectTo: window.location.href`) is wired correctly and `onAuthStateChange` already updates `currentUser` — that part works once the user clicks the link in the same browser.
+## Changes
 
-## Fix
+### 1. Frontend (`public/site/app.js` + `public/site/index.html`)
+- Remove the `requireAuth(...)` wrapper from `openPulsePanel()` — anyone can open it.
+- Remove `requireAuth(...)` from `togglePulseLike()` and `submitPulsePost()`.
+- Make every post anonymous by default: drop the "Post anonymously" toggle, always insert with `is_anonymous: true` and `user_id: null`.
+- Display name = whatever the user types in a simple "Your name (optional)" field, stored in a new `display_name` column. Falls back to "Anonymous traveler".
+- Likes: store one like per browser using a `localStorage` device id (no auth). Prevent double-likes client-side; server uniqueness keyed on `(post_id, device_id)`.
+- Remove the login modal trigger from the Pulse flow. Login modal stays available only for things that genuinely need an account later (none right now).
 
-### 1. Migration — GRANTs + tighten likes
+### 2. Database migration
+- `pulse_posts`: make `user_id` nullable, add `display_name text`.
+- `pulse_likes`: make `user_id` nullable, add `device_id text not null`, replace unique constraint with `(post_id, device_id)`.
+- `pulse_comments`: make `user_id` nullable, add `display_name text`.
+- RLS: allow `anon` to `SELECT` and `INSERT` on all three tables. Keep `UPDATE`/`DELETE` restricted (no edit/delete from anon — prevents drive-by vandalism). Grants updated to include `anon` INSERT.
 
-```sql
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.pulse_posts    TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.pulse_comments TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.pulse_likes    TO authenticated;
-GRANT SELECT ON public.pulse_posts, public.pulse_comments, public.pulse_likes TO anon;
-GRANT ALL ON public.pulse_posts, public.pulse_comments, public.pulse_likes TO service_role;
+### 3. Auth providers (optional cleanup)
+- You can ignore the Google Client ID screen entirely — close it without saving.
+- Optionally: hide the Google/Apple/Email buttons since nothing in the app requires sign-in anymore. (Say the word and I'll remove them; otherwise I'll leave the login modal dormant in case you re-enable accounts later.)
 
-ALTER TABLE public.pulse_likes ALTER COLUMN user_id SET NOT NULL;
-ALTER TABLE public.pulse_likes ADD CONSTRAINT pulse_likes_unique UNIQUE (post_id, user_id);
-```
-
-(Identity columns and RLS policies are already correct — no schema changes needed there.)
-
-### 2. `public/site/app.js` — wire Pulse to Supabase
-
-- **`openPulsePanel()`** — wrap body in `requireAuth(...)` so signed-out users see the login modal first; after sign-in the panel opens automatically via the existing `pendingProtectedAction` flow.
-- **`renderPulseFeed()`** — replace the hardcoded `PULSE_POSTS` filter with `await sb.from('pulse_posts').select('*, pulse_likes(count), pulse_comments(count)').order('created_at',{ascending:false})`, optionally filtered by `category`. Map rows into the existing `pulseCardHtml()` shape (name from `traveler_profiles` join or "Anonymous" when `is_anonymous`, `time` from `created_at` via a small relative-time helper, `likes`/`comments` from the count aggregates). Keep a short loading state and a clear error message instead of failing silently.
-- **`submitPulsePost()`** — `await sb.from('pulse_posts').insert({ user_id: currentUser.id, category, text_content, image_url, location_text, is_anonymous }).select().single()`. On success, refresh the feed from the DB (don't push into the local array). On error, surface the message in the compose sheet. Image upload to the existing `destination-images` (or a new `pulse-images`) bucket is out of scope for this pass — store the data URL in `image_url` short-term, or skip image until storage is wired.
-- **`togglePulseLike(btn, postId)`** — `requireAuth(...)`. Insert into `pulse_likes` on like, delete on unlike (`.delete().eq('post_id',id).eq('user_id', currentUser.id)`), then update the count in the DOM from the response.
-- Keep the existing in-memory `PULSE_POSTS` only as a fallback for the "no data yet" empty state.
-
-### 3. End-to-end test
-
-After the migration runs and the JS is updated:
-- Sign in via magic link in a real browser (Playwright), confirm `sb.auth.getSession()` returns a session.
-- Open Pulse → confirm feed loads from DB (initially empty).
-- Compose a post → confirm a row lands in `pulse_posts` with the correct `user_id` and that it appears at the top of the feed.
-- Tap like → confirm a row in `pulse_likes` and the count increments; tap again → row removed, count decrements.
-- Sign out → confirm Pulse panel re-prompts for login on next open.
+## Spam/abuse note
+Fully open posting attracts spam eventually. For now we rely on: device-id rate limiting (1 post / 30s client-side), max length on text, and the ability for you (as owner) to delete rows from the backend. If spam shows up later, we add a lightweight captcha or re-introduce optional sign-in for posting only.
 
 ## Out of scope
-
-- Comments UI (still "coming soon" button) — only the table grants/RLS are touched.
-- Image upload to Storage — covered in a follow-up once Pulse posting is verified.
-- Google / Apple OAuth providers — magic link only, as today.
+- Comments UI (still a "coming soon" stub).
+- Image uploads to Storage.
+- Moderation dashboard.
