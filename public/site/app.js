@@ -1358,6 +1358,105 @@ async function submitPulsePost(){
   document.getElementById('pulseBody').scrollTo({top:0, behavior:'smooth'});
 }
 
+// ═══════════════════════════════════════════════════════
+// HERO WEATHER WIDGET — small, non-critical visual touch under
+// the hero subtitle. Uses Open-Meteo (no API key, no signup,
+// free for non-commercial use up to 10k calls/day). Client-side
+// only, cached in localStorage for 10 minutes so a page refresh
+// doesn't re-fetch immediately. If the request fails for any
+// reason, the widget simply stays hidden — this is decoration,
+// never allowed to show an error or interrupt the page.
+// ═══════════════════════════════════════════════════════
+const SANVIC_LAT = 10.50, SANVIC_LNG = 119.22;
+const WEATHER_CACHE_KEY = 'sanvic_weather_cache_v1';
+const WEATHER_CACHE_MS = 10 * 60 * 1000; // 10 minutes
+
+// Open-Meteo WMO weather codes -> a small label + simple inline SVG icon.
+// Codes grouped into the handful of states that matter for a quick glance.
+function weatherCodeToDisplay(code){
+  if(code === 0) return { label: 'Clear', icon: 'sun' };
+  if([1,2,3].includes(code)) return { label: 'Partly cloudy', icon: 'cloud-sun' };
+  if([45,48].includes(code)) return { label: 'Foggy', icon: 'cloud' };
+  if([51,53,55,56,57].includes(code)) return { label: 'Drizzle', icon: 'cloud-drizzle' };
+  if([61,63,65,66,67,80,81,82].includes(code)) return { label: 'Rain', icon: 'cloud-rain' };
+  if([95,96,99].includes(code)) return { label: 'Storms', icon: 'cloud-lightning' };
+  if([71,73,75,77,85,86].includes(code)) return { label: 'Showers', icon: 'cloud-rain' };
+  return { label: 'Cloudy', icon: 'cloud' };
+}
+
+const WEATHER_ICONS = {
+  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>',
+  'cloud-sun': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2M4.93 4.93l1.41 1.41M2 12h2"/><path d="M9.5 14.5A4.5 4.5 0 1 1 13.74 8h.76a4 4 0 0 1 0 8h-7a3.5 3.5 0 0 1-.99-1.5z"/></svg>',
+  cloud: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.6A4 4 0 0 0 6 19h11.5z"/></svg>',
+  'cloud-drizzle': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 15a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.6A4 4 0 0 0 6 15h11.5z"/><line x1="8" y1="19" x2="8" y2="21"/><line x1="12" y1="19" x2="12" y2="21"/><line x1="16" y1="19" x2="16" y2="21"/></svg>',
+  'cloud-rain': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 13a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.6A4 4 0 0 0 4.5 13h11.5z"/><line x1="8" y1="19" x2="8" y2="21"/><line x1="12" y1="19" x2="12" y2="21"/><line x1="16" y1="19" x2="16" y2="21"/></svg>',
+  'cloud-lightning': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 13a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.6A4 4 0 0 0 6 13h11.5z"/><polyline points="13 14 11 18 14 18 12 22"/></svg>',
+  sunset: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="9" x2="12" y2="2"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="19.78" y1="10.22" x2="18.36" y2="11.64"/><line x1="1" y1="18" x2="23" y2="18"/><polyline points="8 6 12 2 16 6"/></svg>'
+};
+
+async function initHeroWeather(){
+  try {
+    const cached = getWeatherCache();
+    if(cached){
+      renderHeroWeather(cached);
+      return;
+    }
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${SANVIC_LAT}&longitude=${SANVIC_LNG}&current=temperature_2m,weather_code&daily=sunset&timezone=Asia%2FManila`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('Weather request failed');
+    const data = await res.json();
+
+    const temp = data.current && data.current.temperature_2m;
+    const code = data.current && data.current.weather_code;
+    const sunsetIso = data.daily && data.daily.sunset && data.daily.sunset[0];
+    if(temp == null || code == null) throw new Error('Unexpected weather response shape');
+
+    const payload = { temp, code, sunsetIso, fetchedAt: Date.now() };
+    setWeatherCache(payload);
+    renderHeroWeather(payload);
+  } catch(err){
+    // Decoration only — fail silently, widget just stays hidden.
+    console.warn('[SANVIC] Hero weather unavailable:', err);
+  }
+}
+
+function getWeatherCache(){
+  try {
+    const raw = localStorage.getItem(WEATHER_CACHE_KEY);
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    if(!parsed.fetchedAt || Date.now() - parsed.fetchedAt > WEATHER_CACHE_MS) return null;
+    return parsed;
+  } catch(err){
+    return null;
+  }
+}
+
+function setWeatherCache(payload){
+  try { localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(payload)); } catch(err){ /* ignore quota/private-mode errors */ }
+}
+
+function renderHeroWeather(payload){
+  const widget = document.getElementById('heroWeather');
+  if(!widget) return;
+
+  const { label, icon } = weatherCodeToDisplay(payload.code);
+  const tempC = Math.round(payload.temp);
+
+  document.getElementById('hwTemp').innerHTML = `${WEATHER_ICONS[icon]}${tempC}°C`;
+  document.getElementById('hwCondition').textContent = label;
+
+  if(payload.sunsetIso){
+    const sunsetDate = new Date(payload.sunsetIso);
+    const timeStr = sunsetDate.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true });
+    document.getElementById('hwSunset').innerHTML = `${WEATHER_ICONS.sunset}Sunset ${timeStr}`;
+  } else {
+    document.getElementById('hwSunset').style.display = 'none';
+  }
+
+  widget.style.display = '';
+}
+
 function getYoutubeId(url){
   if(!url) return '';
   const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
@@ -1793,6 +1892,7 @@ window.addEventListener('load',()=>{
   setTimeout(animPlaceholder,2800);
   setTimeout(loadVoices,800);
   initAuth();
+  initHeroWeather();
 
   // Show dock & orb after splash
   setTimeout(()=>{
