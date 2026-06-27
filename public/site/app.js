@@ -928,6 +928,7 @@ async function submitPulseComment(postId){
     post_id: postId,
     user_id: currentUser ? currentUser.id : null,
     display_name: name,
+    is_anonymous: !name,
     text_content: text.slice(0,300),
   });
   txtEl.disabled = false;
