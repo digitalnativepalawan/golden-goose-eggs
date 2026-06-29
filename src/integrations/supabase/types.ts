@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      destination_categories: {
+        Row: {
+          color: string
+          created_at: string
+          id: number
+          key: string
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: never
+          key: string
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: never
+          key?: string
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       destinations: {
         Row: {
           category: string
@@ -288,6 +315,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      site_settings: {
+        Row: {
+          key: string
+          updated_at: string | null
+          value: string | null
+        }
+        Insert: {
+          key: string
+          updated_at?: string | null
+          value?: string | null
+        }
+        Update: {
+          key?: string
+          updated_at?: string | null
+          value?: string | null
+        }
+        Relationships: []
       }
       tala_responses: {
         Row: {
