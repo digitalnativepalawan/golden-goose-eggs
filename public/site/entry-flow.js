@@ -69,9 +69,17 @@
   function bindAction(id, fn){
     const el=document.getElementById(id);
     if(!el) return;
-    el.onclick=fn;
-    el.onpointerup=function(e){ e.preventDefault(); fn(); };
-    el.ontouchend=function(e){ e.preventDefault(); fn(); };
+    let last = 0;
+    const run = function(e){
+      if(e){ e.preventDefault(); e.stopPropagation(); }
+      const now = Date.now();
+      if(now - last < 450) return;
+      last = now;
+      fn();
+    };
+    el.onclick = run;
+    el.onpointerup = run;
+    el.ontouchend = run;
   }
 
   function render(){
