@@ -11,12 +11,5 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   global: { headers: { apikey: SUPABASE_ANON_KEY } },
 });
 
-(function loadSanvicExperienceModules(){
-  const parentV = new URLSearchParams(window.location.search).get('v');
-  const v = parentV || String(Date.now());
-  ['entry-flow.js', 'personalize.js', 'pulse-demo-content.js'].forEach((file) => {
-    const script = document.createElement('script');
-    script.src = file + '?v=' + encodeURIComponent(v);
-    document.body.appendChild(script);
-  });
-})();
+// Experience modules are loaded from index.html after app.js is ready.
+window.SANVIC_EXPERIENCE_MODULES = ['entry-flow.js', 'personalize.js', 'pulse-demo-content.js'];
