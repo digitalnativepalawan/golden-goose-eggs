@@ -7,7 +7,7 @@
     s.id = 'sanvicMapPinNoPulseCss';
     s.textContent = `
       .splash-tagline{color:rgba(255,255,255,.72)!important;text-shadow:0 2px 12px rgba(0,0,0,.55)!important;font-weight:400!important;}
-      .splash-footer{color:rgba(255,255,255,.42)!important;text-shadow:0 2px 10px rgba(0,0,0,.5)!important;font-weight:500!important;}
+      .splash-footer{color:rgba(255,255,255,.72)!important;text-shadow:0 2px 12px rgba(0,0,0,.6)!important;font-weight:600!important;opacity:1!important;}
       .leaflet-control-zoom{display:none!important;visibility:hidden!important;pointer-events:none!important;}
       #talaOrbWrap,.tala-orb-wrap{display:none!important;visibility:hidden!important;pointer-events:none!important;}
       .mk-wrap{width:28px!important;height:28px!important;filter:drop-shadow(0 3px 7px rgba(0,0,0,.55))!important;animation:none!important;}
@@ -18,7 +18,7 @@
 
       @media(max-width:767px){
         .splash-tagline{font-size:.98rem!important;line-height:1.75!important;color:rgba(255,255,255,.76)!important;}
-        .splash-footer{font-size:.68rem!important;color:rgba(255,255,255,.46)!important;letter-spacing:.38em!important;}
+        .splash-footer{font-size:.72rem!important;color:rgba(255,255,255,.76)!important;letter-spacing:.38em!important;opacity:1!important;}
         .bottom-dock{bottom:calc(12px + var(--safe-bottom))!important;width:min(calc(100vw - 42px),430px)!important;padding:6px 7px!important;gap:1px!important;background:rgba(4,12,30,.74)!important;border-color:rgba(255,255,255,.08)!important;box-shadow:0 12px 34px rgba(0,0,0,.34)!important;}
         .dock-item{flex:1!important;width:auto!important;height:48px!important;border-radius:18px!important;gap:2px!important;color:rgba(255,255,255,.72)!important;background:transparent!important;}
         .dock-item svg{width:22px!important;height:22px!important;stroke:rgba(255,255,255,.84)!important;stroke-width:1.9!important;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5));}
