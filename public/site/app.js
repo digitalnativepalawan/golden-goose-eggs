@@ -87,6 +87,8 @@ const DEFAULT_FALLBACK_RESPONSE = `I'm not sure about that, but I can help with:
 
 const DEFAULT_HERO_TITLE = `Discover Palawan<br><em>Differently.</em>`;
 const DEFAULT_HERO_SUBTITLE = ``;
+const DEFAULT_SPLASH_SUBTEXT = `The San Vicente Travel Hub<br>Curated by the people who live here`;
+const DEFAULT_SPLASH_FOOTER = `PALAWAN`;
 
 // ─── LIVE DATA (populated from Supabase, falls back to defaults) ───
 let destinations = [];
@@ -94,6 +96,8 @@ let aiData = [];
 let defaultR = DEFAULT_FALLBACK_RESPONSE;
 let heroTitle = DEFAULT_HERO_TITLE;
 let heroSubtitle = DEFAULT_HERO_SUBTITLE;
+let splashSubtext = DEFAULT_SPLASH_SUBTEXT;
+let splashFooter = DEFAULT_SPLASH_FOOTER;
 let dataReady = false;
 
 // ═══════════════════════════════════════════════════════
@@ -467,12 +471,13 @@ function isSuggestionActiveToday(s){
 
 async function loadDataFromSupabase(){
   try {
-    const [destRes, talaRes, settingsRes, sugRes, siteRes] = await Promise.all([
+    const [destRes, talaRes, settingsRes, sugRes, siteRes, catRes] = await Promise.all([
       sb.from('destinations').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_responses').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_settings').select('*').eq('key', 'default_response').maybeSingle(),
       sb.from('tala_suggestions').select('*').order('sort_order', { ascending: true }),
-      sb.from('site_settings').select('*').in('key', ['hero_title', 'hero_subtitle']),
+      sb.from('site_settings').select('*').in('key', ['hero_title', 'hero_subtitle', 'splash_subtext', 'splash_footer']),
+      sb.from('destination_categories').select('*').order('sort_order', { ascending: true }),
     ]);
 
     if (destRes.error) throw destRes.error;
@@ -482,12 +487,17 @@ async function loadDataFromSupabase(){
     aiData = (talaRes.data && talaRes.data.length) ? talaRes.data.map(r=>({ id:r.id, kw:r.keywords, r:r.response, cat:r.category||'knowledge' })) : DEFAULT_TALA_DATA;
     defaultR = (settingsRes.data && settingsRes.data.value) ? settingsRes.data.value : DEFAULT_FALLBACK_RESPONSE;
     talaSuggestions = (sugRes && sugRes.data && sugRes.data.length) ? sugRes.data : DEFAULT_SUGGESTIONS;
+    applyCategoriesFromRows(catRes && catRes.data);
 
     const siteRows = (siteRes && siteRes.data) ? siteRes.data : [];
     const titleRow = siteRows.find(r => r.key === 'hero_title');
     const subRow = siteRows.find(r => r.key === 'hero_subtitle');
+    const splashSubRow = siteRows.find(r => r.key === 'splash_subtext');
+    const splashFootRow = siteRows.find(r => r.key === 'splash_footer');
     heroTitle = (titleRow && titleRow.value) ? titleRow.value : DEFAULT_HERO_TITLE;
     heroSubtitle = (subRow && subRow.value != null) ? subRow.value : DEFAULT_HERO_SUBTITLE;
+    splashSubtext = (splashSubRow && splashSubRow.value != null) ? splashSubRow.value : DEFAULT_SPLASH_SUBTEXT;
+    splashFooter = (splashFootRow && splashFootRow.value != null) ? splashFootRow.value : DEFAULT_SPLASH_FOOTER;
   } catch(err) {
     console.warn('[SANVIC] Supabase load failed, using built-in defaults:', err);
     destinations = DEFAULT_DESTINATIONS;
@@ -496,8 +506,12 @@ async function loadDataFromSupabase(){
     talaSuggestions = DEFAULT_SUGGESTIONS;
     heroTitle = DEFAULT_HERO_TITLE;
     heroSubtitle = DEFAULT_HERO_SUBTITLE;
+    splashSubtext = DEFAULT_SPLASH_SUBTEXT;
+    splashFooter = DEFAULT_SPLASH_FOOTER;
+    applyCategoriesFromRows(null); // falls through to keeping current catStyle (defaults on first load)
   }
   applyHeroText();
+  applySplashText();
   dataReady = true;
 }
 
@@ -508,14 +522,50 @@ function applyHeroText(){
   if(subEl) subEl.innerHTML = heroSubtitle;
 }
 
-const catStyle = {
-  beaches:{label:"Beaches",color:"#0ea5e9",bg:"rgba(14,165,233,.12)"},
-  islands:{label:"Islands",color:"#8b5cf6",bg:"rgba(139,92,246,.12)"},
-  nature:{label:"Nature",color:"#22c55e",bg:"rgba(34,197,94,.12)"},
-  adventure:{label:"Adventure",color:"#ef4444",bg:"rgba(239,68,68,.12)"},
-  culture:{label:"Culture",color:"#f59e0b",bg:"rgba(245,158,11,.12)"},
-  stays:{label:"Stays",color:"#ec4899",bg:"rgba(236,72,153,.12)"}
+function applySplashText(){
+  const tagEl = document.getElementById('splashTagline');
+  const footEl = document.getElementById('splashFooter');
+  if(tagEl) tagEl.innerHTML = splashSubtext;
+  if(footEl) footEl.innerHTML = splashFooter;
+}
+
+const DEFAULT_CAT_STYLE = {
+  beaches:{label:"Beaches",color:"#0ea5e9"},
+  islands:{label:"Islands",color:"#8b5cf6"},
+  nature:{label:"Nature",color:"#22c55e"},
+  adventure:{label:"Adventure",color:"#ef4444"},
+  culture:{label:"Culture",color:"#f59e0b"},
+  stays:{label:"Stays",color:"#ec4899"}
 };
+
+// Converts a "#rrggbb" hex color into the soft translucent background
+// chip color used throughout (12% opacity), matching the look every
+// existing category already has.
+function hexToBg(hex, alpha){
+  alpha = alpha==null ? .12 : alpha;
+  const h = (hex||'#0ea5e9').replace('#','');
+  const r = parseInt(h.substring(0,2),16) || 0;
+  const g = parseInt(h.substring(2,4),16) || 0;
+  const b = parseInt(h.substring(4,6),16) || 0;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// Mutable — repopulated from destination_categories in Supabase every
+// time data loads. Starts with the built-in defaults so nothing is
+// ever blank before the first load finishes.
+let catStyle = {};
+Object.keys(DEFAULT_CAT_STYLE).forEach(k=>{
+  catStyle[k] = { label: DEFAULT_CAT_STYLE[k].label, color: DEFAULT_CAT_STYLE[k].color, bg: hexToBg(DEFAULT_CAT_STYLE[k].color) };
+});
+
+function applyCategoriesFromRows(rows){
+  if(!rows || !rows.length) return; // keep defaults if the table is empty/unreachable
+  const next = {};
+  rows.forEach(r=>{
+    next[r.key] = { label: r.label, color: r.color || '#0ea5e9', bg: hexToBg(r.color) };
+  });
+  catStyle = next;
+}
 
 // ─── AI ───
 function getAI(input) {
@@ -1862,7 +1912,14 @@ function heroMic(){
 }
 
 // ─── BOTTOM NAV ───
+const DOCK_SEEN_KEY = 'sanvic_dock_seen';
+function dismissDockIntro(){
+  document.getElementById('bottomDock')?.classList.remove('intro-pulse');
+  document.getElementById('dockCoachmark')?.classList.remove('show');
+  localStorage.setItem(DOCK_SEEN_KEY,'1');
+}
 function dockNav(tab){
+  dismissDockIntro();
   document.querySelectorAll('.dock-item').forEach(d=>d.classList.remove('active'));
   document.querySelector(`.dock-item[data-tab="${tab}"]`).classList.add('active');
 
@@ -1921,6 +1978,13 @@ window.addEventListener('load',()=>{
   setTimeout(()=>{
     document.getElementById('bottomDock').classList.add('visible');
     document.getElementById('talaOrbWrap').classList.remove('hidden');
+    if(!localStorage.getItem(DOCK_SEEN_KEY)){
+      setTimeout(()=>{
+        document.getElementById('bottomDock').classList.add('intro-pulse');
+        document.getElementById('dockCoachmark').classList.add('show');
+      },400);
+      setTimeout(dismissDockIntro,5200); // auto-dismiss if user never taps
+    }
   },2600);
 });
 
@@ -2002,9 +2066,125 @@ function escapeHtml(s){
 
 // ───────────── DESTINATIONS ADMIN ─────────────
 
+let destCatPanelOpen = false;
+let editingDestCatId = null; // null = not editing, 'new' = creating, else id
+
+function adminToggleDestCatPanel(){
+  destCatPanelOpen = !destCatPanelOpen;
+  renderAdminDest();
+}
+
+function adminDestCatPanelHtml(){
+  let html = `
+    <div class="admin-field" style="font-size:.7rem;color:var(--white-dim);margin-bottom:10px;">
+      These are the categories available when adding or editing a destination (Beaches, Islands, etc). Add your own, rename, or change the marker color. Deleting a category doesn't delete destinations already using it — they'll just show the category's key until you re-assign them.
+    </div>
+    <button class="admin-add-btn" onclick="adminNewDestCat()">+ Add category</button>`;
+
+  if(editingDestCatId !== null){
+    html += adminDestCatFormHtml();
+  }
+
+  const keys = Object.keys(catStyle);
+  if(!keys.length){
+    html += `<div class="admin-empty">No categories yet.</div>`;
+  } else {
+    html += keys.map(key=>{
+      const c = catStyle[key];
+      return `
+      <div class="admin-list-item">
+        <div class="admin-list-item-head">
+          <div onclick="adminEditDestCat('${escapeHtml(key)}')" style="flex:1;cursor:pointer;display:flex;align-items:center;gap:10px;">
+            <span style="width:14px;height:14px;border-radius:50%;background:${escapeHtml(c.color)};flex-shrink:0;display:inline-block;"></span>
+            <div>
+              <strong>${escapeHtml(c.label)}</strong><br>
+              <span>${escapeHtml(key)}</span>
+            </div>
+          </div>
+          <div class="admin-row-actions">
+            <button class="admin-mini-btn" onclick="adminEditDestCat('${escapeHtml(key)}')">Edit</button>
+            <button class="admin-mini-btn danger" onclick="adminDeleteDestCat('${escapeHtml(key)}')">Delete</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  return html;
+}
+
+function adminDestCatFormHtml(){
+  const isNew = editingDestCatId === 'new';
+  const c = isNew ? {key:'',label:'',color:'#0ea5e9'} : { key: editingDestCatId, ...catStyle[editingDestCatId] };
+  return `
+    <div class="admin-edit-box">
+      <div class="admin-field">
+        <label>Key (lowercase, no spaces — used internally, can't be changed later)</label>
+        <input id="dcfKey" value="${escapeHtml(c.key)}" placeholder="e.g. waterfalls" ${isNew?'':'disabled'}>
+      </div>
+      <div class="admin-field"><label>Label (shown to visitors)</label><input id="dcfLabel" value="${escapeHtml(c.label)}" placeholder="e.g. Waterfalls"></div>
+      <div class="admin-field"><label>Marker / pill color (hex)</label><input id="dcfColor" value="${escapeHtml(c.color)}" placeholder="#0ea5e9"></div>
+      <div class="admin-edit-actions">
+        <button class="admin-save-btn" onclick="adminSaveDestCat('${isNew?'':escapeHtml(c.key)}')">${isNew?'Create':'Save changes'}</button>
+        <button class="admin-cancel-btn" onclick="editingDestCatId=null;renderAdminDest();">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function adminNewDestCat(){ editingDestCatId='new'; renderAdminDest(); }
+function adminEditDestCat(key){ editingDestCatId=key; renderAdminDest(); }
+
+async function adminSaveDestCat(existingKey){
+  const isNew = !existingKey;
+  const key = document.getElementById('dcfKey').value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
+  const label = document.getElementById('dcfLabel').value.trim();
+  const color = document.getElementById('dcfColor').value.trim() || '#0ea5e9';
+  if(!key || !label){ alert('Key and label are both required.'); return; }
+  if(isNew && catStyle[key]){ alert(`A category with the key "${key}" already exists.`); return; }
+
+  try {
+    if(isNew){
+      const sortOrder = Object.keys(catStyle).length;
+      const { error } = await sb.from('destination_categories').insert({ key, label, color, sort_order: sortOrder });
+      if(error) throw error;
+    } else {
+      const { error } = await sb.from('destination_categories').update({ label, color }).eq('key', existingKey);
+      if(error) throw error;
+    }
+    await loadDataFromSupabase();
+    editingDestCatId = null;
+    renderAdminDest();
+    rebuildMarkers(); // marker colors depend on catStyle
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+async function adminDeleteDestCat(key){
+  const inUse = destinations.filter(d=>d.category===key).length;
+  const warn = inUse ? ` ${inUse} destination${inUse===1?'':'s'} currently use this category and will show "${key}" until reassigned.` : '';
+  if(!confirm(`Delete the "${catStyle[key]?.label||key}" category?${warn}`)) return;
+  try {
+    const { error } = await sb.from('destination_categories').delete().eq('key', key);
+    if(error) throw error;
+    await loadDataFromSupabase();
+    renderAdminDest();
+    rebuildMarkers();
+  } catch(err){
+    alert('Delete failed: ' + (err.message || err));
+  }
+}
+
 function renderAdminDest(){
   const body = document.getElementById('adminBody');
-  let html = `<button class="admin-add-btn" onclick="adminNewDest()">+ Add destination</button>`;
+  let html = `
+    <div class="admin-section-toggle" onclick="adminToggleDestCatPanel()">
+      <span>🏷️ Manage categories ${destCatPanelOpen?'▾':'▸'}</span>
+      <span class="admin-section-count">${Object.keys(catStyle).length}</span>
+    </div>
+    <div id="adfCatPanel" style="display:${destCatPanelOpen?'':'none'}">
+      ${adminDestCatPanelHtml()}
+    </div>
+    <button class="admin-add-btn" style="margin-top:14px;" onclick="adminNewDest()">+ Add destination</button>`;
 
   if(adminEditingDestId !== null){
     html += adminDestFormHtml();
@@ -2422,6 +2602,14 @@ function renderAdminSite(){
       <label>Hero subtitle (optional, smaller line under the title)</label>
       <textarea id="adsHeroSubtitle" rows="2" onblur="adminSaveHeroSubtitle()">${escapeHtml(heroSubtitle)}</textarea>
     </div>
+    <div class="admin-field" style="margin-top:18px;">
+      <label>Loading screen subtext (the 2-line tagline under the SANVIC logo — use &lt;br&gt; for the line break)</label>
+      <textarea id="adsSplashSubtext" rows="2" onblur="adminSaveSplashSubtext()">${escapeHtml(splashSubtext)}</textarea>
+    </div>
+    <div class="admin-field">
+      <label>Loading screen footer (small caps text at the bottom of the loader)</label>
+      <textarea id="adsSplashFooter" rows="1" onblur="adminSaveSplashFooter()">${escapeHtml(splashFooter)}</textarea>
+    </div>
     <div class="admin-empty" style="margin-top:6px;">Saves automatically when you click away from a field. Changes appear for every visitor.</div>`;
 }
 
@@ -2447,6 +2635,34 @@ async function adminSaveHeroSubtitle(){
     if(error) throw error;
     heroSubtitle = val;
     applyHeroText();
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+async function adminSaveSplashSubtext(){
+  const val = document.getElementById('adsSplashSubtext').value.trim();
+  if(val === splashSubtext) return;
+  const finalVal = val || DEFAULT_SPLASH_SUBTEXT;
+  try {
+    const { error } = await sb.from('site_settings').upsert({ key: 'splash_subtext', value: finalVal });
+    if(error) throw error;
+    splashSubtext = finalVal;
+    applySplashText();
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+async function adminSaveSplashFooter(){
+  const val = document.getElementById('adsSplashFooter').value.trim();
+  if(val === splashFooter) return;
+  const finalVal = val || DEFAULT_SPLASH_FOOTER;
+  try {
+    const { error } = await sb.from('site_settings').upsert({ key: 'splash_footer', value: finalVal });
+    if(error) throw error;
+    splashFooter = finalVal;
+    applySplashText();
   } catch(err){
     alert('Save failed: ' + (err.message || err));
   }
@@ -2735,10 +2951,11 @@ async function adminSaveDefaultResponse(){
 // ───────────── RESET TO DEFAULTS ─────────────
 
 async function adminResetDefaults(){
-  if(!confirm('This will erase ALL destinations and tala responses in Supabase and replace them with the original built-in defaults. Continue?')) return;
+  if(!confirm('This will erase ALL destinations, categories, and tala responses in Supabase and replace them with the original built-in defaults. Continue?')) return;
   try {
     await sb.from('destinations').delete().neq('id', -1);
     await sb.from('tala_responses').delete().neq('id', -1);
+    await sb.from('destination_categories').delete().neq('id', -1);
 
     const destRows = DEFAULT_DESTINATIONS.map((d,i)=>({
       name:d.name, lat:d.lat, lng:d.lng, category:d.category, image:d.image,
@@ -2746,9 +2963,11 @@ async function adminResetDefaults(){
       rating:d.stats.rating, travel:d.stats.travel, temp:d.stats.temp, season:d.stats.season
     }));
     const talaRows = DEFAULT_TALA_DATA.map((t,i)=>({ keywords:t.kw, response:t.r, sort_order:i }));
+    const catRows = Object.keys(DEFAULT_CAT_STYLE).map((key,i)=>({ key, label: DEFAULT_CAT_STYLE[key].label, color: DEFAULT_CAT_STYLE[key].color, sort_order:i }));
 
     await sb.from('destinations').insert(destRows);
     await sb.from('tala_responses').insert(talaRows);
+    await sb.from('destination_categories').insert(catRows);
     await sb.from('tala_settings').upsert({ key:'default_response', value: DEFAULT_FALLBACK_RESPONSE });
 
     await loadDataFromSupabase();
