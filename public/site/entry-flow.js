@@ -32,7 +32,21 @@
 
   function esc(v){ return String(v||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function saved(){ try{return JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){return null;} }
-  function shouldShow(){ const p=new URLSearchParams(location.search); if(p.get('resetEntry')==='1'){localStorage.removeItem(KEY);return true;} return !saved(); }
+  function resetEntrySession(){
+    try{
+      sessionStorage.removeItem('sanvic_entry_first_layer_opened');
+      sessionStorage.removeItem('sanvic_entry_layer_nudged');
+    }catch(e){}
+  }
+  function shouldShow(){
+    const p=new URLSearchParams(location.search);
+    if(p.get('resetEntry')==='1'){
+      localStorage.removeItem(KEY);
+      resetEntrySession();
+      return true;
+    }
+    return !saved();
+  }
   function tags(){ const out=[]; VIBES.forEach(v=>{ if(state.vibes.includes(v[0])) v[1].forEach(t=>{ if(!out.includes(t)) out.push(t); }); }); return out; }
 
   function css(){
