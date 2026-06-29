@@ -438,6 +438,7 @@ function destRowToObj(row){
     id: row.id, name: row.name, lat: row.lat, lng: row.lng, category: row.category,
     image: row.image, description: row.description, tip: row.tip, color: row.color || '#0ea5e9',
     videoUrl: row.video_url || '', videoType: row.video_type || '', featured: !!row.featured,
+    barangay: row.barangay || '',
     stats: { rating: row.rating, travel: row.travel, temp: row.temp, season: row.season }
   };
 }
