@@ -26,6 +26,9 @@
         .dock-item[data-tab="tala"]{transform:translateY(-3px);}
         .dock-item[data-tab="tala"] svg{width:24px!important;height:24px!important;stroke-width:1.9!important;}
         .dock-item[data-tab="tala"].active{background:rgba(20,184,166,.12)!important;box-shadow:inset 0 0 0 1px rgba(20,184,166,.18),0 8px 18px rgba(0,0,0,.14)!important;}
+
+        .dest-sheet.expanded .sanvic-dest-close{display:flex!important;}
+        .sanvic-dest-close{position:fixed;top:calc(var(--safe-top) + 12px);right:14px;z-index:130;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.12);background:rgba(4,12,30,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);color:rgba(255,255,255,.92);align-items:center;justify-content:center;font-size:24px;line-height:1;box-shadow:0 8px 24px rgba(0,0,0,.32);}
       }
     `;
     document.head.appendChild(s);
@@ -38,6 +41,24 @@
     if(!svg) return;
     svg.outerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l1.7 4.4 4.4 1.7-4.4 1.7L12 15.7l-1.7-4.4-4.4-1.7 4.4-1.7L12 3.5z"/><path d="M18.5 14.5l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8.8-2.1z"/><path d="M5.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8z"/></svg>';
     btn.dataset.talaIconFixed = '1';
+  }
+
+  function ensureDestinationClose(){
+    const sheet = document.getElementById('destSheet');
+    if(!sheet || document.getElementById('sanvicDestClose')) return;
+    const b = document.createElement('button');
+    b.id = 'sanvicDestClose';
+    b.className = 'sanvic-dest-close';
+    b.type = 'button';
+    b.setAttribute('aria-label','Back to map');
+    b.textContent = '×';
+    b.style.display = 'none';
+    b.onclick = function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      if(typeof closeDestSheet === 'function') closeDestSheet();
+    };
+    sheet.appendChild(b);
   }
 
   function applyMapOpening(){
@@ -60,6 +81,7 @@
     const timer = setInterval(function(){
       tries += 1;
       replaceTalaDockIcon();
+      ensureDestinationClose();
       applyMapOpening();
       if(tries > 80) clearInterval(timer);
     }, 150);
