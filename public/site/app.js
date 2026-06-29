@@ -2180,6 +2180,135 @@ async function adminDeleteDestCat(key){
   }
 }
 
+let nearbyPanelOpen = false;
+let editingNearbyId = null; // null = not editing, 'new' = creating, else id
+
+function adminToggleNearbyPanel(){
+  nearbyPanelOpen = !nearbyPanelOpen;
+  renderAdminDest();
+}
+
+const NEARBY_CAT_LABELS = { food:'Food', shop:'Shop', service:'Service', stay:'Stay' };
+
+function adminNearbyPanelHtml(){
+  let html = `
+    <div class="admin-field" style="font-size:.7rem;color:var(--white-dim);margin-bottom:10px;">
+      Shown when a visitor taps "What's around me" on a destination — grouped by barangay, the same barangay set on that destination below. Add real food/shop/service spots so every barangay has something useful.
+    </div>
+    <button class="admin-add-btn" onclick="adminNewNearby()">+ Add place</button>`;
+
+  if(editingNearbyId !== null){
+    html += adminNearbyFormHtml();
+  }
+
+  const barangays = Object.keys(nearbyPlacesByBarangay).sort();
+  if(!barangays.length){
+    html += `<div class="admin-empty">No nearby places yet.</div>`;
+  } else {
+    barangays.forEach(b=>{
+      const items = nearbyPlacesByBarangay[b];
+      if(!items.length) return;
+      html += `<div style="font-size:.68rem;color:var(--white-dim);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 6px;">Brgy. ${escapeHtml(b)}</div>`;
+      html += items.map(p=>`
+        <div class="admin-list-item">
+          <div class="admin-list-item-head">
+            <div onclick="adminEditNearby(${p.id})" style="flex:1;cursor:pointer;display:flex;align-items:center;gap:10px;">
+              <span style="font-size:1.1rem;">${escapeHtml(p.icon)}</span>
+              <div>
+                <strong>${escapeHtml(p.name)}</strong> <span style="color:var(--white-dim);font-size:.68rem;">(${NEARBY_CAT_LABELS[p.cat]||p.cat})</span><br>
+                <span>${escapeHtml(p.desc)}</span>
+              </div>
+            </div>
+            <div class="admin-row-actions">
+              <button class="admin-mini-btn" onclick="adminEditNearby(${p.id})">Edit</button>
+              <button class="admin-mini-btn danger" onclick="adminDeleteNearby(${p.id})">Delete</button>
+            </div>
+          </div>
+        </div>`).join('');
+    });
+  }
+  return html;
+}
+
+function adminNearbyFormHtml(){
+  const isNew = editingNearbyId === 'new';
+  let p = null;
+  if(!isNew){
+    for(const b in nearbyPlacesByBarangay){
+      const found = nearbyPlacesByBarangay[b].find(x=>x.id===editingNearbyId);
+      if(found){ p = {...found, barangay:b}; break; }
+    }
+  }
+  p = p || {barangay:'', name:'', cat:'food', desc:'', dist:'', icon:'📍'};
+  return `
+    <div class="admin-edit-box">
+      <div class="admin-field">
+        <label>Barangay (must match a destination's barangay exactly)</label>
+        <input id="npfBarangay" list="npfBarangayList" value="${escapeHtml(p.barangay)}" placeholder="e.g. Poblacion">
+        <datalist id="npfBarangayList">${Array.from(new Set([...Object.keys(nearbyPlacesByBarangay), ...destinations.map(d=>d.barangay).filter(Boolean)])).map(b=>`<option value="${escapeHtml(b)}">`).join('')}</datalist>
+      </div>
+      <div class="admin-field"><label>Name</label><input id="npfName" value="${escapeHtml(p.name)}" placeholder="e.g. Mango Bar and Restaurant"></div>
+      <div class="admin-grid-2">
+        <div class="admin-field"><label>Category</label>
+          <select id="npfCat">
+            <option value="food" ${p.cat==='food'?'selected':''}>Food</option>
+            <option value="shop" ${p.cat==='shop'?'selected':''}>Shop</option>
+            <option value="service" ${p.cat==='service'?'selected':''}>Service</option>
+            <option value="stay" ${p.cat==='stay'?'selected':''}>Stay</option>
+          </select>
+        </div>
+        <div class="admin-field"><label>Icon (single emoji)</label><input id="npfIcon" value="${escapeHtml(p.icon)}" placeholder="🍽️"></div>
+      </div>
+      <div class="admin-field"><label>Short description</label><input id="npfDesc" value="${escapeHtml(p.desc)}" placeholder="e.g. Grilled seafood, beachfront seating"></div>
+      <div class="admin-field"><label>Distance / location label</label><input id="npfDist" value="${escapeHtml(p.dist)}" placeholder="e.g. Poblacion town, 5 min walk"></div>
+      <div class="admin-edit-actions">
+        <button class="admin-save-btn" onclick="adminSaveNearby(${isNew?"'new'":editingNearbyId})">${isNew?'Create':'Save changes'}</button>
+        <button class="admin-cancel-btn" onclick="editingNearbyId=null;renderAdminDest();">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function adminNewNearby(){ editingNearbyId='new'; renderAdminDest(); }
+function adminEditNearby(id){ editingNearbyId=id; renderAdminDest(); }
+
+async function adminSaveNearby(id){
+  const barangay = document.getElementById('npfBarangay').value.trim();
+  const name = document.getElementById('npfName').value.trim();
+  const cat = document.getElementById('npfCat').value;
+  const icon = document.getElementById('npfIcon').value.trim() || '📍';
+  const desc = document.getElementById('npfDesc').value.trim();
+  const dist = document.getElementById('npfDist').value.trim();
+  if(!barangay || !name){ alert('Barangay and name are both required.'); return; }
+
+  try {
+    if(id === 'new'){
+      const sortOrder = (nearbyPlacesByBarangay[barangay]||[]).length;
+      const { error } = await sb.from('nearby_places').insert({ barangay, name, category:cat, description:desc, distance_label:dist, icon, sort_order:sortOrder });
+      if(error) throw error;
+    } else {
+      const { error } = await sb.from('nearby_places').update({ barangay, name, category:cat, description:desc, distance_label:dist, icon }).eq('id', id);
+      if(error) throw error;
+    }
+    await loadDataFromSupabase();
+    editingNearbyId = null;
+    renderAdminDest();
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+async function adminDeleteNearby(id){
+  if(!confirm('Delete this place?')) return;
+  try {
+    const { error } = await sb.from('nearby_places').delete().eq('id', id);
+    if(error) throw error;
+    await loadDataFromSupabase();
+    renderAdminDest();
+  } catch(err){
+    alert('Delete failed: ' + (err.message || err));
+  }
+}
+
 function renderAdminDest(){
   const body = document.getElementById('adminBody');
   let html = `
