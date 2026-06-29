@@ -87,6 +87,8 @@ const DEFAULT_FALLBACK_RESPONSE = `I'm not sure about that, but I can help with:
 
 const DEFAULT_HERO_TITLE = `Discover Palawan<br><em>Differently.</em>`;
 const DEFAULT_HERO_SUBTITLE = ``;
+const DEFAULT_SPLASH_SUBTEXT = `The San Vicente Travel Hub<br>Curated by the people who live here`;
+const DEFAULT_SPLASH_FOOTER = `PALAWAN`;
 
 // ─── LIVE DATA (populated from Supabase, falls back to defaults) ───
 let destinations = [];
@@ -94,6 +96,8 @@ let aiData = [];
 let defaultR = DEFAULT_FALLBACK_RESPONSE;
 let heroTitle = DEFAULT_HERO_TITLE;
 let heroSubtitle = DEFAULT_HERO_SUBTITLE;
+let splashSubtext = DEFAULT_SPLASH_SUBTEXT;
+let splashFooter = DEFAULT_SPLASH_FOOTER;
 let dataReady = false;
 
 // ═══════════════════════════════════════════════════════
