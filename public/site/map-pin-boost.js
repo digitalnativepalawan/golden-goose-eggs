@@ -1,15 +1,15 @@
-// SANVIC map pin glow
-// Visual-only marker styling. Does not touch onboarding, storage, map state, panels, or navigation.
+// SANVIC map pin cleanup
+// Visual-only: removes radar/pulsing halos from map location pins.
 (function(){
   function injectPinStyles(){
-    if(document.getElementById('sanvicMapPinGlowCss')) return;
+    if(document.getElementById('sanvicMapPinNoPulseCss')) return;
     const s = document.createElement('style');
-    s.id = 'sanvicMapPinGlowCss';
+    s.id = 'sanvicMapPinNoPulseCss';
     s.textContent = `
-      .mk-wrap{width:44px!important;height:44px!important;filter:drop-shadow(0 8px 18px rgba(0,0,0,.55));}
-      .mk-ring{border-width:2.5px!important;opacity:.72!important;transform:scale(1.12);animation:mkp 2.2s ease-in-out infinite!important;}
-      .mk-dot{width:14px!important;height:14px!important;border:2px solid rgba(255,255,255,.95)!important;box-shadow:0 0 0 4px rgba(2,14,38,.72),0 0 22px rgba(255,255,255,.65)!important;}
-      .mk-glow{inset:-14px!important;opacity:.5!important;filter:blur(1px);}
+      .mk-wrap{width:34px!important;height:34px!important;filter:drop-shadow(0 3px 8px rgba(0,0,0,.5));animation:none!important;}
+      .mk-ring{display:none!important;animation:none!important;opacity:0!important;}
+      .mk-glow{display:none!important;animation:none!important;opacity:0!important;}
+      .mk-dot{width:12px!important;height:12px!important;border:2px solid rgba(255,255,255,.96)!important;box-shadow:0 2px 8px rgba(0,0,0,.55)!important;}
       .leaflet-marker-icon{overflow:visible!important;}
     `;
     document.head.appendChild(s);
