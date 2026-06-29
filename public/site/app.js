@@ -490,6 +490,8 @@ async function loadDataFromSupabase(){
     defaultR = (settingsRes.data && settingsRes.data.value) ? settingsRes.data.value : DEFAULT_FALLBACK_RESPONSE;
     talaSuggestions = (sugRes && sugRes.data && sugRes.data.length) ? sugRes.data : DEFAULT_SUGGESTIONS;
     applyCategoriesFromRows(catRes && catRes.data);
+    applyNearbyPlacesFromRows(nearbyRes && nearbyRes.data);
+
 
     const siteRows = (siteRes && siteRes.data) ? siteRes.data : [];
     const titleRow = siteRows.find(r => r.key === 'hero_title');
