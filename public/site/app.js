@@ -2354,7 +2354,7 @@ function renderAdminDest(){
 
 function adminDestFormHtml(){
   const isNew = adminEditingDestId === 'new';
-  const d = isNew ? {name:'',lat:'',lng:'',category:'beaches',image:'',description:'',tip:'',color:'#0ea5e9',videoUrl:'',videoType:'',featured:false,stats:{rating:'',travel:'',temp:'',season:''}} : destinations.find(x=>x.id===adminEditingDestId);
+  const d = isNew ? {name:'',lat:'',lng:'',category:'beaches',image:'',description:'',tip:'',color:'#0ea5e9',videoUrl:'',videoType:'',featured:false,barangay:'',stats:{rating:'',travel:'',temp:'',season:''}} : destinations.find(x=>x.id===adminEditingDestId);
   if(!d) return '';
   const vType = d.videoType || 'none';
   return `
