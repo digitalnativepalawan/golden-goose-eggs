@@ -27,7 +27,7 @@
       if(window[VIEW_DONE]) return true;
       if(typeof map === 'undefined' || !map || typeof map.setView !== 'function') return false;
       window[VIEW_DONE] = true;
-      map.setView([10.47, 119.12], 11, { animate:false });
+      map.setView([10.47, 119.12], 12, { animate:false });
       return true;
     }catch(e){ return false; }
   }
