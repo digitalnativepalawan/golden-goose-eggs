@@ -5,26 +5,26 @@
   const MAX = 4;
   const DELAY = 2600;
   const VIBES = [
-    ['🍹 Mojito by the beach',['beach','drink','social']],
-    ['🍔 Smashed burger after swimming',['food','beach']],
-    ['👋 Meeting someone new',['social','pulse']],
-    ['📖 Reading in a hammock',['quiet','slow']],
-    ['🌿 Trekking into the jungle',['explore','nature']],
-    ['❤️ Beach bed with my love',['quiet','couples','private']],
-    ['🐢 Watching turtle hatchlings',['nature','wildlife']],
-    ['🛵 Lost somewhere on a scooter',['explore','routes']],
-    ['🏄 Surfing badly but proudly',['surf','adventure']],
-    ['🐟 Eating fish caught this morning',['food','local']],
-    ['🧊 Trying to kill the hangover',['food','recovery']],
-    ['🌅 Chasing sunset',['sunset','photo']],
-    ['🎒 Finding the place nobody told me about',['hidden','explore']],
-    ['🎤 Singing videoke with friendly locals',['social','local','pulse']],
-    ['🛶 Joining island hopping with new friends',['island','social','pulse']],
-    ['🏝 Finding a wild beach with almost nobody around',['quiet','hidden','beach']],
-    ['📸 Hunting for the perfect photo',['photo','viewpoints','sunset']],
-    ['🥂 Cold Chardonnay on a private boat',['private','curated','boat']],
-    ['🧘 Massage, brunch, and pretending emails don’t exist',['slow','wellness','food']],
-    ['🧺 Wandering through the local market',['food','local','market']]
+    ['Mojito by the beach',['beach','drink','social']],
+    ['Smashed burger after swimming',['food','beach']],
+    ['Meeting someone new',['social','pulse']],
+    ['Reading in a hammock',['quiet','slow']],
+    ['Trekking into the jungle',['explore','nature']],
+    ['Beach bed with my love',['quiet','couples','private']],
+    ['Watching turtle hatchlings',['nature','wildlife']],
+    ['Lost somewhere on a scooter',['explore','routes']],
+    ['Surfing badly but proudly',['surf','adventure']],
+    ['Eating fish caught this morning',['food','local']],
+    ['Trying to kill the hangover',['food','recovery']],
+    ['Chasing sunset',['sunset','photo']],
+    ['Finding the place nobody told me about',['hidden','explore']],
+    ['Singing videoke with friendly locals',['social','local','pulse']],
+    ['Joining island hopping with new friends',['island','social','pulse']],
+    ['Finding a wild beach with almost nobody around',['quiet','hidden','beach']],
+    ['Hunting for the perfect photo',['photo','viewpoints','sunset']],
+    ['Cold Chardonnay on a private boat',['private','curated','boat']],
+    ['Massage, brunch, and pretending emails don’t exist',['slow','wellness','food']],
+    ['Wandering through the local market',['food','local','market']]
   ];
   const PLACEHOLDERS = ['Marco','Luna','IslandCat','The Dutch Guy','SandyFeet','Still Hungover'];
   const state = { step:1, nickname:'', vibes:[] };
@@ -55,18 +55,19 @@
     s.id='sanvicEntryCss';
     s.textContent=`
       body.sanvic-entry-lock #bottomDock.visible,body.sanvic-entry-lock #talaOrbWrap{opacity:0!important;pointer-events:none!important}
-      .sanvic-entry{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;padding:18px;background:radial-gradient(circle at 50% 10%,rgba(20,184,166,.16),transparent 30%),linear-gradient(180deg,rgba(2,14,38,.46),rgba(2,14,38,.86));opacity:0;visibility:hidden;pointer-events:none;transition:opacity .25s ease,visibility .25s ease}
+      .sanvic-entry{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;padding:18px;background:radial-gradient(circle at 50% 8%,rgba(20,184,166,.14),transparent 30%),linear-gradient(180deg,rgba(2,14,38,.52),rgba(2,14,38,.9));opacity:0;visibility:hidden;pointer-events:none;transition:opacity .25s ease,visibility .25s ease;font-family:var(--font-body,'DM Sans',-apple-system,sans-serif)}
       .sanvic-entry.active{opacity:1;visibility:visible;pointer-events:auto}.sanvic-entry.closing{opacity:0;pointer-events:none}
-      .sanvic-entry-card{width:min(100%,430px);max-height:calc(100dvh - 36px);border-radius:28px;background:linear-gradient(180deg,rgba(8,18,38,.82),rgba(4,12,30,.94));border:1px solid rgba(255,255,255,.09);box-shadow:0 28px 90px rgba(0,0,0,.45);backdrop-filter:blur(28px);overflow:hidden;display:flex}
+      .sanvic-entry-card{width:min(100%,430px);max-height:calc(100dvh - 36px);border-radius:30px;background:linear-gradient(180deg,rgba(8,18,38,.78),rgba(4,12,30,.95));border:1px solid rgba(255,255,255,.08);box-shadow:0 28px 90px rgba(0,0,0,.46);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);overflow:hidden;display:flex}
       .sanvic-entry-inner{width:100%;max-height:inherit;padding:24px 20px 18px;display:flex;flex-direction:column;gap:14px;overflow:hidden}
-      .sanvic-entry-kicker{font-size:.58rem;letter-spacing:.34em;text-transform:uppercase;color:var(--limestone,#c4a882)}
-      .sanvic-entry-title{font-family:var(--font-display,Georgia,serif);font-size:clamp(2rem,8vw,2.75rem);font-weight:300;line-height:1.02;color:var(--white-soft,rgba(255,255,255,.9));margin:0}
-      .sanvic-entry-sub{font-size:.88rem;font-weight:300;line-height:1.5;color:var(--white-muted,rgba(255,255,255,.55));margin:0}.sanvic-entry-note{font-size:.75rem;color:var(--white-dim,rgba(255,255,255,.3));margin:0}
-      .sanvic-entry-input{width:100%;height:54px;border-radius:18px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--white-soft,rgba(255,255,255,.9));font-family:var(--font-body,-apple-system,sans-serif);font-size:1rem;padding:0 15px;outline:0;user-select:text;-webkit-user-select:text}
-      .sanvic-entry-actions{display:flex;flex-direction:column;gap:8px;flex-shrink:0}.sanvic-entry-primary,.sanvic-entry-secondary{border:0;border-radius:999px;font-family:var(--font-body,-apple-system,sans-serif);cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}.sanvic-entry-primary{min-height:50px;background:linear-gradient(135deg,var(--sand,#e8dcc8),var(--limestone,#c4a882));color:var(--charcoal-deep,#020e26);font-weight:600}.sanvic-entry-secondary{height:34px;background:transparent;color:var(--white-muted,rgba(255,255,255,.5));font-weight:600}
-      .sanvic-entry-count{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white-dim,rgba(255,255,255,.3));flex-shrink:0}.sanvic-vibe-grid{display:grid;grid-template-columns:1fr;gap:8px;overflow-y:auto;max-height:34dvh;min-height:0;padding:1px 2px 8px;overscroll-behavior:contain}.sanvic-vibe-option{border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.05);color:var(--white-soft,rgba(255,255,255,.9));font-family:var(--font-body,-apple-system,sans-serif);font-size:.86rem;text-align:left;padding:11px 13px}.sanvic-vibe-option.selected{border-color:rgba(224,122,95,.55);background:rgba(224,122,95,.15)}.sanvic-vibe-option.disabled{opacity:.45}.sanvic-entry-smile{font-family:var(--font-display,Georgia,serif);font-size:3rem;color:var(--limestone,#c4a882);line-height:1}
-      @media(min-width:700px){.sanvic-entry{justify-content:flex-start;padding-left:max(6vw,70px)}.sanvic-entry-card{width:min(46vw,560px);max-height:min(86vh,720px)}.sanvic-entry-inner{padding:32px 28px 24px}.sanvic-entry-title{font-size:clamp(2.6rem,4vw,3.6rem)}.sanvic-vibe-grid{grid-template-columns:1fr 1fr;max-height:40vh}}
-      @media(max-height:720px){.sanvic-entry-inner{gap:10px;padding-top:18px;padding-bottom:14px}.sanvic-entry-title{font-size:1.9rem}.sanvic-entry-sub{font-size:.8rem}.sanvic-vibe-grid{max-height:28dvh}.sanvic-vibe-option{padding:9px 11px;font-size:.82rem}.sanvic-entry-primary{min-height:46px}}
+      .sanvic-entry-kicker{font-family:var(--font-body,'DM Sans',-apple-system,sans-serif);font-size:.62rem;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.46);font-weight:600}
+      .sanvic-entry-title{font-family:var(--font-body,'DM Sans',-apple-system,sans-serif);font-size:clamp(1.72rem,7vw,2.35rem);font-weight:500;letter-spacing:-.045em;line-height:1.06;color:rgba(255,255,255,.92);margin:0}
+      .sanvic-entry-sub{font-family:var(--font-body,'DM Sans',-apple-system,sans-serif);font-size:.92rem;font-weight:300;line-height:1.55;color:rgba(255,255,255,.58);margin:0}.sanvic-entry-note{font-size:.78rem;color:rgba(255,255,255,.38);margin:0;line-height:1.5}
+      .sanvic-entry-input{width:100%;height:54px;border-radius:18px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.055);color:rgba(255,255,255,.92);font-family:var(--font-body,'DM Sans',-apple-system,sans-serif);font-size:1rem;font-weight:400;padding:0 15px;outline:0;user-select:text;-webkit-user-select:text}
+      .sanvic-entry-input::placeholder{color:rgba(255,255,255,.32)}
+      .sanvic-entry-actions{display:flex;flex-direction:column;gap:8px;flex-shrink:0}.sanvic-entry-primary,.sanvic-entry-secondary{border:0;border-radius:999px;font-family:var(--font-body,'DM Sans',-apple-system,sans-serif);cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}.sanvic-entry-primary{min-height:50px;background:linear-gradient(135deg,var(--sand,#e8dcc8),var(--limestone,#c4a882));color:var(--charcoal-deep,#020e26);font-weight:700;letter-spacing:-.01em}.sanvic-entry-secondary{height:34px;background:transparent;color:rgba(255,255,255,.48);font-weight:600}
+      .sanvic-entry-count{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.34);font-weight:600;flex-shrink:0}.sanvic-vibe-grid{display:grid;grid-template-columns:1fr;gap:8px;overflow-y:auto;max-height:34dvh;min-height:0;padding:1px 2px 8px;overscroll-behavior:contain}.sanvic-vibe-option{border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.045);color:rgba(255,255,255,.84);font-family:var(--font-body,'DM Sans',-apple-system,sans-serif);font-size:.88rem;font-weight:400;line-height:1.25;text-align:left;padding:12px 14px;letter-spacing:-.01em}.sanvic-vibe-option.selected{border-color:rgba(20,184,166,.42);background:rgba(20,184,166,.13);color:rgba(255,255,255,.95);box-shadow:inset 0 0 0 1px rgba(20,184,166,.08)}.sanvic-vibe-option.disabled{opacity:.45}.sanvic-entry-smile{font-family:var(--font-body,'DM Sans',-apple-system,sans-serif);font-size:2.7rem;color:var(--limestone,#c4a882);line-height:1;font-weight:300}
+      @media(min-width:700px){.sanvic-entry{justify-content:flex-start;padding-left:max(6vw,70px)}.sanvic-entry-card{width:min(46vw,560px);max-height:min(86vh,720px)}.sanvic-entry-inner{padding:32px 28px 24px}.sanvic-entry-title{font-size:clamp(2.1rem,3.2vw,3rem)}.sanvic-vibe-grid{grid-template-columns:1fr 1fr;max-height:40vh}}
+      @media(max-height:720px){.sanvic-entry-inner{gap:10px;padding-top:18px;padding-bottom:14px}.sanvic-entry-title{font-size:1.72rem}.sanvic-entry-sub{font-size:.82rem}.sanvic-vibe-grid{max-height:28dvh}.sanvic-vibe-option{padding:9px 11px;font-size:.82rem}.sanvic-entry-primary{min-height:46px}}
     `;
     document.head.appendChild(s);
   }
