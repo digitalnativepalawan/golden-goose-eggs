@@ -1,7 +1,7 @@
 // SANVIC map pin cleanup
-// Visual-only: removes radar/pulsing halos from map location pins and sets a better opening map view.
+// Visual-only: removes radar/pulsing halos, opens to the full municipality, and keeps pins visible.
 (function(){
-  const VIEW_DONE = '__sanvicMiddleMapViewDone';
+  const VIEW_DONE = '__sanvicMunicipalityMapViewDone';
 
   function injectPinStyles(){
     if(document.getElementById('sanvicMapPinNoPulseCss')) return;
@@ -22,12 +22,24 @@
     document.querySelectorAll('.mk-wrap').forEach(el => { el.style.animation = 'none'; });
   }
 
-  function setMiddleMapView(){
+  function showPinsAtWideView(){
+    try{
+      if(typeof allMarkers === 'undefined' || !Array.isArray(allMarkers) || !allMarkers.length) return false;
+      if(typeof activeMarkerSet !== 'undefined') activeMarkerSet = allMarkers;
+      if(typeof pinVisibilityOverride !== 'undefined') pinVisibilityOverride = true;
+      if(typeof applyPinVisibility === 'function') applyPinVisibility();
+      stripHalos();
+      return true;
+    }catch(e){ return false; }
+  }
+
+  function setMunicipalityMapView(){
     try{
       if(window[VIEW_DONE]) return true;
       if(typeof map === 'undefined' || !map || typeof map.setView !== 'function') return false;
       window[VIEW_DONE] = true;
-      map.setView([10.47, 119.12], 12, { animate:false });
+      map.setView([10.50, 119.20], 11, { animate:false });
+      showPinsAtWideView();
       return true;
     }catch(e){ return false; }
   }
@@ -43,8 +55,9 @@
     const timer = setInterval(() => {
       tries++;
       stripHalos();
-      const viewSet = setMiddleMapView();
-      if((viewSet && tries > 6) || tries > 80) clearInterval(timer);
+      const viewSet = setMunicipalityMapView();
+      const pinsShown = showPinsAtWideView();
+      if((viewSet && pinsShown && tries > 6) || tries > 100) clearInterval(timer);
     }, 150);
   }
 
