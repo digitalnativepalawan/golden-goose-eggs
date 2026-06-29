@@ -2378,6 +2378,11 @@ function adminDestFormHtml(){
         <div class="admin-field"><label>Latitude</label><input id="adfLat" value="${d.lat}"></div>
         <div class="admin-field"><label>Longitude</label><input id="adfLng" value="${d.lng}"></div>
       </div>
+      <div class="admin-field">
+        <label>Barangay (used for "What's around me" — must match a barangay name exactly)</label>
+        <input id="adfBarangay" list="adfBarangayList" value="${escapeHtml(d.barangay||'')}" placeholder="e.g. Poblacion, Port Barton, Alimanguan...">
+        <datalist id="adfBarangayList">${Object.keys(nearbyPlacesByBarangay).map(b=>`<option value="${escapeHtml(b)}">`).join('')}</datalist>
+      </div>
       <div class="admin-grid-2">
         <div class="admin-field"><label>Category</label>
           <select id="adfCat">
