@@ -1,11 +1,12 @@
 // SANVIC map pin cleanup
-// Removes radar halos, opens to the full municipality, and keeps pins visible.
+// Removes radar halos, opens to the full municipality, keeps pins visible, and hides Leaflet zoom buttons.
 (function(){
   function addStyles(){
     if(document.getElementById('sanvicMapPinNoPulseCss')) return;
     const s = document.createElement('style');
     s.id = 'sanvicMapPinNoPulseCss';
     s.textContent = `
+      .leaflet-control-zoom{display:none!important;visibility:hidden!important;pointer-events:none!important;}
       .mk-wrap{width:28px!important;height:28px!important;filter:drop-shadow(0 3px 7px rgba(0,0,0,.55))!important;animation:none!important;}
       .mk-wrap *{animation:none!important;transition:none!important;}
       .mk-ring,.mk-glow{display:none!important;visibility:hidden!important;opacity:0!important;}
