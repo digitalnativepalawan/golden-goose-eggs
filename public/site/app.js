@@ -513,6 +513,7 @@ async function loadDataFromSupabase(){
     splashSubtext = DEFAULT_SPLASH_SUBTEXT;
     splashFooter = DEFAULT_SPLASH_FOOTER;
     applyCategoriesFromRows(null); // falls through to keeping current catStyle (defaults on first load)
+    applyNearbyPlacesFromRows(null);
   }
   applyHeroText();
   applySplashText();
