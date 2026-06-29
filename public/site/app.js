@@ -2640,6 +2640,34 @@ async function adminSaveHeroSubtitle(){
   }
 }
 
+async function adminSaveSplashSubtext(){
+  const val = document.getElementById('adsSplashSubtext').value.trim();
+  if(val === splashSubtext) return;
+  const finalVal = val || DEFAULT_SPLASH_SUBTEXT;
+  try {
+    const { error } = await sb.from('site_settings').upsert({ key: 'splash_subtext', value: finalVal });
+    if(error) throw error;
+    splashSubtext = finalVal;
+    applySplashText();
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+async function adminSaveSplashFooter(){
+  const val = document.getElementById('adsSplashFooter').value.trim();
+  if(val === splashFooter) return;
+  const finalVal = val || DEFAULT_SPLASH_FOOTER;
+  try {
+    const { error } = await sb.from('site_settings').upsert({ key: 'splash_footer', value: finalVal });
+    if(error) throw error;
+    splashFooter = finalVal;
+    applySplashText();
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
 // ───────────── TALA ADMIN ─────────────
 
 function renderAdminTala(){
