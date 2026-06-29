@@ -9,13 +9,13 @@
   function greeting(){ const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; }
 
   function mood(tags){
-    if(has(tags, ['social','pulse','local','island'])) return { line:'A few people are already moving around today.', search:'Island hopping, videoke, people nearby...', nudge:'Pulse is warm today.' };
-    if(has(tags, ['quiet','private','slow','wellness'])) return { line:'Quiet beaches and slower corners are close by.', search:'Quiet beaches, hammocks, slow mornings...', nudge:'Look for calm spots.' };
-    if(has(tags, ['food','market','recovery'])) return { line:'Fresh plates, market stops, and beach snacks are close by.', search:'Seafood, burgers, markets, coffee...', nudge:'Food is a good first stop.' };
-    if(has(tags, ['explore','hidden','routes','surf','adventure'])) return { line:'Scooter roads, hidden places, and wild edges are calling.', search:'Waterfalls, scooter routes, hidden beaches...', nudge:'Explore is open.' };
-    if(has(tags, ['photo','viewpoints','sunset'])) return { line:'The light should be worth chasing today.', search:'Viewpoints, sunsets, photo spots...', nudge:'Watch the light.' };
-    if(has(tags, ['boat','curated'])) return { line:'Private boats and quiet water are worth checking today.', search:'Private boats, islands, quiet water...', nudge:'Start by the water.' };
-    return { line:'The map is open. The day is still unwritten.', search:'Ask TALA or search San Vicente...', nudge:'Start anywhere.' };
+    if(has(tags, ['social','pulse','local','island'])) return { line:'A few people are already moving around today.', search:'Island hopping, videoke, people nearby...', nudge:'Pulse is warm today.', layer:'pulse', pulse:'island' };
+    if(has(tags, ['quiet','private','slow','wellness'])) return { line:'Quiet beaches and slower corners are close by.', search:'Quiet beaches, hammocks, slow mornings...', nudge:'Look for calm spots.', layer:'discover', discover:'beaches' };
+    if(has(tags, ['food','market','recovery'])) return { line:'Fresh plates, market stops, and beach snacks are close by.', search:'Seafood, burgers, markets, coffee...', nudge:'Food is a good first stop.', layer:'discover', discover:'culture' };
+    if(has(tags, ['explore','hidden','routes','surf','adventure'])) return { line:'Scooter roads, hidden places, and wild edges are calling.', search:'Waterfalls, scooter routes, hidden beaches...', nudge:'Explore is open.', layer:'discover', discover:'nature' };
+    if(has(tags, ['photo','viewpoints','sunset'])) return { line:'The light should be worth chasing today.', search:'Viewpoints, sunsets, photo spots...', nudge:'Watch the light.', layer:'discover', discover:'nature' };
+    if(has(tags, ['boat','curated'])) return { line:'Private boats and quiet water are worth checking today.', search:'Private boats, islands, quiet water...', nudge:'Start by the water.', layer:'discover', discover:'islands' };
+    return { line:'The map is open. The day is still unwritten.', search:'Ask TALA or search San Vicente...', nudge:'Start anywhere.', layer:'discover', discover:'all' };
   }
 
   function talaLine(entry, m){
@@ -94,19 +94,43 @@
       .forEach(item => list.appendChild(item.card));
   }
 
+  function setActiveDock(tabName){
+    document.querySelectorAll('.dock-item').forEach(d => d.classList.toggle('active', d.dataset.tab === tabName));
+  }
+
+  function openFirstLayer(m, tags){
+    if(sessionStorage.getItem('sanvic_entry_first_layer_opened') === '1') return;
+    sessionStorage.setItem('sanvic_entry_first_layer_opened', '1');
+
+    setTimeout(() => {
+      try{
+        if(m.layer === 'pulse' && typeof window.openPulsePanel === 'function'){
+          window.closeAllPanels && window.closeAllPanels();
+          window.openPulsePanel();
+          setActiveDock('pulse');
+          if(m.pulse && typeof window.selectPulseCategory === 'function') window.selectPulseCategory(m.pulse);
+          return;
+        }
+
+        if(typeof window.openDiscoverPanel === 'function'){
+          window.closeAllPanels && window.closeAllPanels();
+          window.openDiscoverPanel();
+          setActiveDock('discover');
+          if(m.discover && typeof window.selectDiscoverCategory === 'function') window.selectDiscoverCategory(m.discover);
+          setTimeout(() => orderDiscover(tags), 120);
+        }
+      } catch(err){
+        console.warn('[SANVIC] Entry first-layer nudge skipped:', err);
+      }
+    }, 650);
+  }
+
   function setTabHint(tags, m){
     document.body.dataset.sanvicEntryNudge = m.nudge;
     const discover = document.querySelector('.dock-item[data-tab="discover"]');
     const pulse = document.querySelector('.dock-item[data-tab="pulse"]');
     if(discover) discover.title = m.nudge;
     if(pulse && has(tags, ['social','pulse','local','island'])) pulse.title = 'See what is happening now.';
-  }
-
-  function softOpenRelevantLayer(tags){
-    if(sessionStorage.getItem('sanvic_entry_layer_nudged') === '1') return;
-    sessionStorage.setItem('sanvic_entry_layer_nudged', '1');
-    const tab = has(tags, ['social','pulse','local','island']) ? document.querySelector('.dock-item[data-tab="pulse"]') : document.querySelector('.dock-item[data-tab="discover"]');
-    if(tab){ tab.classList.add('vibe-ready'); setTimeout(() => tab.classList.remove('vibe-ready'), 4200); }
   }
 
   function injectStyles(){
@@ -117,7 +141,7 @@
     document.head.appendChild(s);
   }
 
-  function apply(){
+  function apply(options){
     const entry = getEntry();
     if(!entry) return;
     const tags = Array.isArray(entry.vibeTags) ? entry.vibeTags : [];
@@ -130,12 +154,12 @@
     setTala(entry, m);
     orderDiscover(tags);
     setTabHint(tags, m);
-    softOpenRelevantLayer(tags);
+    if(options && options.openLayer) openFirstLayer(m, tags);
   }
 
-  function schedule(){ setTimeout(apply, 80); setTimeout(apply, 600); setTimeout(apply, 1600); }
-  window.addEventListener('load', () => { setTimeout(apply, 3200); setTimeout(apply, 5200); });
+  function schedule(){ setTimeout(() => apply({openLayer:true}), 80); setTimeout(() => apply({openLayer:true}), 600); setTimeout(() => apply({openLayer:false}), 1600); }
+  window.addEventListener('load', () => { setTimeout(() => apply({openLayer:false}), 3200); setTimeout(() => apply({openLayer:false}), 5200); });
   window.addEventListener('sanvic:entry-complete', schedule);
-  document.addEventListener('click', schedule);
-  window.addEventListener('storage', apply);
+  document.addEventListener('click', () => apply({openLayer:false}));
+  window.addEventListener('storage', () => apply({openLayer:false}));
 })();
