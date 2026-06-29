@@ -2565,6 +2565,7 @@ async function adminSaveDest(){
       video_url: videoType === 'none' ? null : (videoUrl || null),
       video_type: videoType === 'none' ? null : videoType,
       featured: document.getElementById('adfFeatured').checked,
+      barangay: document.getElementById('adfBarangay').value.trim(),
     };
     if(!payload.name || isNaN(payload.lat) || isNaN(payload.lng)){
       alert('Name, latitude, and longitude are required.');
