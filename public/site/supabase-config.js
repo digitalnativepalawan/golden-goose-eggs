@@ -11,12 +11,10 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   global: { headers: { apikey: SUPABASE_ANON_KEY } },
 });
 
-// Load SANVIC first-visit experience and soft personalization as isolated modules.
-// They wait for page readiness internally, so this keeps the main interface untouched.
 (function loadSanvicExperienceModules(){
   const parentV = new URLSearchParams(window.location.search).get('v');
   const v = parentV || String(Date.now());
-  ['entry-flow.js', 'entry-polish.js', 'personalize.js'].forEach((file) => {
+  ['entry-flow.js', 'personalize.js'].forEach((file) => {
     const script = document.createElement('script');
     script.src = file + '?v=' + encodeURIComponent(v);
     document.body.appendChild(script);
