@@ -2066,9 +2066,125 @@ function escapeHtml(s){
 
 // ───────────── DESTINATIONS ADMIN ─────────────
 
+let destCatPanelOpen = false;
+let editingDestCatId = null; // null = not editing, 'new' = creating, else id
+
+function adminToggleDestCatPanel(){
+  destCatPanelOpen = !destCatPanelOpen;
+  renderAdminDest();
+}
+
+function adminDestCatPanelHtml(){
+  let html = `
+    <div class="admin-field" style="font-size:.7rem;color:var(--white-dim);margin-bottom:10px;">
+      These are the categories available when adding or editing a destination (Beaches, Islands, etc). Add your own, rename, or change the marker color. Deleting a category doesn't delete destinations already using it — they'll just show the category's key until you re-assign them.
+    </div>
+    <button class="admin-add-btn" onclick="adminNewDestCat()">+ Add category</button>`;
+
+  if(editingDestCatId !== null){
+    html += adminDestCatFormHtml();
+  }
+
+  const keys = Object.keys(catStyle);
+  if(!keys.length){
+    html += `<div class="admin-empty">No categories yet.</div>`;
+  } else {
+    html += keys.map(key=>{
+      const c = catStyle[key];
+      return `
+      <div class="admin-list-item">
+        <div class="admin-list-item-head">
+          <div onclick="adminEditDestCat('${escapeHtml(key)}')" style="flex:1;cursor:pointer;display:flex;align-items:center;gap:10px;">
+            <span style="width:14px;height:14px;border-radius:50%;background:${escapeHtml(c.color)};flex-shrink:0;display:inline-block;"></span>
+            <div>
+              <strong>${escapeHtml(c.label)}</strong><br>
+              <span>${escapeHtml(key)}</span>
+            </div>
+          </div>
+          <div class="admin-row-actions">
+            <button class="admin-mini-btn" onclick="adminEditDestCat('${escapeHtml(key)}')">Edit</button>
+            <button class="admin-mini-btn danger" onclick="adminDeleteDestCat('${escapeHtml(key)}')">Delete</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  return html;
+}
+
+function adminDestCatFormHtml(){
+  const isNew = editingDestCatId === 'new';
+  const c = isNew ? {key:'',label:'',color:'#0ea5e9'} : { key: editingDestCatId, ...catStyle[editingDestCatId] };
+  return `
+    <div class="admin-edit-box">
+      <div class="admin-field">
+        <label>Key (lowercase, no spaces — used internally, can't be changed later)</label>
+        <input id="dcfKey" value="${escapeHtml(c.key)}" placeholder="e.g. waterfalls" ${isNew?'':'disabled'}>
+      </div>
+      <div class="admin-field"><label>Label (shown to visitors)</label><input id="dcfLabel" value="${escapeHtml(c.label)}" placeholder="e.g. Waterfalls"></div>
+      <div class="admin-field"><label>Marker / pill color (hex)</label><input id="dcfColor" value="${escapeHtml(c.color)}" placeholder="#0ea5e9"></div>
+      <div class="admin-edit-actions">
+        <button class="admin-save-btn" onclick="adminSaveDestCat('${isNew?'':escapeHtml(c.key)}')">${isNew?'Create':'Save changes'}</button>
+        <button class="admin-cancel-btn" onclick="editingDestCatId=null;renderAdminDest();">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function adminNewDestCat(){ editingDestCatId='new'; renderAdminDest(); }
+function adminEditDestCat(key){ editingDestCatId=key; renderAdminDest(); }
+
+async function adminSaveDestCat(existingKey){
+  const isNew = !existingKey;
+  const key = document.getElementById('dcfKey').value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
+  const label = document.getElementById('dcfLabel').value.trim();
+  const color = document.getElementById('dcfColor').value.trim() || '#0ea5e9';
+  if(!key || !label){ alert('Key and label are both required.'); return; }
+  if(isNew && catStyle[key]){ alert(`A category with the key "${key}" already exists.`); return; }
+
+  try {
+    if(isNew){
+      const sortOrder = Object.keys(catStyle).length;
+      const { error } = await sb.from('destination_categories').insert({ key, label, color, sort_order: sortOrder });
+      if(error) throw error;
+    } else {
+      const { error } = await sb.from('destination_categories').update({ label, color }).eq('key', existingKey);
+      if(error) throw error;
+    }
+    await loadDataFromSupabase();
+    editingDestCatId = null;
+    renderAdminDest();
+    rebuildMarkers(); // marker colors depend on catStyle
+  } catch(err){
+    alert('Save failed: ' + (err.message || err));
+  }
+}
+
+async function adminDeleteDestCat(key){
+  const inUse = destinations.filter(d=>d.category===key).length;
+  const warn = inUse ? ` ${inUse} destination${inUse===1?'':'s'} currently use this category and will show "${key}" until reassigned.` : '';
+  if(!confirm(`Delete the "${catStyle[key]?.label||key}" category?${warn}`)) return;
+  try {
+    const { error } = await sb.from('destination_categories').delete().eq('key', key);
+    if(error) throw error;
+    await loadDataFromSupabase();
+    renderAdminDest();
+    rebuildMarkers();
+  } catch(err){
+    alert('Delete failed: ' + (err.message || err));
+  }
+}
+
 function renderAdminDest(){
   const body = document.getElementById('adminBody');
-  let html = `<button class="admin-add-btn" onclick="adminNewDest()">+ Add destination</button>`;
+  let html = `
+    <div class="admin-section-toggle" onclick="adminToggleDestCatPanel()">
+      <span>🏷️ Manage categories ${destCatPanelOpen?'▾':'▸'}</span>
+      <span class="admin-section-count">${Object.keys(catStyle).length}</span>
+    </div>
+    <div id="adfCatPanel" style="display:${destCatPanelOpen?'':'none'}">
+      ${adminDestCatPanelHtml()}
+    </div>
+    <button class="admin-add-btn" style="margin-top:14px;" onclick="adminNewDest()">+ Add destination</button>`;
 
   if(adminEditingDestId !== null){
     html += adminDestFormHtml();
