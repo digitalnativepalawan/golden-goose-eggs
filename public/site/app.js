@@ -472,13 +472,14 @@ function isSuggestionActiveToday(s){
 
 async function loadDataFromSupabase(){
   try {
-    const [destRes, talaRes, settingsRes, sugRes, siteRes, catRes] = await Promise.all([
+    const [destRes, talaRes, settingsRes, sugRes, siteRes, catRes, nearbyRes] = await Promise.all([
       sb.from('destinations').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_responses').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_settings').select('*').eq('key', 'default_response').maybeSingle(),
       sb.from('tala_suggestions').select('*').order('sort_order', { ascending: true }),
       sb.from('site_settings').select('*').in('key', ['hero_title', 'hero_subtitle', 'splash_subtext', 'splash_footer']),
       sb.from('destination_categories').select('*').order('sort_order', { ascending: true }),
+      sb.from('nearby_places').select('*').order('sort_order', { ascending: true }),
     ]);
 
     if (destRes.error) throw destRes.error;
