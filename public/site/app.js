@@ -2602,6 +2602,14 @@ function renderAdminSite(){
       <label>Hero subtitle (optional, smaller line under the title)</label>
       <textarea id="adsHeroSubtitle" rows="2" onblur="adminSaveHeroSubtitle()">${escapeHtml(heroSubtitle)}</textarea>
     </div>
+    <div class="admin-field" style="margin-top:18px;">
+      <label>Loading screen subtext (the 2-line tagline under the SANVIC logo — use &lt;br&gt; for the line break)</label>
+      <textarea id="adsSplashSubtext" rows="2" onblur="adminSaveSplashSubtext()">${escapeHtml(splashSubtext)}</textarea>
+    </div>
+    <div class="admin-field">
+      <label>Loading screen footer (small caps text at the bottom of the loader)</label>
+      <textarea id="adsSplashFooter" rows="1" onblur="adminSaveSplashFooter()">${escapeHtml(splashFooter)}</textarea>
+    </div>
     <div class="admin-empty" style="margin-top:6px;">Saves automatically when you click away from a field. Changes appear for every visitor.</div>`;
 }
 
