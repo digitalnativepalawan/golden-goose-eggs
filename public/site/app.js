@@ -2951,10 +2951,11 @@ async function adminSaveDefaultResponse(){
 // ───────────── RESET TO DEFAULTS ─────────────
 
 async function adminResetDefaults(){
-  if(!confirm('This will erase ALL destinations and tala responses in Supabase and replace them with the original built-in defaults. Continue?')) return;
+  if(!confirm('This will erase ALL destinations, categories, and tala responses in Supabase and replace them with the original built-in defaults. Continue?')) return;
   try {
     await sb.from('destinations').delete().neq('id', -1);
     await sb.from('tala_responses').delete().neq('id', -1);
+    await sb.from('destination_categories').delete().neq('id', -1);
 
     const destRows = DEFAULT_DESTINATIONS.map((d,i)=>({
       name:d.name, lat:d.lat, lng:d.lng, category:d.category, image:d.image,
@@ -2962,9 +2963,11 @@ async function adminResetDefaults(){
       rating:d.stats.rating, travel:d.stats.travel, temp:d.stats.temp, season:d.stats.season
     }));
     const talaRows = DEFAULT_TALA_DATA.map((t,i)=>({ keywords:t.kw, response:t.r, sort_order:i }));
+    const catRows = Object.keys(DEFAULT_CAT_STYLE).map((key,i)=>({ key, label: DEFAULT_CAT_STYLE[key].label, color: DEFAULT_CAT_STYLE[key].color, sort_order:i }));
 
     await sb.from('destinations').insert(destRows);
     await sb.from('tala_responses').insert(talaRows);
+    await sb.from('destination_categories').insert(catRows);
     await sb.from('tala_settings').upsert({ key:'default_response', value: DEFAULT_FALLBACK_RESPONSE });
 
     await loadDataFromSupabase();
