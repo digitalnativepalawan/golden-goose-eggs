@@ -1,6 +1,5 @@
 // SANVIC mobile map/nav cleanup
-// Removes radar halos, opens to the full municipality, keeps pins visible, hides Leaflet zoom buttons,
-// and makes footer Tala the single primary Tala entry on mobile.
+// Keeps footer Tala as the single primary Tala entry and cleans up map controls/pins.
 (function(){
   function addStyles(){
     if(document.getElementById('sanvicMapPinNoPulseCss')) return;
@@ -8,6 +7,7 @@
     s.id = 'sanvicMapPinNoPulseCss';
     s.textContent = `
       .leaflet-control-zoom{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      #talaOrbWrap,.tala-orb-wrap{display:none!important;visibility:hidden!important;pointer-events:none!important;}
       .mk-wrap{width:28px!important;height:28px!important;filter:drop-shadow(0 3px 7px rgba(0,0,0,.55))!important;animation:none!important;}
       .mk-wrap *{animation:none!important;transition:none!important;}
       .mk-ring,.mk-glow{display:none!important;visibility:hidden!important;opacity:0!important;}
@@ -15,7 +15,6 @@
       .leaflet-marker-icon{overflow:visible!important;}
 
       @media(max-width:767px){
-        #talaOrbWrap,.tala-orb-wrap{display:none!important;visibility:hidden!important;pointer-events:none!important;}
         .bottom-dock{bottom:calc(12px + var(--safe-bottom))!important;width:min(calc(100vw - 42px),430px)!important;padding:6px 7px!important;gap:1px!important;background:rgba(4,12,30,.74)!important;border-color:rgba(255,255,255,.08)!important;box-shadow:0 12px 34px rgba(0,0,0,.34)!important;}
         .dock-item{flex:1!important;width:auto!important;height:48px!important;border-radius:18px!important;gap:2px!important;color:rgba(255,255,255,.72)!important;background:transparent!important;}
         .dock-item svg{width:22px!important;height:22px!important;stroke:rgba(255,255,255,.84)!important;stroke-width:1.9!important;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5));}
