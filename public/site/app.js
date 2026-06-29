@@ -471,12 +471,13 @@ function isSuggestionActiveToday(s){
 
 async function loadDataFromSupabase(){
   try {
-    const [destRes, talaRes, settingsRes, sugRes, siteRes] = await Promise.all([
+    const [destRes, talaRes, settingsRes, sugRes, siteRes, catRes] = await Promise.all([
       sb.from('destinations').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_responses').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_settings').select('*').eq('key', 'default_response').maybeSingle(),
       sb.from('tala_suggestions').select('*').order('sort_order', { ascending: true }),
-      sb.from('site_settings').select('*').in('key', ['hero_title', 'hero_subtitle']),
+      sb.from('site_settings').select('*').in('key', ['hero_title', 'hero_subtitle', 'splash_subtext', 'splash_footer']),
+      sb.from('destination_categories').select('*').order('sort_order', { ascending: true }),
     ]);
 
     if (destRes.error) throw destRes.error;
@@ -486,12 +487,17 @@ async function loadDataFromSupabase(){
     aiData = (talaRes.data && talaRes.data.length) ? talaRes.data.map(r=>({ id:r.id, kw:r.keywords, r:r.response, cat:r.category||'knowledge' })) : DEFAULT_TALA_DATA;
     defaultR = (settingsRes.data && settingsRes.data.value) ? settingsRes.data.value : DEFAULT_FALLBACK_RESPONSE;
     talaSuggestions = (sugRes && sugRes.data && sugRes.data.length) ? sugRes.data : DEFAULT_SUGGESTIONS;
+    applyCategoriesFromRows(catRes && catRes.data);
 
     const siteRows = (siteRes && siteRes.data) ? siteRes.data : [];
     const titleRow = siteRows.find(r => r.key === 'hero_title');
     const subRow = siteRows.find(r => r.key === 'hero_subtitle');
+    const splashSubRow = siteRows.find(r => r.key === 'splash_subtext');
+    const splashFootRow = siteRows.find(r => r.key === 'splash_footer');
     heroTitle = (titleRow && titleRow.value) ? titleRow.value : DEFAULT_HERO_TITLE;
     heroSubtitle = (subRow && subRow.value != null) ? subRow.value : DEFAULT_HERO_SUBTITLE;
+    splashSubtext = (splashSubRow && splashSubRow.value != null) ? splashSubRow.value : DEFAULT_SPLASH_SUBTEXT;
+    splashFooter = (splashFootRow && splashFootRow.value != null) ? splashFootRow.value : DEFAULT_SPLASH_FOOTER;
   } catch(err) {
     console.warn('[SANVIC] Supabase load failed, using built-in defaults:', err);
     destinations = DEFAULT_DESTINATIONS;
@@ -500,8 +506,12 @@ async function loadDataFromSupabase(){
     talaSuggestions = DEFAULT_SUGGESTIONS;
     heroTitle = DEFAULT_HERO_TITLE;
     heroSubtitle = DEFAULT_HERO_SUBTITLE;
+    splashSubtext = DEFAULT_SPLASH_SUBTEXT;
+    splashFooter = DEFAULT_SPLASH_FOOTER;
+    applyCategoriesFromRows(null); // falls through to keeping current catStyle (defaults on first load)
   }
   applyHeroText();
+  applySplashText();
   dataReady = true;
 }
 
@@ -512,14 +522,50 @@ function applyHeroText(){
   if(subEl) subEl.innerHTML = heroSubtitle;
 }
 
-const catStyle = {
-  beaches:{label:"Beaches",color:"#0ea5e9",bg:"rgba(14,165,233,.12)"},
-  islands:{label:"Islands",color:"#8b5cf6",bg:"rgba(139,92,246,.12)"},
-  nature:{label:"Nature",color:"#22c55e",bg:"rgba(34,197,94,.12)"},
-  adventure:{label:"Adventure",color:"#ef4444",bg:"rgba(239,68,68,.12)"},
-  culture:{label:"Culture",color:"#f59e0b",bg:"rgba(245,158,11,.12)"},
-  stays:{label:"Stays",color:"#ec4899",bg:"rgba(236,72,153,.12)"}
+function applySplashText(){
+  const tagEl = document.getElementById('splashTagline');
+  const footEl = document.getElementById('splashFooter');
+  if(tagEl) tagEl.innerHTML = splashSubtext;
+  if(footEl) footEl.innerHTML = splashFooter;
+}
+
+const DEFAULT_CAT_STYLE = {
+  beaches:{label:"Beaches",color:"#0ea5e9"},
+  islands:{label:"Islands",color:"#8b5cf6"},
+  nature:{label:"Nature",color:"#22c55e"},
+  adventure:{label:"Adventure",color:"#ef4444"},
+  culture:{label:"Culture",color:"#f59e0b"},
+  stays:{label:"Stays",color:"#ec4899"}
 };
+
+// Converts a "#rrggbb" hex color into the soft translucent background
+// chip color used throughout (12% opacity), matching the look every
+// existing category already has.
+function hexToBg(hex, alpha){
+  alpha = alpha==null ? .12 : alpha;
+  const h = (hex||'#0ea5e9').replace('#','');
+  const r = parseInt(h.substring(0,2),16) || 0;
+  const g = parseInt(h.substring(2,4),16) || 0;
+  const b = parseInt(h.substring(4,6),16) || 0;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// Mutable — repopulated from destination_categories in Supabase every
+// time data loads. Starts with the built-in defaults so nothing is
+// ever blank before the first load finishes.
+let catStyle = {};
+Object.keys(DEFAULT_CAT_STYLE).forEach(k=>{
+  catStyle[k] = { label: DEFAULT_CAT_STYLE[k].label, color: DEFAULT_CAT_STYLE[k].color, bg: hexToBg(DEFAULT_CAT_STYLE[k].color) };
+});
+
+function applyCategoriesFromRows(rows){
+  if(!rows || !rows.length) return; // keep defaults if the table is empty/unreachable
+  const next = {};
+  rows.forEach(r=>{
+    next[r.key] = { label: r.label, color: r.color || '#0ea5e9', bg: hexToBg(r.color) };
+  });
+  catStyle = next;
+}
 
 // ─── AI ───
 function getAI(input) {
