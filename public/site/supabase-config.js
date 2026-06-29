@@ -16,7 +16,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 (function loadSanvicExperienceModules(){
   const parentV = new URLSearchParams(window.location.search).get('v');
   const v = parentV || String(Date.now());
-  ['entry-flow.js', 'personalize.js'].forEach((file) => {
+  ['entry-flow.js', 'entry-polish.js', 'personalize.js'].forEach((file) => {
     const script = document.createElement('script');
     script.src = file + '?v=' + encodeURIComponent(v);
     document.body.appendChild(script);
