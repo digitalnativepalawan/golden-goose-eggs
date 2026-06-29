@@ -1,268 +1,104 @@
-// ═══════════════════════════════════════════════════════
 // SANVIC Entry Experience
-// First-time visitor doorway: nickname → travel vibe → welcome.
-// No login. No account. TALA stays hidden until entry is complete.
-// ═══════════════════════════════════════════════════════
-(function initSanvicEntryExperience(){
-  const ENTRY_KEY = 'sanvic_entry_v1';
-  const MAX_VIBES = 4;
-  const ENTRY_DELAY_MS = 2600;
-
+// First visit flow: nickname -> travel vibe -> welcome.
+(function(){
+  const KEY = 'sanvic_entry_v1';
+  const MAX = 4;
+  const DELAY = 2600;
   const VIBES = [
-    { label: '🍹 Mojito by the beach', tags: ['beach', 'drink', 'social'] },
-    { label: '🍔 Smashed burger after swimming', tags: ['food', 'beach'] },
-    { label: '👋 Meeting someone new', tags: ['social', 'pulse'] },
-    { label: '📖 Reading in a hammock', tags: ['quiet', 'slow'] },
-    { label: '🌿 Trekking into the jungle', tags: ['explore', 'nature'] },
-    { label: '❤️ Beach bed with my love', tags: ['quiet', 'couples', 'private'] },
-    { label: '🐢 Watching turtle hatchlings', tags: ['nature', 'wildlife'] },
-    { label: '🛵 Lost somewhere on a scooter', tags: ['explore', 'routes'] },
-    { label: '🏄 Surfing badly but proudly', tags: ['surf', 'adventure'] },
-    { label: '🐟 Eating fish caught this morning', tags: ['food', 'local'] },
-    { label: '🧊 Trying to kill the hangover', tags: ['food', 'recovery'] },
-    { label: '🌅 Chasing sunset', tags: ['sunset', 'photo'] },
-    { label: '🎒 Finding the place nobody told me about', tags: ['hidden', 'explore'] },
-    { label: '🎤 Singing videoke with friendly locals', tags: ['social', 'local', 'pulse'] },
-    { label: '🛶 Joining island hopping with new friends', tags: ['island', 'social', 'pulse'] },
-    { label: '🏝 Finding a wild beach with almost nobody around', tags: ['quiet', 'hidden', 'beach'] },
-    { label: '📸 Hunting for the perfect photo', tags: ['photo', 'viewpoints', 'sunset'] },
-    { label: '🥂 Cold Chardonnay on a private boat', tags: ['private', 'curated', 'boat'] },
-    { label: '🧘 Massage, brunch, and pretending emails don’t exist', tags: ['slow', 'wellness', 'food'] },
-    { label: '🧺 Wandering through the local market', tags: ['food', 'local', 'market'] }
+    ['🍹 Mojito by the beach',['beach','drink','social']],
+    ['🍔 Smashed burger after swimming',['food','beach']],
+    ['👋 Meeting someone new',['social','pulse']],
+    ['📖 Reading in a hammock',['quiet','slow']],
+    ['🌿 Trekking into the jungle',['explore','nature']],
+    ['❤️ Beach bed with my love',['quiet','couples','private']],
+    ['🐢 Watching turtle hatchlings',['nature','wildlife']],
+    ['🛵 Lost somewhere on a scooter',['explore','routes']],
+    ['🏄 Surfing badly but proudly',['surf','adventure']],
+    ['🐟 Eating fish caught this morning',['food','local']],
+    ['🧊 Trying to kill the hangover',['food','recovery']],
+    ['🌅 Chasing sunset',['sunset','photo']],
+    ['🎒 Finding the place nobody told me about',['hidden','explore']],
+    ['🎤 Singing videoke with friendly locals',['social','local','pulse']],
+    ['🛶 Joining island hopping with new friends',['island','social','pulse']],
+    ['🏝 Finding a wild beach with almost nobody around',['quiet','hidden','beach']],
+    ['📸 Hunting for the perfect photo',['photo','viewpoints','sunset']],
+    ['🥂 Cold Chardonnay on a private boat',['private','curated','boat']],
+    ['🧘 Massage, brunch, and pretending emails don’t exist',['slow','wellness','food']],
+    ['🧺 Wandering through the local market',['food','local','market']]
   ];
+  const PLACEHOLDERS = ['Marco','Luna','IslandCat','The Dutch Guy','SandyFeet','Still Hungover'];
+  const state = { step:1, nickname:'', vibes:[] };
 
-  const nicknamePlaceholders = ['Marco', 'Luna', 'IslandCat', 'The Dutch Guy', 'SandyFeet', 'Still Hungover'];
-  const state = { step: 1, nickname: '', vibes: [] };
+  function esc(v){ return String(v||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function saved(){ try{return JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){return null;} }
+  function shouldShow(){ const p=new URLSearchParams(location.search); if(p.get('resetEntry')==='1'){localStorage.removeItem(KEY);return true;} return !saved(); }
+  function tags(){ const out=[]; VIBES.forEach(v=>{ if(state.vibes.includes(v[0])) v[1].forEach(t=>{ if(!out.includes(t)) out.push(t); }); }); return out; }
 
-  function escapeHtml(value){
-    return String(value || '').replace(/[&<>'"]/g, function(char){
-      return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char];
-    });
-  }
-
-  function getSavedEntry(){
-    try { return JSON.parse(localStorage.getItem(ENTRY_KEY) || 'null'); }
-    catch(err){ return null; }
-  }
-
-  function shouldShowEntry(){
-    const params = new URLSearchParams(window.location.search);
-    if(params.get('resetEntry') === '1'){
-      localStorage.removeItem(ENTRY_KEY);
-      return true;
-    }
-    return !getSavedEntry();
-  }
-
-  function getSelectedTags(){
-    const selected = VIBES.filter(function(vibe){ return state.vibes.includes(vibe.label); });
-    return Array.from(new Set(selected.flatMap(function(vibe){ return vibe.tags; })));
-  }
-
-  function injectStyles(){
-    if(document.getElementById('sanvicEntryExperienceStyles')) return;
-    const style = document.createElement('style');
-    style.id = 'sanvicEntryExperienceStyles';
-    style.textContent = `
-      body.sanvic-entry-lock #bottomDock.visible{opacity:0!important;pointer-events:none!important;transform:translateX(-50%) translateY(20px)!important}
-      body.sanvic-entry-lock #talaOrbWrap{opacity:0!important;pointer-events:none!important;transform:translateY(20px)!important}
-      body.sanvic-entry-lock .tala-orb-wrap{opacity:0!important;pointer-events:none!important;transform:translateY(20px)!important}
-      .sanvic-entry-experience{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;padding:calc(var(--safe-top,24px) + 18px) 18px calc(var(--safe-bottom,0px) + 18px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .7s cubic-bezier(.16,1,.3,1),visibility .7s;background:radial-gradient(circle at 50% 15%,rgba(20,184,166,.16),transparent 32%),linear-gradient(180deg,rgba(2,14,38,.38),rgba(2,14,38,.78))}
-      .sanvic-entry-experience.active{opacity:1;visibility:visible;pointer-events:auto}
-      .sanvic-entry-experience.closing{opacity:0;pointer-events:none}
-      .sanvic-entry-backdrop{position:absolute;inset:0;background:rgba(2,14,38,.36);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-      .sanvic-entry-card{position:relative;width:min(100%,430px);max-height:min(86vh,720px);overflow:hidden;border-radius:var(--radius-xl,32px);background:linear-gradient(180deg,rgba(8,18,38,.78),rgba(4,12,30,.9));border:1px solid rgba(255,255,255,.08);box-shadow:0 28px 90px rgba(0,0,0,.42),0 0 0 1px rgba(196,168,130,.04) inset;backdrop-filter:blur(36px);-webkit-backdrop-filter:blur(36px);transform:translateY(18px) scale(.98);transition:transform .75s cubic-bezier(.16,1,.3,1)}
-      .sanvic-entry-experience.active .sanvic-entry-card{transform:translateY(0) scale(1)}
-      .sanvic-entry-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(224,122,95,.08),transparent 35%,rgba(20,184,166,.08));pointer-events:none}
-      .sanvic-entry-inner{position:relative;padding:30px 24px 24px;display:flex;flex-direction:column;gap:20px}
-      .sanvic-entry-kicker{font-size:.58rem;font-weight:400;letter-spacing:.34em;text-transform:uppercase;color:var(--limestone,#c4a882);opacity:.82}
-      .sanvic-entry-title{font-family:var(--font-display,Georgia,serif);font-size:clamp(2rem,9vw,2.8rem);font-weight:300;line-height:1.04;letter-spacing:-.02em;color:var(--white-soft,rgba(255,255,255,.9))}
-      .sanvic-entry-sub{font-size:.9rem;font-weight:300;line-height:1.6;color:var(--white-muted,rgba(255,255,255,.5));max-width:330px}
-      .sanvic-entry-input{width:100%;height:54px;border-radius:var(--radius-md,20px);border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--white-soft,rgba(255,255,255,.9));font-family:var(--font-body,-apple-system,sans-serif);font-size:1rem;font-weight:300;padding:0 16px;outline:none;user-select:text;-webkit-user-select:text;transition:border-color .25s,background .25s,box-shadow .25s}
-      .sanvic-entry-input:focus{border-color:rgba(196,168,130,.38);background:rgba(255,255,255,.08);box-shadow:0 0 0 4px rgba(196,168,130,.07)}
-      .sanvic-entry-input::placeholder{color:var(--white-dim,rgba(255,255,255,.25))}
-      .sanvic-entry-actions{display:flex;flex-direction:column;gap:10px;margin-top:2px}
-      .sanvic-entry-primary,.sanvic-entry-secondary{height:50px;border-radius:9999px;font-family:var(--font-body,-apple-system,sans-serif);font-size:.86rem;font-weight:500;letter-spacing:.04em;cursor:pointer;transition:transform .25s cubic-bezier(.34,1.56,.64,1),opacity .25s,background .25s;border:none;-webkit-tap-highlight-color:transparent}
-      .sanvic-entry-primary{background:linear-gradient(135deg,var(--sand,#e8dcc8),var(--limestone,#c4a882));color:var(--charcoal-deep,#020e26);box-shadow:0 8px 28px rgba(196,168,130,.18)}
-      .sanvic-entry-primary:active,.sanvic-entry-secondary:active{transform:scale(.97)}
-      .sanvic-entry-secondary{background:transparent;color:var(--white-muted,rgba(255,255,255,.5));height:42px}
-      .sanvic-entry-count{font-size:.68rem;font-weight:400;letter-spacing:.12em;text-transform:uppercase;color:var(--white-dim,rgba(255,255,255,.25));margin-top:-6px}
-      .sanvic-vibe-grid{display:grid;grid-template-columns:1fr;gap:9px;max-height:min(46vh,360px);overflow-y:auto;padding:2px 2px 4px;margin:0 -2px;overscroll-behavior:contain}
-      .sanvic-vibe-grid::-webkit-scrollbar{width:2px}.sanvic-vibe-grid::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px}
-      .sanvic-vibe-option{width:100%;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:rgba(255,255,255,.045);color:var(--white-soft,rgba(255,255,255,.9));font-family:var(--font-body,-apple-system,sans-serif);font-size:.88rem;font-weight:300;line-height:1.25;text-align:left;padding:13px 14px;cursor:pointer;transition:all .24s cubic-bezier(.16,1,.3,1);display:flex;align-items:center;gap:9px;-webkit-tap-highlight-color:transparent}
-      .sanvic-vibe-option:active{transform:scale(.985)}
-      .sanvic-vibe-option.selected{border-color:rgba(224,122,95,.52);background:rgba(224,122,95,.13);box-shadow:0 0 0 1px rgba(224,122,95,.08) inset,0 8px 24px rgba(224,122,95,.08)}
-      .sanvic-vibe-option.disabled{opacity:.38}
-      .sanvic-entry-smile{font-family:var(--font-display,Georgia,serif);font-size:4rem;line-height:1;color:var(--limestone,#c4a882);opacity:.75;margin-bottom:-10px}
-      .sanvic-entry-note{font-size:.72rem;font-weight:300;line-height:1.5;color:var(--white-dim,rgba(255,255,255,.25))}
-      @media (min-width:700px){.sanvic-vibe-grid{grid-template-columns:1fr 1fr}.sanvic-entry-card{width:min(92%,620px)}.sanvic-entry-title{font-size:3rem}.sanvic-entry-sub{max-width:420px}}
+  function css(){
+    if(document.getElementById('sanvicEntryCss')) return;
+    const s=document.createElement('style');
+    s.id='sanvicEntryCss';
+    s.textContent=`
+      body.sanvic-entry-lock #bottomDock.visible,body.sanvic-entry-lock #talaOrbWrap{opacity:0!important;pointer-events:none!important}
+      .sanvic-entry{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;padding:18px;background:radial-gradient(circle at 50% 10%,rgba(20,184,166,.16),transparent 30%),linear-gradient(180deg,rgba(2,14,38,.46),rgba(2,14,38,.86));opacity:0;visibility:hidden;pointer-events:none;transition:opacity .45s ease,visibility .45s ease}
+      .sanvic-entry.active{opacity:1;visibility:visible;pointer-events:auto}.sanvic-entry.closing{opacity:0;pointer-events:none}
+      .sanvic-entry-card{width:min(100%,430px);max-height:calc(100dvh - 36px);border-radius:28px;background:linear-gradient(180deg,rgba(8,18,38,.82),rgba(4,12,30,.94));border:1px solid rgba(255,255,255,.09);box-shadow:0 28px 90px rgba(0,0,0,.45);backdrop-filter:blur(28px);overflow:hidden;display:flex}
+      .sanvic-entry-inner{width:100%;max-height:inherit;padding:24px 20px 18px;display:flex;flex-direction:column;gap:14px;overflow:hidden}
+      .sanvic-entry-kicker{font-size:.58rem;letter-spacing:.34em;text-transform:uppercase;color:var(--limestone,#c4a882)}
+      .sanvic-entry-title{font-family:var(--font-display,Georgia,serif);font-size:clamp(2rem,8vw,2.75rem);font-weight:300;line-height:1.02;color:var(--white-soft,rgba(255,255,255,.9));margin:0}
+      .sanvic-entry-sub{font-size:.88rem;font-weight:300;line-height:1.5;color:var(--white-muted,rgba(255,255,255,.55));margin:0}.sanvic-entry-note{font-size:.75rem;color:var(--white-dim,rgba(255,255,255,.3));margin:0}
+      .sanvic-entry-input{width:100%;height:54px;border-radius:18px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--white-soft,rgba(255,255,255,.9));font-family:var(--font-body,-apple-system,sans-serif);font-size:1rem;padding:0 15px;outline:0;user-select:text;-webkit-user-select:text}
+      .sanvic-entry-actions{display:flex;flex-direction:column;gap:8px;flex-shrink:0}.sanvic-entry-primary,.sanvic-entry-secondary{border:0;border-radius:999px;font-family:var(--font-body,-apple-system,sans-serif);cursor:pointer;-webkit-tap-highlight-color:transparent}.sanvic-entry-primary{min-height:50px;background:linear-gradient(135deg,var(--sand,#e8dcc8),var(--limestone,#c4a882));color:var(--charcoal-deep,#020e26);font-weight:600}.sanvic-entry-secondary{height:34px;background:transparent;color:var(--white-muted,rgba(255,255,255,.5));font-weight:600}
+      .sanvic-entry-count{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white-dim,rgba(255,255,255,.3));flex-shrink:0}.sanvic-vibe-grid{display:grid;grid-template-columns:1fr;gap:8px;overflow-y:auto;max-height:34dvh;min-height:0;padding:1px 2px 8px;overscroll-behavior:contain}.sanvic-vibe-option{border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.05);color:var(--white-soft,rgba(255,255,255,.9));font-family:var(--font-body,-apple-system,sans-serif);font-size:.86rem;text-align:left;padding:11px 13px}.sanvic-vibe-option.selected{border-color:rgba(224,122,95,.55);background:rgba(224,122,95,.15)}.sanvic-vibe-option.disabled{opacity:.45}.sanvic-entry-smile{font-family:var(--font-display,Georgia,serif);font-size:3rem;color:var(--limestone,#c4a882);line-height:1}
+      @media(min-width:700px){.sanvic-entry{justify-content:flex-start;padding-left:max(6vw,70px)}.sanvic-entry-card{width:min(46vw,560px);max-height:min(86vh,720px)}.sanvic-entry-inner{padding:32px 28px 24px}.sanvic-entry-title{font-size:clamp(2.6rem,4vw,3.6rem)}.sanvic-vibe-grid{grid-template-columns:1fr 1fr;max-height:40vh}}
+      @media(max-height:720px){.sanvic-entry-inner{gap:10px;padding-top:18px;padding-bottom:14px}.sanvic-entry-title{font-size:1.9rem}.sanvic-entry-sub{font-size:.8rem}.sanvic-vibe-grid{max-height:28dvh}.sanvic-vibe-option{padding:9px 11px;font-size:.82rem}.sanvic-entry-primary{min-height:46px}}
     `;
-    document.head.appendChild(style);
+    document.head.appendChild(s);
   }
 
-  function injectMarkup(){
-    if(document.getElementById('sanvicEntryExperience')) return;
-    const overlay = document.createElement('div');
-    overlay.className = 'sanvic-entry-experience';
-    overlay.id = 'sanvicEntryExperience';
-    overlay.setAttribute('aria-hidden', 'true');
-    overlay.innerHTML = `
-      <div class="sanvic-entry-backdrop"></div>
-      <section class="sanvic-entry-card" role="dialog" aria-modal="true" aria-labelledby="sanvicEntryTitle">
-        <div class="sanvic-entry-inner" id="sanvicEntryContent"></div>
-      </section>`;
-    document.body.appendChild(overlay);
+  function mount(){
+    if(document.getElementById('sanvicEntry')) return;
+    const o=document.createElement('div');
+    o.id='sanvicEntry';
+    o.className='sanvic-entry';
+    o.innerHTML='<section class="sanvic-entry-card" role="dialog" aria-modal="true"><div class="sanvic-entry-inner" id="sanvicEntryContent"></div></section>';
+    document.body.appendChild(o);
   }
 
   function render(){
-    const wrap = document.getElementById('sanvicEntryContent');
-    if(!wrap) return;
-
-    if(state.step === 1){
-      const placeholder = nicknamePlaceholders[Math.floor(Math.random() * nicknamePlaceholders.length)];
-      wrap.innerHTML = `
-        <div class="sanvic-entry-kicker">SANVIC</div>
-        <h1 class="sanvic-entry-title" id="sanvicEntryTitle">How should we call you?</h1>
-        <p class="sanvic-entry-sub">Just a nickname.<br>No account. No email. No drama.</p>
-        <input id="sanvicEntryNickname" class="sanvic-entry-input" maxlength="32" autocomplete="off" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(state.nickname)}">
-        <div class="sanvic-entry-actions">
-          <button class="sanvic-entry-primary" id="sanvicEntryContinue">Continue</button>
-          <button class="sanvic-entry-secondary" id="sanvicEntrySkip">Skip</button>
-        </div>`;
-      const input = document.getElementById('sanvicEntryNickname');
-      input.addEventListener('input', function(){ state.nickname = input.value; });
-      input.addEventListener('keydown', function(event){ if(event.key === 'Enter') goNext(); });
-      document.getElementById('sanvicEntryContinue').addEventListener('click', goNext);
-      document.getElementById('sanvicEntrySkip').addEventListener('click', function(){ state.nickname = ''; state.step = 2; render(); });
-      setTimeout(function(){ input.focus({ preventScroll: true }); }, 80);
+    const w=document.getElementById('sanvicEntryContent'); if(!w) return;
+    if(state.step===1){
+      const ph=PLACEHOLDERS[Math.floor(Math.random()*PLACEHOLDERS.length)];
+      w.innerHTML=`<div class="sanvic-entry-kicker">SANVIC</div><h1 class="sanvic-entry-title">How should we call you?</h1><p class="sanvic-entry-sub">Just a nickname.<br>No account. No email. No drama.</p><input id="sanvicName" class="sanvic-entry-input" maxlength="32" autocomplete="off" placeholder="${esc(ph)}" value="${esc(state.nickname)}"><div class="sanvic-entry-actions"><button class="sanvic-entry-primary" id="entryNext">Continue</button><button class="sanvic-entry-secondary" id="entrySkip">Skip</button></div>`;
+      const input=document.getElementById('sanvicName');
+      input.addEventListener('input',()=>state.nickname=input.value);
+      input.addEventListener('keydown',e=>{if(e.key==='Enter') next();});
+      document.getElementById('entryNext').onclick=next;
+      document.getElementById('entrySkip').onclick=()=>{state.nickname='';state.step=2;render();};
+      setTimeout(()=>input.focus({preventScroll:true}),80);
       return;
     }
-
-    if(state.step === 2){
-      const count = state.vibes.length;
-      wrap.innerHTML = `
-        <div class="sanvic-entry-kicker">Your San Vicente mood</div>
-        <h1 class="sanvic-entry-title" id="sanvicEntryTitle">Tomorrow at 3 PM, where do you see yourself?</h1>
-        <p class="sanvic-entry-sub">Choose up to 4.</p>
-        <div class="sanvic-entry-count">${count}/${MAX_VIBES} chosen</div>
-        <div class="sanvic-vibe-grid">
-          ${VIBES.map(function(vibe, index){
-            const selected = state.vibes.includes(vibe.label);
-            const disabled = !selected && count >= MAX_VIBES;
-            return `<button type="button" class="sanvic-vibe-option ${selected ? 'selected' : ''} ${disabled ? 'disabled' : ''}" data-index="${index}">${escapeHtml(vibe.label)}</button>`;
-          }).join('')}
-        </div>
-        <div class="sanvic-entry-actions">
-          <button class="sanvic-entry-primary" id="sanvicEntryContinue">Continue</button>
-        </div>`;
-      document.querySelectorAll('.sanvic-vibe-option').forEach(function(button){
-        button.addEventListener('click', function(){ toggleVibe(Number(button.dataset.index)); });
-      });
-      document.getElementById('sanvicEntryContinue').addEventListener('click', goNext);
+    if(state.step===2){
+      const count=state.vibes.length;
+      w.innerHTML=`<div class="sanvic-entry-kicker">Your San Vicente mood</div><h1 class="sanvic-entry-title">Tomorrow at 3 PM, where do you see yourself?</h1><p class="sanvic-entry-sub">Choose up to 4.</p><div class="sanvic-entry-count">${count}/${MAX} chosen</div><div class="sanvic-vibe-grid">${VIBES.map((v,i)=>{const sel=state.vibes.includes(v[0]);const dis=!sel&&count>=MAX;return `<button type="button" class="sanvic-vibe-option ${sel?'selected':''} ${dis?'disabled':''}" data-i="${i}">${esc(v[0])}</button>`;}).join('')}</div><div class="sanvic-entry-actions"><button class="sanvic-entry-primary" id="entryNext">Continue</button></div>`;
+      document.querySelectorAll('.sanvic-vibe-option').forEach(b=>b.onclick=()=>toggle(Number(b.dataset.i)));
+      document.getElementById('entryNext').onclick=next;
       return;
     }
-
-    const nickname = state.nickname.trim() || 'Traveler';
-    wrap.innerHTML = `
-      <div class="sanvic-entry-kicker">The map is open</div>
-      <div class="sanvic-entry-smile">:)</div>
-      <h1 class="sanvic-entry-title" id="sanvicEntryTitle">${escapeHtml(nickname)}, welcome to San Vicente :)</h1>
-      <p class="sanvic-entry-sub">The map is open.<br>The day is still unwritten.</p>
-      <p class="sanvic-entry-note">A few things are already happening today.</p>
-      <div class="sanvic-entry-actions">
-        <button class="sanvic-entry-primary" id="sanvicEntryEnter">Enter San Vicente</button>
-      </div>`;
-    document.getElementById('sanvicEntryEnter').addEventListener('click', completeEntry);
+    const name=state.nickname.trim()||'Traveler';
+    w.innerHTML=`<div class="sanvic-entry-kicker">The map is open</div><div class="sanvic-entry-smile">:)</div><h1 class="sanvic-entry-title">${esc(name)}, welcome to San Vicente :)</h1><p class="sanvic-entry-sub">The map is open.<br>The day is still unwritten.</p><p class="sanvic-entry-note">A few things are already happening today.</p><div class="sanvic-entry-actions"><button class="sanvic-entry-primary" id="entryEnter">Enter San Vicente</button></div>`;
+    document.getElementById('entryEnter').onclick=complete;
   }
 
-  function goNext(){
-    if(state.step === 1){
-      const input = document.getElementById('sanvicEntryNickname');
-      state.nickname = (input ? input.value : '').trim();
-      state.step = 2;
-    } else if(state.step === 2){
-      state.step = 3;
-    }
-    render();
-  }
+  function next(){ if(state.step===1){const i=document.getElementById('sanvicName');state.nickname=(i?i.value:'').trim();state.step=2;} else if(state.step===2){state.step=3;} render(); }
+  function toggle(i){ const v=VIBES[i]; if(!v)return; const k=state.vibes.indexOf(v[0]); if(k>=0)state.vibes.splice(k,1); else if(state.vibes.length<MAX)state.vibes.push(v[0]); render(); }
+  function applyProfile(p){ const x=p||saved(); if(!x)return; document.body.dataset.sanvicVibes=(x.vibeTags||[]).join(' '); if(x.nickname)document.body.dataset.sanvicNickname=x.nickname; const n=document.getElementById('pulseComposeName'); if(n&&x.nickname&&!n.value)n.value=x.nickname; }
+  function unlock(){ document.body.classList.remove('sanvic-entry-lock'); document.getElementById('bottomDock')?.classList.add('visible'); document.getElementById('talaOrbWrap')?.classList.remove('hidden'); applyProfile(); }
+  function complete(){ const p={nickname:state.nickname.trim(),vibes:state.vibes.slice(),vibeTags:tags(),enteredAt:new Date().toISOString()}; localStorage.setItem(KEY,JSON.stringify(p)); applyProfile(p); const o=document.getElementById('sanvicEntry'); if(!o){unlock();return;} o.classList.add('closing'); setTimeout(()=>{o.classList.remove('active','closing'); o.remove(); unlock(); window.dispatchEvent(new Event('sanvic:entry-complete'));},260); }
 
-  function toggleVibe(index){
-    const vibe = VIBES[index];
-    if(!vibe) return;
-    const existing = state.vibes.indexOf(vibe.label);
-    if(existing >= 0){
-      state.vibes.splice(existing, 1);
-    } else if(state.vibes.length < MAX_VIBES){
-      state.vibes.push(vibe.label);
-    }
-    render();
-  }
-
-  function applyEntryProfile(profile){
-    const saved = profile || getSavedEntry();
-    if(!saved) return;
-    document.body.dataset.sanvicVibes = (saved.vibeTags || []).join(' ');
-    if(saved.nickname){
-      document.body.dataset.sanvicNickname = saved.nickname;
-    }
-    const pulseNameInput = document.getElementById('pulseComposeName');
-    if(pulseNameInput && saved.nickname && !pulseNameInput.value){
-      pulseNameInput.value = saved.nickname;
-    }
-  }
-
-  function unlockMainInterface(){
-    document.body.classList.remove('sanvic-entry-lock');
-    document.getElementById('bottomDock')?.classList.add('visible');
-    document.getElementById('talaOrbWrap')?.classList.remove('hidden');
-    applyEntryProfile();
-  }
-
-  function completeEntry(){
-    const profile = {
-      nickname: state.nickname.trim(),
-      vibes: state.vibes.slice(),
-      vibeTags: getSelectedTags(),
-      enteredAt: new Date().toISOString()
-    };
-    localStorage.setItem(ENTRY_KEY, JSON.stringify(profile));
-    applyEntryProfile(profile);
-
-    const overlay = document.getElementById('sanvicEntryExperience');
-    if(!overlay){
-      unlockMainInterface();
-      return;
-    }
-    overlay.classList.add('closing');
-    overlay.setAttribute('aria-hidden', 'true');
-    setTimeout(function(){
-      overlay.classList.remove('active', 'closing');
-      unlockMainInterface();
-    }, 520);
-  }
-
-  function boot(){
-    injectStyles();
-
-    if(!shouldShowEntry()){
-      setTimeout(applyEntryProfile, 0);
-      return;
-    }
-
-    document.body.classList.add('sanvic-entry-lock');
-    injectMarkup();
-
-    window.addEventListener('load', function(){
-      setTimeout(function(){
-        render();
-        const overlay = document.getElementById('sanvicEntryExperience');
-        if(overlay){
-          overlay.classList.add('active');
-          overlay.setAttribute('aria-hidden', 'false');
-        }
-      }, ENTRY_DELAY_MS);
-    });
-  }
-
-  boot();
+  css();
+  if(!shouldShow()){ setTimeout(applyProfile,0); return; }
+  document.body.classList.add('sanvic-entry-lock');
+  mount();
+  window.addEventListener('load',()=>setTimeout(()=>{render(); const o=document.getElementById('sanvicEntry'); if(o)o.classList.add('active');},DELAY));
 })();
