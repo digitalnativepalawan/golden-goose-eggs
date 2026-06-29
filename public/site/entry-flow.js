@@ -28,6 +28,7 @@
   ];
   const PLACEHOLDERS = ['Marco','Luna','IslandCat','The Dutch Guy','SandyFeet','Still Hungover'];
   const state = { step:1, nickname:'', vibes:[] };
+  let completed = false;
 
   function esc(v){ return String(v||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function saved(){ try{return JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){return null;} }
@@ -40,7 +41,7 @@
     s.id='sanvicEntryCss';
     s.textContent=`
       body.sanvic-entry-lock #bottomDock.visible,body.sanvic-entry-lock #talaOrbWrap{opacity:0!important;pointer-events:none!important}
-      .sanvic-entry{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;padding:18px;background:radial-gradient(circle at 50% 10%,rgba(20,184,166,.16),transparent 30%),linear-gradient(180deg,rgba(2,14,38,.46),rgba(2,14,38,.86));opacity:0;visibility:hidden;pointer-events:none;transition:opacity .45s ease,visibility .45s ease}
+      .sanvic-entry{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;padding:18px;background:radial-gradient(circle at 50% 10%,rgba(20,184,166,.16),transparent 30%),linear-gradient(180deg,rgba(2,14,38,.46),rgba(2,14,38,.86));opacity:0;visibility:hidden;pointer-events:none;transition:opacity .25s ease,visibility .25s ease}
       .sanvic-entry.active{opacity:1;visibility:visible;pointer-events:auto}.sanvic-entry.closing{opacity:0;pointer-events:none}
       .sanvic-entry-card{width:min(100%,430px);max-height:calc(100dvh - 36px);border-radius:28px;background:linear-gradient(180deg,rgba(8,18,38,.82),rgba(4,12,30,.94));border:1px solid rgba(255,255,255,.09);box-shadow:0 28px 90px rgba(0,0,0,.45);backdrop-filter:blur(28px);overflow:hidden;display:flex}
       .sanvic-entry-inner{width:100%;max-height:inherit;padding:24px 20px 18px;display:flex;flex-direction:column;gap:14px;overflow:hidden}
@@ -48,7 +49,7 @@
       .sanvic-entry-title{font-family:var(--font-display,Georgia,serif);font-size:clamp(2rem,8vw,2.75rem);font-weight:300;line-height:1.02;color:var(--white-soft,rgba(255,255,255,.9));margin:0}
       .sanvic-entry-sub{font-size:.88rem;font-weight:300;line-height:1.5;color:var(--white-muted,rgba(255,255,255,.55));margin:0}.sanvic-entry-note{font-size:.75rem;color:var(--white-dim,rgba(255,255,255,.3));margin:0}
       .sanvic-entry-input{width:100%;height:54px;border-radius:18px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:var(--white-soft,rgba(255,255,255,.9));font-family:var(--font-body,-apple-system,sans-serif);font-size:1rem;padding:0 15px;outline:0;user-select:text;-webkit-user-select:text}
-      .sanvic-entry-actions{display:flex;flex-direction:column;gap:8px;flex-shrink:0}.sanvic-entry-primary,.sanvic-entry-secondary{border:0;border-radius:999px;font-family:var(--font-body,-apple-system,sans-serif);cursor:pointer;-webkit-tap-highlight-color:transparent}.sanvic-entry-primary{min-height:50px;background:linear-gradient(135deg,var(--sand,#e8dcc8),var(--limestone,#c4a882));color:var(--charcoal-deep,#020e26);font-weight:600}.sanvic-entry-secondary{height:34px;background:transparent;color:var(--white-muted,rgba(255,255,255,.5));font-weight:600}
+      .sanvic-entry-actions{display:flex;flex-direction:column;gap:8px;flex-shrink:0}.sanvic-entry-primary,.sanvic-entry-secondary{border:0;border-radius:999px;font-family:var(--font-body,-apple-system,sans-serif);cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}.sanvic-entry-primary{min-height:50px;background:linear-gradient(135deg,var(--sand,#e8dcc8),var(--limestone,#c4a882));color:var(--charcoal-deep,#020e26);font-weight:600}.sanvic-entry-secondary{height:34px;background:transparent;color:var(--white-muted,rgba(255,255,255,.5));font-weight:600}
       .sanvic-entry-count{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white-dim,rgba(255,255,255,.3));flex-shrink:0}.sanvic-vibe-grid{display:grid;grid-template-columns:1fr;gap:8px;overflow-y:auto;max-height:34dvh;min-height:0;padding:1px 2px 8px;overscroll-behavior:contain}.sanvic-vibe-option{border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.05);color:var(--white-soft,rgba(255,255,255,.9));font-family:var(--font-body,-apple-system,sans-serif);font-size:.86rem;text-align:left;padding:11px 13px}.sanvic-vibe-option.selected{border-color:rgba(224,122,95,.55);background:rgba(224,122,95,.15)}.sanvic-vibe-option.disabled{opacity:.45}.sanvic-entry-smile{font-family:var(--font-display,Georgia,serif);font-size:3rem;color:var(--limestone,#c4a882);line-height:1}
       @media(min-width:700px){.sanvic-entry{justify-content:flex-start;padding-left:max(6vw,70px)}.sanvic-entry-card{width:min(46vw,560px);max-height:min(86vh,720px)}.sanvic-entry-inner{padding:32px 28px 24px}.sanvic-entry-title{font-size:clamp(2.6rem,4vw,3.6rem)}.sanvic-vibe-grid{grid-template-columns:1fr 1fr;max-height:40vh}}
       @media(max-height:720px){.sanvic-entry-inner{gap:10px;padding-top:18px;padding-bottom:14px}.sanvic-entry-title{font-size:1.9rem}.sanvic-entry-sub{font-size:.8rem}.sanvic-vibe-grid{max-height:28dvh}.sanvic-vibe-option{padding:9px 11px;font-size:.82rem}.sanvic-entry-primary{min-height:46px}}
@@ -65,36 +66,57 @@
     document.body.appendChild(o);
   }
 
+  function bindAction(id, fn){
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.onclick=fn;
+    el.onpointerup=function(e){ e.preventDefault(); fn(); };
+    el.ontouchend=function(e){ e.preventDefault(); fn(); };
+  }
+
   function render(){
     const w=document.getElementById('sanvicEntryContent'); if(!w) return;
     if(state.step===1){
       const ph=PLACEHOLDERS[Math.floor(Math.random()*PLACEHOLDERS.length)];
-      w.innerHTML=`<div class="sanvic-entry-kicker">SANVIC</div><h1 class="sanvic-entry-title">How should we call you?</h1><p class="sanvic-entry-sub">Just a nickname.<br>No account. No email. No drama.</p><input id="sanvicName" class="sanvic-entry-input" maxlength="32" autocomplete="off" placeholder="${esc(ph)}" value="${esc(state.nickname)}"><div class="sanvic-entry-actions"><button class="sanvic-entry-primary" id="entryNext">Continue</button><button class="sanvic-entry-secondary" id="entrySkip">Skip</button></div>`;
+      w.innerHTML=`<div class="sanvic-entry-kicker">SANVIC</div><h1 class="sanvic-entry-title">How should we call you?</h1><p class="sanvic-entry-sub">Just a nickname.<br>No account. No email. No drama.</p><input id="sanvicName" class="sanvic-entry-input" maxlength="32" autocomplete="off" placeholder="${esc(ph)}" value="${esc(state.nickname)}"><div class="sanvic-entry-actions"><button type="button" class="sanvic-entry-primary" id="entryNext">Continue</button><button type="button" class="sanvic-entry-secondary" id="entrySkip">Skip</button></div>`;
       const input=document.getElementById('sanvicName');
       input.addEventListener('input',()=>state.nickname=input.value);
       input.addEventListener('keydown',e=>{if(e.key==='Enter') next();});
-      document.getElementById('entryNext').onclick=next;
-      document.getElementById('entrySkip').onclick=()=>{state.nickname='';state.step=2;render();};
+      bindAction('entryNext', next);
+      bindAction('entrySkip', ()=>{state.nickname='';state.step=2;render();});
       setTimeout(()=>input.focus({preventScroll:true}),80);
       return;
     }
     if(state.step===2){
       const count=state.vibes.length;
-      w.innerHTML=`<div class="sanvic-entry-kicker">Your San Vicente mood</div><h1 class="sanvic-entry-title">Tomorrow at 3 PM, where do you see yourself?</h1><p class="sanvic-entry-sub">Choose up to 4.</p><div class="sanvic-entry-count">${count}/${MAX} chosen</div><div class="sanvic-vibe-grid">${VIBES.map((v,i)=>{const sel=state.vibes.includes(v[0]);const dis=!sel&&count>=MAX;return `<button type="button" class="sanvic-vibe-option ${sel?'selected':''} ${dis?'disabled':''}" data-i="${i}">${esc(v[0])}</button>`;}).join('')}</div><div class="sanvic-entry-actions"><button class="sanvic-entry-primary" id="entryNext">Continue</button></div>`;
+      w.innerHTML=`<div class="sanvic-entry-kicker">Your San Vicente mood</div><h1 class="sanvic-entry-title">Tomorrow at 3 PM, where do you see yourself?</h1><p class="sanvic-entry-sub">Choose up to 4.</p><div class="sanvic-entry-count">${count}/${MAX} chosen</div><div class="sanvic-vibe-grid">${VIBES.map((v,i)=>{const sel=state.vibes.includes(v[0]);const dis=!sel&&count>=MAX;return `<button type="button" class="sanvic-vibe-option ${sel?'selected':''} ${dis?'disabled':''}" data-i="${i}">${esc(v[0])}</button>`;}).join('')}</div><div class="sanvic-entry-actions"><button type="button" class="sanvic-entry-primary" id="entryNext">Continue</button></div>`;
       document.querySelectorAll('.sanvic-vibe-option').forEach(b=>b.onclick=()=>toggle(Number(b.dataset.i)));
-      document.getElementById('entryNext').onclick=next;
+      bindAction('entryNext', next);
       return;
     }
     const name=state.nickname.trim()||'Traveler';
-    w.innerHTML=`<div class="sanvic-entry-kicker">The map is open</div><div class="sanvic-entry-smile">:)</div><h1 class="sanvic-entry-title">${esc(name)}, welcome to San Vicente :)</h1><p class="sanvic-entry-sub">The map is open.<br>The day is still unwritten.</p><p class="sanvic-entry-note">A few things are already happening today.</p><div class="sanvic-entry-actions"><button class="sanvic-entry-primary" id="entryEnter">Enter San Vicente</button></div>`;
-    document.getElementById('entryEnter').onclick=complete;
+    w.innerHTML=`<div class="sanvic-entry-kicker">The map is open</div><div class="sanvic-entry-smile">:)</div><h1 class="sanvic-entry-title">${esc(name)}, welcome to San Vicente :)</h1><p class="sanvic-entry-sub">The map is open.<br>The day is still unwritten.</p><p class="sanvic-entry-note">A few things are already happening today.</p><div class="sanvic-entry-actions"><button type="button" class="sanvic-entry-primary" id="entryEnter">Enter San Vicente</button></div>`;
+    bindAction('entryEnter', complete);
   }
 
   function next(){ if(state.step===1){const i=document.getElementById('sanvicName');state.nickname=(i?i.value:'').trim();state.step=2;} else if(state.step===2){state.step=3;} render(); }
   function toggle(i){ const v=VIBES[i]; if(!v)return; const k=state.vibes.indexOf(v[0]); if(k>=0)state.vibes.splice(k,1); else if(state.vibes.length<MAX)state.vibes.push(v[0]); render(); }
   function applyProfile(p){ const x=p||saved(); if(!x)return; document.body.dataset.sanvicVibes=(x.vibeTags||[]).join(' '); if(x.nickname)document.body.dataset.sanvicNickname=x.nickname; const n=document.getElementById('pulseComposeName'); if(n&&x.nickname&&!n.value)n.value=x.nickname; }
-  function unlock(){ document.body.classList.remove('sanvic-entry-lock'); document.getElementById('bottomDock')?.classList.add('visible'); document.getElementById('talaOrbWrap')?.classList.remove('hidden'); applyProfile(); }
-  function complete(){ const p={nickname:state.nickname.trim(),vibes:state.vibes.slice(),vibeTags:tags(),enteredAt:new Date().toISOString()}; localStorage.setItem(KEY,JSON.stringify(p)); applyProfile(p); const o=document.getElementById('sanvicEntry'); if(!o){unlock();return;} o.classList.add('closing'); setTimeout(()=>{o.classList.remove('active','closing'); o.remove(); unlock(); window.dispatchEvent(new Event('sanvic:entry-complete'));},260); }
+  function unlock(){ document.body.classList.remove('sanvic-entry-lock'); const b=document.getElementById('bottomDock'); if(b)b.classList.add('visible'); const t=document.getElementById('talaOrbWrap'); if(t)t.classList.remove('hidden'); applyProfile(); }
+  function complete(){
+    if(completed) return;
+    completed = true;
+    const p={nickname:state.nickname.trim(),vibes:state.vibes.slice(),vibeTags:tags(),enteredAt:new Date().toISOString()};
+    try{ localStorage.setItem(KEY,JSON.stringify(p)); }catch(e){}
+    applyProfile(p);
+    const o=document.getElementById('sanvicEntry');
+    if(o){ o.classList.remove('active'); o.remove(); }
+    unlock();
+    try{ window.dispatchEvent(new Event('sanvic:entry-complete')); }catch(e){}
+  }
+
+  document.addEventListener('click', function(e){ if(e.target && e.target.id === 'entryEnter') complete(); }, true);
+  document.addEventListener('touchend', function(e){ if(e.target && e.target.id === 'entryEnter') { e.preventDefault(); complete(); } }, true);
 
   css();
   if(!shouldShow()){ setTimeout(applyProfile,0); return; }
