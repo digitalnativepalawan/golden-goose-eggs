@@ -21,15 +21,15 @@
         .splash-footer{font-size:.72rem!important;color:rgba(255,255,255,.76)!important;letter-spacing:.38em!important;opacity:1!important;}
         .bottom-dock{bottom:calc(12px + var(--safe-bottom))!important;width:min(calc(100vw - 42px),430px)!important;padding:6px 7px!important;gap:1px!important;background:rgba(4,12,30,.74)!important;border-color:rgba(255,255,255,.08)!important;box-shadow:0 12px 34px rgba(0,0,0,.34)!important;}
         .dock-item{flex:1!important;width:auto!important;height:48px!important;border-radius:18px!important;gap:2px!important;color:rgba(255,255,255,.72)!important;background:transparent!important;}
-        .dock-item svg{width:22px!important;height:22px!important;stroke:rgba(255,255,255,.84)!important;stroke-width:1.9!important;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5));}
+        .dock-item svg{width:22px!important;height:22px!important;stroke:rgba(255,255,255,.84)!important;stroke-width:1.85!important;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5));}
         .dock-item span{font-size:.58rem!important;letter-spacing:.01em!important;color:rgba(255,255,255,.62)!important;}
-        .dock-item.active{color:rgba(255,255,255,.96)!important;background:transparent!important;}
+        .dock-item.active{color:rgba(255,255,255,.96)!important;background:rgba(255,255,255,.055)!important;}
         .dock-item.active span{color:rgba(255,255,255,.9)!important;}
         .dock-item.active::after{bottom:3px!important;width:4px!important;height:4px!important;box-shadow:0 0 8px rgba(20,184,166,.38)!important;}
         .dock-item.active svg{stroke:rgba(255,255,255,.98)!important;filter:drop-shadow(0 0 10px rgba(20,184,166,.32));}
-        .dock-item[data-tab="tala"]{transform:translateY(-3px);}
-        .dock-item[data-tab="tala"] svg{width:24px!important;height:24px!important;stroke-width:1.9!important;}
-        .dock-item[data-tab="tala"].active{background:rgba(20,184,166,.12)!important;box-shadow:inset 0 0 0 1px rgba(20,184,166,.18),0 8px 18px rgba(0,0,0,.14)!important;}
+        .dock-item[data-tab="tala"]{transform:none!important;}
+        .dock-item[data-tab="tala"] svg{width:22px!important;height:22px!important;stroke-width:1.85!important;}
+        .dock-item[data-tab="tala"].active{background:rgba(255,255,255,.055)!important;box-shadow:none!important;}
 
         .dest-sheet.expanded .sanvic-dest-close{display:flex!important;}
         .sanvic-dest-close{position:fixed;top:calc(var(--safe-top) + 12px);right:14px;z-index:130;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.12);background:rgba(4,12,30,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);color:rgba(255,255,255,.92);align-items:center;justify-content:center;font-size:24px;line-height:1;box-shadow:0 8px 24px rgba(0,0,0,.32);}
@@ -38,13 +38,13 @@
     document.head.appendChild(s);
   }
 
-  function replaceTalaDockIcon(){
+  function restoreTalaDockIcon(){
     const btn = document.querySelector('.dock-item[data-tab="tala"]');
-    if(!btn || btn.dataset.talaIconFixed === '1') return;
+    if(!btn || btn.dataset.talaIconFixed === 'reference') return;
     const svg = btn.querySelector('svg');
     if(!svg) return;
-    svg.outerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l1.7 4.4 4.4 1.7-4.4 1.7L12 15.7l-1.7-4.4-4.4-1.7 4.4-1.7L12 3.5z"/><path d="M18.5 14.5l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8.8-2.1z"/><path d="M5.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8z"/></svg>';
-    btn.dataset.talaIconFixed = '1';
+    svg.outerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>';
+    btn.dataset.talaIconFixed = 'reference';
   }
 
   function ensureDestinationClose(){
@@ -84,7 +84,7 @@
     let tries = 0;
     const timer = setInterval(function(){
       tries += 1;
-      replaceTalaDockIcon();
+      restoreTalaDockIcon();
       ensureDestinationClose();
       applyMapOpening();
       if(tries > 80) clearInterval(timer);
