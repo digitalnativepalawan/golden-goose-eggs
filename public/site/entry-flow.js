@@ -1,85 +1,78 @@
 // ═══════════════════════════════════════════════════════
-// Supabase connection for the static SANVIC.PH site.
-// Public anon/publishable key — safe to expose client-side,
-// access is governed by Row Level Security policies on the
-// destinations / tala_responses / tala_settings tables.
+// SANVIC Entry Experience
+// First-time visitor doorway: nickname → travel vibe → welcome.
+// No login. No account. TALA stays hidden until entry is complete.
 // ═══════════════════════════════════════════════════════
-const SUPABASE_URL = "https://qkbqvdwplgakjdhxdbiz.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_ZvdKuIsiZIsW2-w1bHts2w_HHBj6r4-";
-
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  global: { headers: { apikey: SUPABASE_ANON_KEY } },
-});
-
-// ═══════════════════════════════════════════════════════
-// SANVIC first-entry vibe flow.
-// This is intentionally injected from this already-loaded config file
-// so the existing interface stays untouched and reversible.
-// ═══════════════════════════════════════════════════════
-(function initSanvicEntryVibeFlow(){
+(function initSanvicEntryExperience(){
   const ENTRY_KEY = 'sanvic_entry_v1';
   const MAX_VIBES = 4;
+  const ENTRY_DELAY_MS = 2600;
+
   const VIBES = [
-    { label:'🍹 Mojito by the beach', tags:['beach','drink','social'] },
-    { label:'🍔 Smashed burger after swimming', tags:['food','beach'] },
-    { label:'👋 Meeting someone new', tags:['social','pulse'] },
-    { label:'📖 Reading in a hammock', tags:['quiet','slow'] },
-    { label:'🌿 Trekking into the jungle', tags:['explore','nature'] },
-    { label:'❤️ Beach bed with my love', tags:['quiet','couples','private'] },
-    { label:'🐢 Watching turtle hatchlings', tags:['nature','wildlife'] },
-    { label:'🛵 Lost somewhere on a scooter', tags:['explore','routes'] },
-    { label:'🏄 Surfing badly but proudly', tags:['surf','adventure'] },
-    { label:'🐟 Eating fish caught this morning', tags:['food','local'] },
-    { label:'🧊 Trying to kill the hangover', tags:['food','recovery'] },
-    { label:'🌅 Chasing sunset', tags:['sunset','photo'] },
-    { label:'🎒 Finding the place nobody told me about', tags:['hidden','explore'] },
-    { label:'🎤 Singing videoke with friendly locals', tags:['social','local','pulse'] },
-    { label:'🛶 Joining island hopping with new friends', tags:['island','social','pulse'] },
-    { label:'🏝 Finding a wild beach with almost nobody around', tags:['quiet','hidden','beach'] },
-    { label:'📸 Hunting for the perfect photo', tags:['photo','viewpoints','sunset'] },
-    { label:'🥂 Cold Chardonnay on a private boat', tags:['private','curated','boat'] },
-    { label:'🧘 Massage, brunch, and pretending emails don’t exist', tags:['slow','wellness','food'] },
-    { label:'🧺 Wandering through the local market', tags:['food','local','market'] }
+    { label: '🍹 Mojito by the beach', tags: ['beach', 'drink', 'social'] },
+    { label: '🍔 Smashed burger after swimming', tags: ['food', 'beach'] },
+    { label: '👋 Meeting someone new', tags: ['social', 'pulse'] },
+    { label: '📖 Reading in a hammock', tags: ['quiet', 'slow'] },
+    { label: '🌿 Trekking into the jungle', tags: ['explore', 'nature'] },
+    { label: '❤️ Beach bed with my love', tags: ['quiet', 'couples', 'private'] },
+    { label: '🐢 Watching turtle hatchlings', tags: ['nature', 'wildlife'] },
+    { label: '🛵 Lost somewhere on a scooter', tags: ['explore', 'routes'] },
+    { label: '🏄 Surfing badly but proudly', tags: ['surf', 'adventure'] },
+    { label: '🐟 Eating fish caught this morning', tags: ['food', 'local'] },
+    { label: '🧊 Trying to kill the hangover', tags: ['food', 'recovery'] },
+    { label: '🌅 Chasing sunset', tags: ['sunset', 'photo'] },
+    { label: '🎒 Finding the place nobody told me about', tags: ['hidden', 'explore'] },
+    { label: '🎤 Singing videoke with friendly locals', tags: ['social', 'local', 'pulse'] },
+    { label: '🛶 Joining island hopping with new friends', tags: ['island', 'social', 'pulse'] },
+    { label: '🏝 Finding a wild beach with almost nobody around', tags: ['quiet', 'hidden', 'beach'] },
+    { label: '📸 Hunting for the perfect photo', tags: ['photo', 'viewpoints', 'sunset'] },
+    { label: '🥂 Cold Chardonnay on a private boat', tags: ['private', 'curated', 'boat'] },
+    { label: '🧘 Massage, brunch, and pretending emails don’t exist', tags: ['slow', 'wellness', 'food'] },
+    { label: '🧺 Wandering through the local market', tags: ['food', 'local', 'market'] }
   ];
 
+  const nicknamePlaceholders = ['Marco', 'Luna', 'IslandCat', 'The Dutch Guy', 'SandyFeet', 'Still Hungover'];
   const state = { step: 1, nickname: '', vibes: [] };
 
-  const esc = (value) => String(value || '').replace(/[&<>'"]/g, (char) => ({
-    '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
-  }[char]));
+  function escapeHtml(value){
+    return String(value || '').replace(/[&<>'"]/g, function(char){
+      return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char];
+    });
+  }
 
-  const getProfile = () => {
+  function getSavedEntry(){
     try { return JSON.parse(localStorage.getItem(ENTRY_KEY) || 'null'); }
     catch(err){ return null; }
-  };
+  }
 
-  const shouldShowEntry = () => {
-    const url = new URL(window.location.href);
-    if(url.searchParams.get('resetEntry') === '1'){
+  function shouldShowEntry(){
+    const params = new URLSearchParams(window.location.search);
+    if(params.get('resetEntry') === '1'){
       localStorage.removeItem(ENTRY_KEY);
       return true;
     }
-    return !getProfile();
-  };
+    return !getSavedEntry();
+  }
 
-  const selectedTags = () => {
-    const selected = VIBES.filter(v => state.vibes.includes(v.label));
-    return [...new Set(selected.flatMap(v => v.tags))];
-  };
+  function getSelectedTags(){
+    const selected = VIBES.filter(function(vibe){ return state.vibes.includes(vibe.label); });
+    return Array.from(new Set(selected.flatMap(function(vibe){ return vibe.tags; })));
+  }
 
-  function injectEntryStyles(){
-    if(document.getElementById('sanvicEntryStyles')) return;
+  function injectStyles(){
+    if(document.getElementById('sanvicEntryExperienceStyles')) return;
     const style = document.createElement('style');
-    style.id = 'sanvicEntryStyles';
+    style.id = 'sanvicEntryExperienceStyles';
     style.textContent = `
       body.sanvic-entry-lock #bottomDock.visible{opacity:0!important;pointer-events:none!important;transform:translateX(-50%) translateY(20px)!important}
       body.sanvic-entry-lock #talaOrbWrap{opacity:0!important;pointer-events:none!important;transform:translateY(20px)!important}
-      .sanvic-entry-flow{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;padding:calc(var(--safe-top,24px) + 18px) 18px calc(var(--safe-bottom,0px) + 18px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .7s cubic-bezier(.16,1,.3,1),visibility .7s;background:radial-gradient(circle at 50% 15%,rgba(20,184,166,.16),transparent 32%),linear-gradient(180deg,rgba(2,14,38,.38),rgba(2,14,38,.78))}
-      .sanvic-entry-flow.active{opacity:1;visibility:visible;pointer-events:auto}
-      .sanvic-entry-flow.closing{opacity:0;pointer-events:none}
+      body.sanvic-entry-lock .tala-orb-wrap{opacity:0!important;pointer-events:none!important;transform:translateY(20px)!important}
+      .sanvic-entry-experience{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;padding:calc(var(--safe-top,24px) + 18px) 18px calc(var(--safe-bottom,0px) + 18px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .7s cubic-bezier(.16,1,.3,1),visibility .7s;background:radial-gradient(circle at 50% 15%,rgba(20,184,166,.16),transparent 32%),linear-gradient(180deg,rgba(2,14,38,.38),rgba(2,14,38,.78))}
+      .sanvic-entry-experience.active{opacity:1;visibility:visible;pointer-events:auto}
+      .sanvic-entry-experience.closing{opacity:0;pointer-events:none}
       .sanvic-entry-backdrop{position:absolute;inset:0;background:rgba(2,14,38,.36);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
       .sanvic-entry-card{position:relative;width:min(100%,430px);max-height:min(86vh,720px);overflow:hidden;border-radius:var(--radius-xl,32px);background:linear-gradient(180deg,rgba(8,18,38,.78),rgba(4,12,30,.9));border:1px solid rgba(255,255,255,.08);box-shadow:0 28px 90px rgba(0,0,0,.42),0 0 0 1px rgba(196,168,130,.04) inset;backdrop-filter:blur(36px);-webkit-backdrop-filter:blur(36px);transform:translateY(18px) scale(.98);transition:transform .75s cubic-bezier(.16,1,.3,1)}
-      .sanvic-entry-flow.active .sanvic-entry-card{transform:translateY(0) scale(1)}
+      .sanvic-entry-experience.active .sanvic-entry-card{transform:translateY(0) scale(1)}
       .sanvic-entry-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(224,122,95,.08),transparent 35%,rgba(20,184,166,.08));pointer-events:none}
       .sanvic-entry-inner{position:relative;padding:30px 24px 24px;display:flex;flex-direction:column;gap:20px}
       .sanvic-entry-kicker{font-size:.58rem;font-weight:400;letter-spacing:.34em;text-transform:uppercase;color:var(--limestone,#c4a882);opacity:.82}
@@ -107,12 +100,12 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     document.head.appendChild(style);
   }
 
-  function injectEntryMarkup(){
-    if(document.getElementById('sanvicEntryFlow')) return;
+  function injectMarkup(){
+    if(document.getElementById('sanvicEntryExperience')) return;
     const overlay = document.createElement('div');
-    overlay.className = 'sanvic-entry-flow';
-    overlay.id = 'sanvicEntryFlow';
-    overlay.setAttribute('aria-hidden','true');
+    overlay.className = 'sanvic-entry-experience';
+    overlay.id = 'sanvicEntryExperience';
+    overlay.setAttribute('aria-hidden', 'true');
     overlay.innerHTML = `
       <div class="sanvic-entry-backdrop"></div>
       <section class="sanvic-entry-card" role="dialog" aria-modal="true" aria-labelledby="sanvicEntryTitle">
@@ -126,21 +119,22 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     if(!wrap) return;
 
     if(state.step === 1){
+      const placeholder = nicknamePlaceholders[Math.floor(Math.random() * nicknamePlaceholders.length)];
       wrap.innerHTML = `
         <div class="sanvic-entry-kicker">SANVIC</div>
         <h1 class="sanvic-entry-title" id="sanvicEntryTitle">How should we call you?</h1>
         <p class="sanvic-entry-sub">Just a nickname.<br>No account. No email. No drama.</p>
-        <input id="sanvicEntryNickname" class="sanvic-entry-input" maxlength="32" autocomplete="off" placeholder="Marco" value="${esc(state.nickname)}">
+        <input id="sanvicEntryNickname" class="sanvic-entry-input" maxlength="32" autocomplete="off" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(state.nickname)}">
         <div class="sanvic-entry-actions">
           <button class="sanvic-entry-primary" id="sanvicEntryContinue">Continue</button>
           <button class="sanvic-entry-secondary" id="sanvicEntrySkip">Skip</button>
         </div>`;
       const input = document.getElementById('sanvicEntryNickname');
-      input.addEventListener('input', () => { state.nickname = input.value; });
-      input.addEventListener('keydown', (event) => { if(event.key === 'Enter') next(); });
-      document.getElementById('sanvicEntryContinue').addEventListener('click', next);
-      document.getElementById('sanvicEntrySkip').addEventListener('click', () => { state.nickname = ''; state.step = 2; render(); });
-      setTimeout(() => input.focus({ preventScroll:true }), 60);
+      input.addEventListener('input', function(){ state.nickname = input.value; });
+      input.addEventListener('keydown', function(event){ if(event.key === 'Enter') goNext(); });
+      document.getElementById('sanvicEntryContinue').addEventListener('click', goNext);
+      document.getElementById('sanvicEntrySkip').addEventListener('click', function(){ state.nickname = ''; state.step = 2; render(); });
+      setTimeout(function(){ input.focus({ preventScroll: true }); }, 80);
       return;
     }
 
@@ -152,19 +146,19 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         <p class="sanvic-entry-sub">Choose up to 4.</p>
         <div class="sanvic-entry-count">${count}/${MAX_VIBES} chosen</div>
         <div class="sanvic-vibe-grid">
-          ${VIBES.map((v, index) => {
-            const selected = state.vibes.includes(v.label);
+          ${VIBES.map(function(vibe, index){
+            const selected = state.vibes.includes(vibe.label);
             const disabled = !selected && count >= MAX_VIBES;
-            return `<button type="button" class="sanvic-vibe-option ${selected ? 'selected' : ''} ${disabled ? 'disabled' : ''}" data-index="${index}">${v.label}</button>`;
+            return `<button type="button" class="sanvic-vibe-option ${selected ? 'selected' : ''} ${disabled ? 'disabled' : ''}" data-index="${index}">${escapeHtml(vibe.label)}</button>`;
           }).join('')}
         </div>
         <div class="sanvic-entry-actions">
           <button class="sanvic-entry-primary" id="sanvicEntryContinue">Continue</button>
         </div>`;
-      document.querySelectorAll('.sanvic-vibe-option').forEach((button) => {
-        button.addEventListener('click', () => toggleVibe(Number(button.dataset.index)));
+      document.querySelectorAll('.sanvic-vibe-option').forEach(function(button){
+        button.addEventListener('click', function(){ toggleVibe(Number(button.dataset.index)); });
       });
-      document.getElementById('sanvicEntryContinue').addEventListener('click', next);
+      document.getElementById('sanvicEntryContinue').addEventListener('click', goNext);
       return;
     }
 
@@ -172,16 +166,16 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     wrap.innerHTML = `
       <div class="sanvic-entry-kicker">The map is open</div>
       <div class="sanvic-entry-smile">:)</div>
-      <h1 class="sanvic-entry-title" id="sanvicEntryTitle">${esc(nickname)}, welcome to San Vicente :)</h1>
+      <h1 class="sanvic-entry-title" id="sanvicEntryTitle">${escapeHtml(nickname)}, welcome to San Vicente :)</h1>
       <p class="sanvic-entry-sub">The map is open.<br>The day is still unwritten.</p>
       <p class="sanvic-entry-note">A few things are already happening today.</p>
       <div class="sanvic-entry-actions">
         <button class="sanvic-entry-primary" id="sanvicEntryEnter">Enter San Vicente</button>
       </div>`;
-    document.getElementById('sanvicEntryEnter').addEventListener('click', complete);
+    document.getElementById('sanvicEntryEnter').addEventListener('click', completeEntry);
   }
 
-  function next(){
+  function goNext(){
     if(state.step === 1){
       const input = document.getElementById('sanvicEntryNickname');
       state.nickname = (input ? input.value : '').trim();
@@ -195,69 +189,80 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   function toggleVibe(index){
     const vibe = VIBES[index];
     if(!vibe) return;
-    const currentIndex = state.vibes.indexOf(vibe.label);
-    if(currentIndex >= 0){
-      state.vibes.splice(currentIndex, 1);
+    const existing = state.vibes.indexOf(vibe.label);
+    if(existing >= 0){
+      state.vibes.splice(existing, 1);
     } else if(state.vibes.length < MAX_VIBES){
       state.vibes.push(vibe.label);
     }
     render();
   }
 
-  function applyProfileToInterface(profile){
-    if(!profile) profile = getProfile();
-    if(!profile) return;
-    document.body.dataset.sanvicVibes = (profile.vibeTags || []).join(' ');
-    const nameInput = document.getElementById('pulseComposeName');
-    if(nameInput && profile.nickname && !nameInput.value) nameInput.value = profile.nickname;
+  function applyEntryProfile(profile){
+    const saved = profile || getSavedEntry();
+    if(!saved) return;
+    document.body.dataset.sanvicVibes = (saved.vibeTags || []).join(' ');
+    if(saved.nickname){
+      document.body.dataset.sanvicNickname = saved.nickname;
+    }
+    const pulseNameInput = document.getElementById('pulseComposeName');
+    if(pulseNameInput && saved.nickname && !pulseNameInput.value){
+      pulseNameInput.value = saved.nickname;
+    }
   }
 
   function unlockMainInterface(){
     document.body.classList.remove('sanvic-entry-lock');
     document.getElementById('bottomDock')?.classList.add('visible');
     document.getElementById('talaOrbWrap')?.classList.remove('hidden');
-    applyProfileToInterface();
+    applyEntryProfile();
   }
 
-  function complete(){
+  function completeEntry(){
     const profile = {
       nickname: state.nickname.trim(),
       vibes: state.vibes.slice(),
-      vibeTags: selectedTags(),
+      vibeTags: getSelectedTags(),
       enteredAt: new Date().toISOString()
     };
     localStorage.setItem(ENTRY_KEY, JSON.stringify(profile));
-    applyProfileToInterface(profile);
+    applyEntryProfile(profile);
 
-    const overlay = document.getElementById('sanvicEntryFlow');
-    if(!overlay){ unlockMainInterface(); return; }
+    const overlay = document.getElementById('sanvicEntryExperience');
+    if(!overlay){
+      unlockMainInterface();
+      return;
+    }
     overlay.classList.add('closing');
-    overlay.setAttribute('aria-hidden','true');
-    setTimeout(() => {
-      overlay.classList.remove('active','closing');
+    overlay.setAttribute('aria-hidden', 'true');
+    setTimeout(function(){
+      overlay.classList.remove('active', 'closing');
       unlockMainInterface();
     }, 520);
   }
 
-  injectEntryStyles();
+  function boot(){
+    injectStyles();
 
-  if(shouldShowEntry()){
+    if(!shouldShowEntry()){
+      setTimeout(applyEntryProfile, 0);
+      return;
+    }
+
     document.body.classList.add('sanvic-entry-lock');
-  } else {
-    setTimeout(() => applyProfileToInterface(), 0);
-    return;
+    injectMarkup();
+
+    window.addEventListener('load', function(){
+      setTimeout(function(){
+        render();
+        const overlay = document.getElementById('sanvicEntryExperience');
+        if(overlay){
+          overlay.classList.add('active');
+          overlay.setAttribute('aria-hidden', 'false');
+        }
+      }, ENTRY_DELAY_MS);
+    });
   }
 
-  injectEntryMarkup();
-
-  window.addEventListener('load', () => {
-    setTimeout(() => {
-      render();
-      const overlay = document.getElementById('sanvicEntryFlow');
-      if(overlay){
-        overlay.classList.add('active');
-        overlay.setAttribute('aria-hidden','false');
-      }
-    }, 2600);
-  });
+  boot();
 })();
