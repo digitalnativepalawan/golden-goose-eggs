@@ -2319,6 +2319,13 @@ function renderAdminDest(){
     <div id="adfCatPanel" style="display:${destCatPanelOpen?'':'none'}">
       ${adminDestCatPanelHtml()}
     </div>
+    <div class="admin-section-toggle" onclick="adminToggleNearbyPanel()" style="margin-top:8px;">
+      <span>📍 Manage "What's around me" ${nearbyPanelOpen?'▾':'▸'}</span>
+      <span class="admin-section-count">${Object.values(nearbyPlacesByBarangay).reduce((n,arr)=>n+arr.length,0)}</span>
+    </div>
+    <div id="adfNearbyPanel" style="display:${nearbyPanelOpen?'':'none'}">
+      ${adminNearbyPanelHtml()}
+    </div>
     <button class="admin-add-btn" style="margin-top:14px;" onclick="adminNewDest()">+ Add destination</button>`;
 
   if(adminEditingDestId !== null){
