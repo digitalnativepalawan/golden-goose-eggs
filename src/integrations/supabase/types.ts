@@ -43,6 +43,7 @@ export type Database = {
       }
       destinations: {
         Row: {
+          barangay: string | null
           category: string
           color: string | null
           created_at: string | null
@@ -64,6 +65,7 @@ export type Database = {
           video_url: string | null
         }
         Insert: {
+          barangay?: string | null
           category: string
           color?: string | null
           created_at?: string | null
@@ -85,6 +87,7 @@ export type Database = {
           video_url?: string | null
         }
         Update: {
+          barangay?: string | null
           category?: string
           color?: string | null
           created_at?: string | null
@@ -104,6 +107,42 @@ export type Database = {
           updated_at?: string | null
           video_type?: string | null
           video_url?: string | null
+        }
+        Relationships: []
+      }
+      nearby_places: {
+        Row: {
+          barangay: string
+          category: string
+          created_at: string
+          description: string
+          distance_label: string
+          icon: string
+          id: number
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          barangay: string
+          category?: string
+          created_at?: string
+          description?: string
+          distance_label?: string
+          icon?: string
+          id?: never
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          barangay?: string
+          category?: string
+          created_at?: string
+          description?: string
+          distance_label?: string
+          icon?: string
+          id?: never
+          name?: string
+          sort_order?: number
         }
         Relationships: []
       }
