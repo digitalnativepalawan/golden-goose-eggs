@@ -10,7 +10,7 @@
       .mk-wrap{width:28px!important;height:28px!important;filter:drop-shadow(0 3px 7px rgba(0,0,0,.55))!important;animation:none!important;}
       .mk-wrap *{animation:none!important;transition:none!important;}
       .mk-ring,.mk-glow{display:none!important;visibility:hidden!important;opacity:0!important;}
-      .mk-dot{width:13px!important;height:13px!important;border:2px solid rgba(255,255,255,.98)!important;box-shadow:0 2px 7px rgba(0,0,0,.65)!important;}
+      .mk-dot{width:13px!important;height:13px!important;border:0!important;box-shadow:0 2px 7px rgba(0,0,0,.55),0 0 8px currentColor!important;}
       .leaflet-marker-icon{overflow:visible!important;}
     `;
     document.head.appendChild(s);
