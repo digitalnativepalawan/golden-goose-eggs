@@ -1978,6 +1978,13 @@ window.addEventListener('load',()=>{
   setTimeout(()=>{
     document.getElementById('bottomDock').classList.add('visible');
     document.getElementById('talaOrbWrap').classList.remove('hidden');
+    if(!localStorage.getItem(DOCK_SEEN_KEY)){
+      setTimeout(()=>{
+        document.getElementById('bottomDock').classList.add('intro-pulse');
+        document.getElementById('dockCoachmark').classList.add('show');
+      },400);
+      setTimeout(dismissDockIntro,5200); // auto-dismiss if user never taps
+    }
   },2600);
 });
 
