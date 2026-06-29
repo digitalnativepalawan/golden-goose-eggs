@@ -11,34 +11,12 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   global: { headers: { apikey: SUPABASE_ANON_KEY } },
 });
 
-(function loadSanvicExperienceModulesAfterApp(){
-  const files = ['entry-flow.js', 'personalize.js', 'pulse-demo-content.js'];
+(function loadSanvicExperienceModules(){
   const parentV = new URLSearchParams(window.location.search).get('v');
   const v = parentV || String(Date.now());
-  let loaded = false;
-
-  function appLooksReady(){
-    return typeof window.openPulsePanel === 'function' ||
-           typeof window.openDiscoverPanel === 'function' ||
-           document.getElementById('bottomDock');
-  }
-
-  function load(){
-    if(loaded) return;
-    loaded = true;
-    files.forEach((file) => {
-      if(document.querySelector('script[src^="' + file + '"]')) return;
-      const script = document.createElement('script');
-      script.src = file + '?v=' + encodeURIComponent(v);
-      document.body.appendChild(script);
-    });
-  }
-
-  function waitForApp(startedAt){
-    if(appLooksReady() || Date.now() - startedAt > 6000){ load(); return; }
-    setTimeout(() => waitForApp(startedAt), 80);
-  }
-
-  if(document.readyState === 'complete') waitForApp(Date.now());
-  else window.addEventListener('load', () => waitForApp(Date.now()), { once:true });
+  ['entry-flow.js', 'personalize.js', 'pulse-demo-content.js'].forEach((file) => {
+    const script = document.createElement('script');
+    script.src = file + '?v=' + encodeURIComponent(v);
+    document.body.appendChild(script);
+  });
 })();
