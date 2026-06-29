@@ -1912,7 +1912,14 @@ function heroMic(){
 }
 
 // ─── BOTTOM NAV ───
+const DOCK_SEEN_KEY = 'sanvic_dock_seen';
+function dismissDockIntro(){
+  document.getElementById('bottomDock')?.classList.remove('intro-pulse');
+  document.getElementById('dockCoachmark')?.classList.remove('show');
+  localStorage.setItem(DOCK_SEEN_KEY,'1');
+}
 function dockNav(tab){
+  dismissDockIntro();
   document.querySelectorAll('.dock-item').forEach(d=>d.classList.remove('active'));
   document.querySelector(`.dock-item[data-tab="${tab}"]`).classList.add('active');
 
