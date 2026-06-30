@@ -22,7 +22,7 @@
       .leaflet-marker-icon{overflow:visible!important;}
       .sv-brgy-icon{background:none!important;border:none!important;}
       .sv-brgy-pin{display:flex;align-items:center;gap:8px;transform:translate(-10px,-10px);white-space:nowrap;pointer-events:auto;}
-      .sv-brgy-dot{width:14px;height:14px;border-radius:999px;background:#1d9bf0;border:2px solid rgba(255,255,255,.86);box-shadow:0 0 0 5px rgba(29,155,240,.18),0 0 18px rgba(29,155,240,.78),0 4px 12px rgba(0,0,0,.45);}
+      .sv-brgy-dot{width:10px;height:10px;border-radius:999px;background:#1d9bf0;border:2px solid rgba(255,255,255,.9);box-shadow:0 2px 6px rgba(0,0,0,.4);}
       .sv-brgy-label{font-family:var(--font-body);font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(232,244,255,.94);text-shadow:0 2px 8px rgba(0,0,0,.8);background:rgba(4,12,30,.48);border:1px solid rgba(29,155,240,.22);border-radius:999px;padding:5px 9px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
 
       @media(max-width:767px){
