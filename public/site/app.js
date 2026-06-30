@@ -571,14 +571,15 @@ function hexToBg(hex, alpha){
 // ever blank before the first load finishes.
 let catStyle = {};
 Object.keys(DEFAULT_CAT_STYLE).forEach(k=>{
-  catStyle[k] = { label: DEFAULT_CAT_STYLE[k].label, color: DEFAULT_CAT_STYLE[k].color, bg: hexToBg(DEFAULT_CAT_STYLE[k].color) };
+  const d = DEFAULT_CAT_STYLE[k];
+  catStyle[k] = { label: d.label, color: d.color, bg: hexToBg(d.color), icon: d.icon || 'map-pin' };
 });
 
 function applyCategoriesFromRows(rows){
   if(!rows || !rows.length) return; // keep defaults if the table is empty/unreachable
   const next = {};
   rows.forEach(r=>{
-    next[r.key] = { label: r.label, color: r.color || '#0ea5e9', bg: hexToBg(r.color) };
+    next[r.key] = { label: r.label, color: r.color || '#0ea5e9', bg: hexToBg(r.color), icon: r.icon || 'map-pin' };
   });
   catStyle = next;
 }
