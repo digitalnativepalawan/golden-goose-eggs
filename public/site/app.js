@@ -3174,7 +3174,7 @@ async function adminResetDefaults(){
       rating:d.stats.rating, travel:d.stats.travel, temp:d.stats.temp, season:d.stats.season
     }));
     const talaRows = DEFAULT_TALA_DATA.map((t,i)=>({ keywords:t.kw, response:t.r, sort_order:i }));
-    const catRows = Object.keys(DEFAULT_CAT_STYLE).map((key,i)=>({ key, label: DEFAULT_CAT_STYLE[key].label, color: DEFAULT_CAT_STYLE[key].color, sort_order:i }));
+    const catRows = Object.keys(DEFAULT_CAT_STYLE).map((key,i)=>({ key, label: DEFAULT_CAT_STYLE[key].label, color: DEFAULT_CAT_STYLE[key].color, icon: DEFAULT_CAT_STYLE[key].icon, sort_order:i }));
 
     await sb.from('destinations').insert(destRows);
     await sb.from('tala_responses').insert(talaRows);
