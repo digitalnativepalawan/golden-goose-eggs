@@ -1,46 +1,59 @@
-# Security hardening — real findings only
+## Goal
 
-The scanner found 31 items. After triage against how your app actually uses the database, **6 are real "anyone on the internet can vandalize your app" bugs**. The rest are either by-design (open Pulse) or stylistic warnings. This plan fixes only the real ones, with zero app-behavior changes for normal users.
+Replace the current flat colored dots on the map with clean, category-aware glyph pins that scale gracefully with zoom, and give admins a Lucide icon picker per category so the map stays visually consistent across all destinations.
 
-## What gets fixed
+## Design direction
 
-### 1. `destinations` table — anyone can wipe or rewrite the map
-Currently any anonymous visitor can DELETE every San Vicente location or change names/coords. **Fix:** keep public read, restrict INSERT/UPDATE/DELETE to admin role only (via existing `has_role`-style check). Your site only reads this table from `app.js`, so nothing breaks.
+Keep the dark, editorial SANVIC aesthetic — no cartoonish 3D pins. Two parts to the marker:
 
-### 2. `tala_responses`, `tala_settings`, `tala_suggestions` — anyone can poison the chatbot
-Same pattern: public can rewrite Tala's answers and prompts. **Fix:** public read stays, writes locked to admin.
+1. **Soft halo** — a low-opacity colored glow (category color) so pins read at a glance without shouting.
+2. **Glyph chip** — a small rounded square (~26px) with a 1px border in the category color, dark translucent fill, and a white Lucide glyph centered inside. Featured destinations get a thin accent ring + slightly larger chip.
 
-### 3. `pulse_categories` — anyone can delete/rename channels
-Channels (Tips, Sightings, etc.) can be wiped by any visitor. **Fix:** public read, admin-only writes.
+```text
+   ╭──────╮
+   │  ⛰   │   ← 26px chip, category-tinted border
+   ╰──────╯
+      ·         ← 4px tail dot anchored on coordinate
+```
 
-### 4. Storage buckets `destination-images` + `destination-videos` — anyone can upload or delete files
-Right now a script can fill your storage quota or replace destination photos with anything. **Fix:** keep public READ (so images still load on the map), restrict INSERT/UPDATE/DELETE to admin.
+Selected/hovered marker lifts to ~32px and gains a brighter ring. This matches the reference screenshot's quiet-but-precise feel while staying legible on satellite, dark, and the new light tiles.
 
-### 5. `traveler_profiles.moderation_note` is publicly readable
-Internal staff notes (ban/mute reasons) leak to anyone who queries the table. **Fix:** create a public-safe view `traveler_profiles_public` that excludes `moderation_note` and `is_banned`/`is_muted` flags; restrict the base table's SELECT to the owner + admins. Update `app.js` reads of profiles to use the view.
+## Zoom behavior (anti-eyesore on mobile)
 
-### 6. Admin role infrastructure (prerequisite for 1–5)
-Add the standard `app_role` enum + `user_roles` table + `has_role()` SECURITY DEFINER function (per Lovable's user-roles pattern). Without this there's no way to express "admin only" in policies. No UI for granting admin yet — first admin gets seeded by user_id via a one-off migration statement you approve.
+- z ≤ 11 (regional): show halo only, no chip — pins become quiet dots, no overlap clutter.
+- z 12–14 (district): chip appears at 22px, no label.
+- z ≥ 15 (street): chip 26px, name label fades in below.
+- Featured pins always render one tier earlier than non-featured so the map has a clear visual hierarchy when zoomed out.
 
-## What I'm deliberately NOT changing
+Implemented via a single Leaflet `zoomend` handler that toggles classes on a marker layer — no re-creation of markers, so panning stays smooth on phones.
 
-- **Pulse open-write policies** (posts/comments/likes "anyone can insert") — you explicitly chose this design after the magic-link spam fiasco. The scanner flags them as warns; they stay.
-- **`anyone can delete any like`** — same Pulse design tradeoff; revisit only if you want device-id enforcement later.
-- **SECURITY DEFINER function warnings** — these are your `admin_*` RPCs. They're guarded by being admin-only callable after step 6 (we'll REVOKE EXECUTE from anon/authenticated and GRANT only to admins).
-- **`.env` "leak"** — already explained: that's the publishable key, designed to be public.
-- **localStorage / token validation / rate limiting** — non-issues or platform-level, not changing.
+## Icons come from the category, not the destination
+
+Each row in `destination_categories` gets a new `icon` column storing a Lucide icon name (e.g. `mountain`, `waves`, `utensils`, `bed-double`). Every destination inherits its category's icon, so the map is automatically consistent and admins only manage icons in one place.
+
+Admin "Manage categories" panel gains an **Icon picker**:
+- Search box + scrollable grid of ~80 curated travel-relevant Lucide icons (beaches, food, lodging, activities, viewpoints, transport, culture, nature, services).
+- Click to select; preview chip on the right shows exactly how the pin will look on the map using the category color.
+- Stored as a string key; rendered client-side from a single `LUCIDE_ICONS` map so there's no runtime fetch.
 
 ## Technical details
 
-One migration containing, in order:
-1. `CREATE TYPE app_role AS ENUM ('admin','moderator','user')`
-2. `CREATE TABLE user_roles (user_id, role)` + GRANTs + RLS + `has_role()` SECURITY DEFINER
-3. DROP + recreate write policies on `destinations`, `tala_responses`, `tala_settings`, `tala_suggestions`, `pulse_categories` → `USING (has_role(auth.uid(),'admin'))`
-4. DROP + recreate `storage.objects` policies for the two buckets, same admin gate on write
-5. `CREATE VIEW traveler_profiles_public` excluding moderation columns; tighten base-table SELECT
-6. REVOKE EXECUTE on `admin_*` functions from anon/authenticated; GRANT to a custom admin role
-7. Optional seed line (commented, you fill in your user_id) to make yourself the first admin
+- **DB**: add `icon TEXT NOT NULL DEFAULT 'map-pin'` to `public.destination_categories`. Backfill sensible defaults per existing category key (beach→waves, food→utensils, etc.). No changes to `destinations`.
+- **Rendering**: replace the current `L.circleMarker` / colored dot path in `public/site/app.js` with `L.divIcon` whose HTML is `<div class="sv-pin sv-pin--{key}"><span class="sv-pin__glyph">{svg}</span></div>`. Lucide SVG strings come from a small inline registry (only icons we actually expose in the picker are bundled — keeps payload small).
+- **CSS**: add `.sv-pin`, `.sv-pin__chip`, `.sv-pin__halo`, size tiers `.is-zoom-low/mid/high`, and `.is-featured` / `.is-active` modifiers to `public/site/index.html`. Tinting uses the existing `--cat-color` CSS var already set per category.
+- **Zoom controller**: one `map.on('zoomend', ...)` that sets `low|mid|high` on the marker pane root; CSS handles the rest. No per-marker JS work on zoom.
+- **Admin UI**: extend the existing category form in `app.js` with an icon picker modal; save writes `icon` alongside `key/label/color`.
+- **Light/Dark/Satellite parity**: chip uses translucent dark fill + category-tinted border in dark/satellite; switches to translucent white fill + darker glyph in light mode via the existing tile-mode class on `<body>`. Boundary lines and labels are untouched.
 
-After migration, single small edit in `public/site/app.js` to swap any direct `traveler_profiles` reads to `traveler_profiles_public`.
+## Out of scope
 
-No frontend behavior changes for end users. Admin actions (which currently have no UI anyway) will require being logged in as an admin — we can build that UI later if you want.
+- No changes to Pulse, Tala, Discover, or nearby_places.
+- No new dependencies — Lucide SVGs are inlined as strings for the curated set; we do not pull in `lucide` as an npm package for the static site.
+- No marker clustering in this pass (can be a follow-up if density grows).
+
+## Acceptance
+
+- Every destination on the map renders with its category's Lucide glyph in a tinted chip.
+- Zooming out on mobile collapses pins to quiet halos; zooming in reveals chips then labels — no overlap soup.
+- Admin can change a category's icon and color and see all its destinations update on the map after save.
+- Light, Dark, and Satellite modes all keep pins legible without restyling boundaries or fonts.

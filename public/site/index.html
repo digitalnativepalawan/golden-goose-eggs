@@ -69,14 +69,38 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 .leaflet-control-attribution{background:var(--glass-bg)!important;backdrop-filter:blur(20px);color:var(--white-dim)!important;font-family:var(--font-body)!important;font-size:.55rem!important;padding:3px 8px!important;border-radius:10px 0 0 0!important;border:none!important}
 .leaflet-control-attribution a{color:var(--ocean-teal-light)!important}
 
-/* Custom markers */
-.mk-wrap{position:relative;width:32px;height:32px;cursor:pointer;transition:transform .3s var(--ease-spring);animation:mkb 4s ease-in-out infinite}
-.mk-wrap:active{transform:scale(.85)}
-.mk-ring{position:absolute;inset:0;border-radius:50%;border:1.5px solid;opacity:.3;animation:mkp 3s ease-in-out infinite}
-.mk-dot{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:8px;height:8px;border-radius:50%;box-shadow:0 0 12px}
-.mk-glow{position:absolute;inset:-5px;border-radius:50%;background:radial-gradient(circle,currentColor 0%,transparent 70%);opacity:.1}
-@keyframes mkp{0%,100%{transform:scale(1);opacity:.3}50%{transform:scale(1.5);opacity:.1}}
-@keyframes mkb{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+/* Custom markers — category-tinted glyph chip with a soft halo.
+   Sizes are driven by a zoom-tier class set on the markerPane:
+   .sv-zoom-low (≤11) → halo only, .sv-zoom-mid (12-14) → small chip,
+   .sv-zoom-high (≥15) → full chip. Keeps mobile zoom-out from clutter. */
+.sv-pin-icon{background:none!important;border:none!important}
+.sv-pin{position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .25s var(--ease-spring);will-change:transform}
+.sv-pin:active{transform:scale(.9)}
+.sv-pin__halo{position:absolute;inset:2px;border-radius:50%;background:radial-gradient(circle,var(--pin-color) 0%,transparent 70%);opacity:.28;transition:opacity .25s,transform .25s}
+.sv-pin__chip{position:relative;width:26px;height:26px;border-radius:9px;background:rgba(13,28,54,.78);border:1.5px solid var(--pin-color);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.04) inset;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:width .2s,height .2s,opacity .2s,transform .2s}
+.sv-pin__chip svg{width:14px;height:14px;display:block}
+.sv-pin.is-featured .sv-pin__chip{box-shadow:0 4px 16px rgba(0,0,0,.5),0 0 0 2px var(--pin-color) inset,0 0 0 1px rgba(255,255,255,.06)}
+.sv-pin.is-featured .sv-pin__halo{opacity:.42}
+/* Zoom tiers */
+.sv-zoom-low .sv-pin__chip{opacity:0;transform:scale(.4);pointer-events:none}
+.sv-zoom-low .sv-pin__halo{inset:10px;opacity:.55}
+.sv-zoom-low .sv-pin.is-featured .sv-pin__chip{opacity:1;transform:scale(.78)}
+.sv-zoom-mid .sv-pin__chip{width:22px;height:22px;border-radius:7px}
+.sv-zoom-mid .sv-pin__chip svg{width:12px;height:12px}
+.sv-zoom-high .sv-pin__chip{width:28px;height:28px}
+.sv-zoom-high .sv-pin__chip svg{width:15px;height:15px}
+.sv-zoom-high .sv-pin__halo{opacity:.34}
+/* Light-tile contrast tweak — flips chip to white fill with darker glyph */
+body.map-light .sv-pin__chip{background:rgba(255,255,255,.92);color:#0d1c36;box-shadow:0 4px 12px rgba(15,23,42,.18)}
+body.map-light .sv-pin__halo{opacity:.55;filter:saturate(1.1)}
+/* Admin icon picker */
+.sv-pin-preview{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:9px;background:rgba(13,28,54,.78);border:1.5px solid var(--pin-color,#0ea5e9);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.sv-icon-preview-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.sv-icon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:6px;max-height:220px;overflow-y:auto;padding:8px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.02)}
+.sv-icon-opt{width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.03);color:#e8edf5;cursor:pointer;transition:all .15s ease;padding:0}
+.sv-icon-opt:hover{background:rgba(20,184,166,.12);border-color:rgba(20,184,166,.35)}
+.sv-icon-opt.is-selected{background:rgba(20,184,166,.22);border-color:rgba(20,184,166,.7);box-shadow:0 0 0 1px rgba(20,184,166,.5) inset}
+.sv-icon-opt svg{width:18px;height:18px}
 
 /* ═══════════════════════════════════
    HERO OVERLAY (top of map)
