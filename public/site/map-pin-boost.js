@@ -1,6 +1,14 @@
 // SANVIC mobile map/nav cleanup
-// Keeps footer Tala as the single primary Tala entry and cleans up map controls/pins.
+// Keeps the restored floating TALA orb visible while syncing the footer nav labels.
 (function(){
+  const NAV_LABELS = {
+    map: 'Today',
+    discover: 'Explorer',
+    tala: 'Pulse',
+    pulse: 'Hunt',
+    saved: 'MyTrip'
+  };
+
   function addStyles(){
     if(document.getElementById('sanvicMapPinNoPulseCss')) return;
     const s = document.createElement('style');
@@ -9,7 +17,8 @@
       .splash-tagline{color:rgba(255,255,255,.72)!important;text-shadow:0 2px 12px rgba(0,0,0,.55)!important;font-weight:400!important;}
       .splash-footer{color:rgba(255,255,255,.72)!important;text-shadow:0 2px 12px rgba(0,0,0,.6)!important;font-weight:600!important;opacity:1!important;}
       .leaflet-control-zoom{display:none!important;visibility:hidden!important;pointer-events:none!important;}
-      #talaOrbWrap,.tala-orb-wrap{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      #talaOrbWrap,.tala-orb-wrap{display:flex!important;visibility:visible!important;pointer-events:auto!important;}
+      #talaOrbWrap.hidden,.tala-orb-wrap.hidden{opacity:0!important;pointer-events:none!important;transform:translateY(20px)!important;}
       .mk-wrap{width:28px!important;height:28px!important;filter:drop-shadow(0 3px 7px rgba(0,0,0,.55))!important;animation:none!important;}
       .mk-wrap *{animation:none!important;transition:none!important;}
       .mk-ring,.mk-glow{display:none!important;visibility:hidden!important;opacity:0!important;}
@@ -38,13 +47,35 @@
     document.head.appendChild(s);
   }
 
-  function restoreTalaDockIcon(){
-    const btn = document.querySelector('.dock-item[data-tab="tala"]');
-    if(!btn || btn.dataset.talaIconFixed === 'reference') return;
-    const svg = btn.querySelector('svg');
-    if(!svg) return;
-    svg.outerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>';
-    btn.dataset.talaIconFixed = 'reference';
+  function syncFloatingNavLabels(){
+    Object.entries(NAV_LABELS).forEach(function([tab, label]){
+      const btn = document.querySelector('.dock-item[data-tab="' + tab + '"]');
+      if(!btn) return;
+      const span = btn.querySelector('span');
+      if(span) span.textContent = label;
+      btn.setAttribute('aria-label', label);
+      btn.setAttribute('title', label);
+      btn.dataset.adminNavLabel = label;
+    });
+    document.documentElement.dataset.sanvicNavLabels = JSON.stringify(NAV_LABELS);
+    window.SANVIC_NAV_LABELS = NAV_LABELS;
+  }
+
+  function restoreTalaFloatingOrb(){
+    const wrap = document.getElementById('talaOrbWrap');
+    const orb = document.getElementById('talaOrb');
+    if(wrap){
+      wrap.style.removeProperty('display');
+      wrap.style.removeProperty('visibility');
+      wrap.setAttribute('aria-label', 'Ask TALA');
+      wrap.dataset.adminNavLabel = 'TALA';
+    }
+    if(orb){
+      orb.setAttribute('aria-label', 'Ask TALA');
+      orb.setAttribute('title', 'Ask TALA');
+    }
+    const label = document.querySelector('#talaOrbWrap .tala-orb-label');
+    if(label) label.textContent = 'Ask TALA';
   }
 
   function ensureDestinationClose(){
@@ -84,7 +115,8 @@
     let tries = 0;
     const timer = setInterval(function(){
       tries += 1;
-      restoreTalaDockIcon();
+      syncFloatingNavLabels();
+      restoreTalaFloatingOrb();
       ensureDestinationClose();
       applyMapOpening();
       if(tries > 80) clearInterval(timer);
