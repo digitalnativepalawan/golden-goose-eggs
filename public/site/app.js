@@ -2153,7 +2153,12 @@ function adminDestCatPanelHtml(){
 
 function adminDestCatFormHtml(){
   const isNew = editingDestCatId === 'new';
-  const c = isNew ? {key:'',label:'',color:'#0ea5e9'} : { key: editingDestCatId, ...catStyle[editingDestCatId] };
+  const c = isNew ? {key:'',label:'',color:'#0ea5e9',icon:'map-pin'} : { key: editingDestCatId, ...catStyle[editingDestCatId] };
+  const currentIcon = c.icon || 'map-pin';
+  const iconGrid = LUCIDE_ICON_KEYS.map(name=>{
+    const sel = name === currentIcon ? ' is-selected' : '';
+    return `<button type="button" class="sv-icon-opt${sel}" data-icon="${name}" onclick="adminPickIcon('${name}')" title="${name}">${lucideSvg(name,18)}</button>`;
+  }).join('');
   return `
     <div class="admin-edit-box">
       <div class="admin-field">
@@ -2161,12 +2166,36 @@ function adminDestCatFormHtml(){
         <input id="dcfKey" value="${escapeHtml(c.key)}" placeholder="e.g. waterfalls" ${isNew?'':'disabled'}>
       </div>
       <div class="admin-field"><label>Label (shown to visitors)</label><input id="dcfLabel" value="${escapeHtml(c.label)}" placeholder="e.g. Waterfalls"></div>
-      <div class="admin-field"><label>Marker / pill color (hex)</label><input id="dcfColor" value="${escapeHtml(c.color)}" placeholder="#0ea5e9"></div>
+      <div class="admin-field"><label>Marker color (hex)</label><input id="dcfColor" value="${escapeHtml(c.color)}" placeholder="#0ea5e9" oninput="adminRefreshIconPreview()"></div>
+      <div class="admin-field">
+        <label>Map icon</label>
+        <div class="sv-icon-preview-row">
+          <span id="dcfPreview" class="sv-pin-preview" style="--pin-color:${escapeHtml(c.color)}">${lucideSvg(currentIcon,18)}</span>
+          <span style="font-size:.72rem;color:var(--white-dim);">Preview · <span id="dcfIconName">${escapeHtml(currentIcon)}</span></span>
+        </div>
+        <input id="dcfIcon" type="hidden" value="${escapeHtml(currentIcon)}">
+        <div class="sv-icon-grid">${iconGrid}</div>
+      </div>
       <div class="admin-edit-actions">
         <button class="admin-save-btn" onclick="adminSaveDestCat('${isNew?'':escapeHtml(c.key)}')">${isNew?'Create':'Save changes'}</button>
         <button class="admin-cancel-btn" onclick="editingDestCatId=null;renderAdminDest();">Cancel</button>
       </div>
     </div>`;
+}
+
+function adminPickIcon(name){
+  const f = document.getElementById('dcfIcon'); if(!f) return;
+  f.value = name;
+  document.querySelectorAll('.sv-icon-opt').forEach(b=>b.classList.toggle('is-selected', b.dataset.icon===name));
+  const lbl = document.getElementById('dcfIconName'); if(lbl) lbl.textContent = name;
+  adminRefreshIconPreview();
+}
+function adminRefreshIconPreview(){
+  const prev = document.getElementById('dcfPreview'); if(!prev) return;
+  const name = (document.getElementById('dcfIcon')||{}).value || 'map-pin';
+  const color = (document.getElementById('dcfColor')||{}).value || '#0ea5e9';
+  prev.style.setProperty('--pin-color', color);
+  prev.innerHTML = lucideSvg(name, 18);
 }
 
 function adminNewDestCat(){ editingDestCatId='new'; renderAdminDest(); }
@@ -2177,22 +2206,23 @@ async function adminSaveDestCat(existingKey){
   const key = document.getElementById('dcfKey').value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
   const label = document.getElementById('dcfLabel').value.trim();
   const color = document.getElementById('dcfColor').value.trim() || '#0ea5e9';
+  const icon = (document.getElementById('dcfIcon').value || 'map-pin').trim();
   if(!key || !label){ alert('Key and label are both required.'); return; }
   if(isNew && catStyle[key]){ alert(`A category with the key "${key}" already exists.`); return; }
 
   try {
     if(isNew){
       const sortOrder = Object.keys(catStyle).length;
-      const { error } = await sb.from('destination_categories').insert({ key, label, color, sort_order: sortOrder });
+      const { error } = await sb.from('destination_categories').insert({ key, label, color, icon, sort_order: sortOrder });
       if(error) throw error;
     } else {
-      const { error } = await sb.from('destination_categories').update({ label, color }).eq('key', existingKey);
+      const { error } = await sb.from('destination_categories').update({ label, color, icon }).eq('key', existingKey);
       if(error) throw error;
     }
     await loadDataFromSupabase();
     editingDestCatId = null;
     renderAdminDest();
-    rebuildMarkers(); // marker colors depend on catStyle
+    rebuildMarkers(); // marker icons/colors depend on catStyle
   } catch(err){
     alert('Save failed: ' + (err.message || err));
   }
