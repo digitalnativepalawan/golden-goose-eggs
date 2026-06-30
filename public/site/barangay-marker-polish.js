@@ -2,6 +2,16 @@
 // Visual-only refinement for the municipality-level barangay dots and labels.
 (function(){
   let overviewApplied = false;
+  let userNavigated = false;
+  let overviewTimer = null;
+
+  const NAV_DESTINATIONS = {
+    map: 'map',
+    discover: 'discover',
+    tala: 'tala',
+    pulse: 'pulse',
+    saved: 'saved'
+  };
 
   function addStyles(){
     if(document.getElementById('sanvicBarangayMarkerPolishCss')) return;
@@ -28,6 +38,7 @@
 
   function fitMunicipalityOverview(force){
     try{
+      if(userNavigated && !force) return true;
       if(typeof map === 'undefined' || !map || typeof L === 'undefined' || typeof SAN_VICENTE_BARANGAYS === 'undefined') return false;
       if(overviewApplied && !force) return true;
       const bounds = L.geoJSON(SAN_VICENTE_BARANGAYS).getBounds();
@@ -39,6 +50,38 @@
       setTimeout(layoutLabels, 120);
       return true;
     }catch(e){ return false; }
+  }
+
+  function stopOverviewLock(){
+    userNavigated = true;
+    document.body.classList.remove('sanvic-overview');
+    if(overviewTimer) clearInterval(overviewTimer);
+  }
+
+  function triggerDockDestination(tab){
+    stopOverviewLock();
+    const destination = NAV_DESTINATIONS[tab] || tab;
+    if(typeof dockNav === 'function'){
+      dockNav(destination);
+      setTimeout(layoutLabels, 120);
+      return;
+    }
+    const btn = document.querySelector('.dock-item[data-tab="' + tab + '"]');
+    if(btn && typeof btn.click === 'function') btn.click();
+  }
+
+  function bindDockNavigation(){
+    Object.keys(NAV_DESTINATIONS).forEach(function(tab){
+      const btn = document.querySelector('.dock-item[data-tab="' + tab + '"]');
+      if(!btn || btn.dataset.sanvicPolishNavBound === '1') return;
+      btn.dataset.sanvicPolishNavBound = '1';
+      btn.addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        triggerDockDestination(tab);
+        return false;
+      }, true);
+    });
   }
 
   function overlap(a,b,pad){
@@ -75,17 +118,18 @@
   function boot(){
     addStyles();
     let tries = 0;
-    const timer = setInterval(function(){
+    overviewTimer = setInterval(function(){
       tries += 1;
+      bindDockNavigation();
       fitMunicipalityOverview(false);
       layoutLabels();
-      if(tries > 100) clearInterval(timer);
+      if(tries > 100 || userNavigated) clearInterval(overviewTimer);
     }, 150);
     window.addEventListener('resize', () => {
+      if(userNavigated) return;
       overviewApplied = false;
       setTimeout(() => { fitMunicipalityOverview(true); layoutLabels(); }, 160);
     }, { passive:true });
-    document.addEventListener('click', () => setTimeout(layoutLabels, 120), true);
     try{
       if(typeof map !== 'undefined' && map && map.on){
         map.on('zoomend moveend resize', function(){
@@ -97,7 +141,11 @@
     }catch(e){}
   }
 
-  window.sanvicFitMunicipalityOverview = function(){ fitMunicipalityOverview(true); };
+  window.sanvicFitMunicipalityOverview = function(){
+    userNavigated = false;
+    overviewApplied = false;
+    fitMunicipalityOverview(true);
+  };
 
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once:true });
   else boot();
