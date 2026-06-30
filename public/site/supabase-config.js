@@ -12,11 +12,12 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 (function loadSanvicExperienceModules(){
-  const parentV = new URLSearchParams(window.location.search).get('v');
-  const v = parentV || String(Date.now());
+  // MODULE_DEPLOY_VERSION must be bumped whenever module files change so
+  // browsers always fetch the latest version, ignoring stale URL ?v= params.
+  const MODULE_DEPLOY_VERSION = '1782860000000';
   ['entry-flow.js', 'personalize.js', 'pulse-demo-content.js', 'map-pin-boost.js', 'barangay-marker-polish.js'].forEach((file) => {
     const script = document.createElement('script');
-    script.src = file + '?v=' + encodeURIComponent(v);
+    script.src = file + '?v=' + MODULE_DEPLOY_VERSION;
     document.body.appendChild(script);
   });
 })();
