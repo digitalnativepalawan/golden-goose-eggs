@@ -2129,14 +2129,15 @@ function adminDestCatPanelHtml(){
   } else {
     html += keys.map(key=>{
       const c = catStyle[key];
+      const ico = lucideSvg(c.icon||'map-pin', 14);
       return `
       <div class="admin-list-item">
         <div class="admin-list-item-head">
           <div onclick="adminEditDestCat('${escapeHtml(key)}')" style="flex:1;cursor:pointer;display:flex;align-items:center;gap:10px;">
-            <span style="width:14px;height:14px;border-radius:50%;background:${escapeHtml(c.color)};flex-shrink:0;display:inline-block;"></span>
+            <span class="sv-pin-preview" style="--pin-color:${escapeHtml(c.color)};width:28px;height:28px;flex-shrink:0;">${ico}</span>
             <div>
               <strong>${escapeHtml(c.label)}</strong><br>
-              <span>${escapeHtml(key)}</span>
+              <span>${escapeHtml(key)} · ${escapeHtml(c.icon||'map-pin')}</span>
             </div>
           </div>
           <div class="admin-row-actions">
