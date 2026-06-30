@@ -693,6 +693,20 @@ async function initMap() {
   rebuildMarkers();
 
   map.on('zoomend', applyPinVisibility);
+  map.on('zoomend', applyPinZoomTier);
+  applyPinZoomTier();
+}
+
+// Sets a CSS class on the Leaflet marker pane so .sv-pin styles can shrink
+// to a halo at low zoom, grow to chip-only at mid zoom, and show the label
+// chip + room to breathe at high zoom. Pure CSS toggle — no per-marker work.
+function applyPinZoomTier(){
+  if(!map) return;
+  const pane = map.getPane('markerPane'); if(!pane) return;
+  const z = map.getZoom();
+  const tier = z <= 11 ? 'low' : (z <= 14 ? 'mid' : 'high');
+  pane.classList.remove('sv-zoom-low','sv-zoom-mid','sv-zoom-high');
+  pane.classList.add('sv-zoom-'+tier);
 }
 
 // ─── BARANGAY BOUNDARIES ───
