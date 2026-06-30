@@ -10,17 +10,17 @@
     style.id = 'sanvicBarangayMarkerPolishCss';
     style.textContent = `
       .sv-brgy-pin{gap:5px!important;transform:translate(-6px,-7px)!important;}
-      .sv-brgy-dot{width:10px!important;height:10px!important;border-width:2px!important;box-shadow:0 2px 6px rgba(0,0,0,.4)!important;}
+      .sv-brgy-dot{width:7px!important;height:7px!important;border:none!important;box-shadow:none!important;}
       .sv-brgy-label{font-size:.56rem!important;letter-spacing:.035em!important;padding:2px 6px!important;line-height:1.05!important;background:rgba(4,12,30,.32)!important;border-color:rgba(29,155,240,.14)!important;}
       .sv-brgy-pin.label-hidden .sv-brgy-label{display:none!important;}
       body.sanvic-overview .sv-brgy-pin.label-hidden .sv-brgy-label{display:inline-flex!important;}
       @media(min-width:768px) and (max-width:1024px){
-        .sv-brgy-dot{width:9px!important;height:9px!important;box-shadow:0 2px 5px rgba(0,0,0,.38)!important;}
+        .sv-brgy-dot{width:7px!important;height:7px!important;border:none!important;box-shadow:none!important;}
         .sv-brgy-label{font-size:.52rem!important;padding:2px 5px!important;letter-spacing:.03em!important;}
       }
       @media(max-width:767px){
         .sv-brgy-pin{gap:3px!important;transform:translate(-5px,-6px)!important;}
-        .sv-brgy-dot{width:8px!important;height:8px!important;border-width:1.5px!important;box-shadow:0 2px 5px rgba(0,0,0,.36)!important;}
+        .sv-brgy-dot{width:6px!important;height:6px!important;border:none!important;box-shadow:none!important;}
         .sv-brgy-label{font-size:.44rem!important;padding:1px 4px!important;letter-spacing:.02em!important;background:rgba(4,12,30,.28)!important;}
       }
     `;
