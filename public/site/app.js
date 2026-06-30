@@ -535,13 +535,24 @@ function applySplashText(){
 }
 
 const DEFAULT_CAT_STYLE = {
-  beaches:{label:"Beaches",color:"#0ea5e9"},
-  islands:{label:"Islands",color:"#8b5cf6"},
-  nature:{label:"Nature",color:"#22c55e"},
-  adventure:{label:"Adventure",color:"#ef4444"},
-  culture:{label:"Culture",color:"#f59e0b"},
-  stays:{label:"Stays",color:"#ec4899"}
+  beaches:{label:"Beaches",color:"#0ea5e9",icon:"waves"},
+  islands:{label:"Islands",color:"#8b5cf6",icon:"palmtree"},
+  nature:{label:"Nature",color:"#22c55e",icon:"trees"},
+  adventure:{label:"Adventure",color:"#ef4444",icon:"compass"},
+  culture:{label:"Culture",color:"#f59e0b",icon:"landmark"},
+  stays:{label:"Stays",color:"#ec4899",icon:"bed-double"}
 };
+
+// Inlined Lucide SVG inner-content for the curated icon set admins can
+// pick from. Keep this in sync with the picker list below. Rendered into
+// a <svg viewBox="0 0 24 24" stroke="currentColor"...> wrapper.
+const LUCIDE_ICONS = JSON.parse('__LUCIDE_ICONS_JSON__');
+const LUCIDE_ICON_KEYS = Object.keys(LUCIDE_ICONS);
+function lucideSvg(name, size){
+  const inner = LUCIDE_ICONS[name] || LUCIDE_ICONS['map-pin'];
+  const s = size || 16;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+}
 
 // Converts a "#rrggbb" hex color into the soft translucent background
 // chip color used throughout (12% opacity), matching the look every
