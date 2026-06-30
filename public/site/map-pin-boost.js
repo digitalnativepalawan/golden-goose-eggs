@@ -9,6 +9,16 @@
     saved: 'MyTrip'
   };
 
+  // The visible labels changed, but the app's original route keys stay the same.
+  // Today -> map, Explorer -> discover, Pulse -> tala, Hunt -> pulse, MyTrip -> saved.
+  const NAV_DESTINATIONS = {
+    map: 'map',
+    discover: 'discover',
+    tala: 'tala',
+    pulse: 'pulse',
+    saved: 'saved'
+  };
+
   const BARANGAY_ONLY_MAX_ZOOM = 12;
   const POI_VISIBLE_MIN_ZOOM = 13;
   let barangayMarkerLayer = null;
@@ -60,6 +70,7 @@
     Object.entries(NAV_LABELS).forEach(function(entry){
       const tab = entry[0];
       const label = entry[1];
+      const destination = NAV_DESTINATIONS[tab] || tab;
       const btn = document.querySelector('.dock-item[data-tab="' + tab + '"]');
       if(!btn) return;
       const span = btn.querySelector('span');
@@ -67,9 +78,71 @@
       btn.setAttribute('aria-label', label);
       btn.setAttribute('title', label);
       btn.dataset.adminNavLabel = label;
+      btn.dataset.navDestination = destination;
     });
     document.documentElement.dataset.sanvicNavLabels = JSON.stringify(NAV_LABELS);
     window.SANVIC_NAV_LABELS = NAV_LABELS;
+    window.SANVIC_NAV_DESTINATIONS = NAV_DESTINATIONS;
+  }
+
+  function triggerDockDestination(tab){
+    const destination = NAV_DESTINATIONS[tab] || tab;
+    if(typeof dockNav === 'function'){
+      dockNav(destination);
+      setTimeout(updateMapMarkerHierarchy, 0);
+      return;
+    }
+
+    // Fallback in case this module wins the load race before app.js exposes dockNav.
+    if(typeof dismissDockIntro === 'function') dismissDockIntro();
+    document.querySelectorAll('.dock-item').forEach(function(item){ item.classList.remove('active'); });
+    const active = document.querySelector('.dock-item[data-tab="' + tab + '"]');
+    if(active) active.classList.add('active');
+
+    if(destination === 'map'){
+      if(typeof closeAllPanels === 'function') closeAllPanels();
+      if(typeof closeDiscoverPanel === 'function') closeDiscoverPanel();
+      document.getElementById('heroOverlay')?.classList.remove('hidden');
+      document.getElementById('heroFade')?.classList.remove('hidden');
+      if(typeof map !== 'undefined' && map){
+        if(typeof pinVisibilityOverride !== 'undefined') pinVisibilityOverride = false;
+        if(typeof activeMarkerSet !== 'undefined' && typeof allMarkers !== 'undefined') activeMarkerSet = allMarkers;
+        map.flyTo([10.50,119.22],11,{duration:1});
+      }
+    } else if(destination === 'discover'){
+      if(typeof closeAllPanels === 'function') closeAllPanels();
+      if(typeof openDiscoverPanel === 'function') openDiscoverPanel();
+      if(typeof filterCategory === 'function') filterCategory('all');
+    } else if(destination === 'tala'){
+      if(typeof closeAllPanels === 'function') closeAllPanels();
+      if(typeof closeDiscoverPanel === 'function') closeDiscoverPanel();
+      if(typeof openTalaSheet === 'function') openTalaSheet();
+    } else if(destination === 'pulse'){
+      if(typeof closeAllPanels === 'function') closeAllPanels();
+      if(typeof closeDiscoverPanel === 'function') closeDiscoverPanel();
+      if(typeof openPulsePanel === 'function') openPulsePanel();
+    } else if(destination === 'saved'){
+      if(typeof closeAllPanels === 'function') closeAllPanels();
+      if(typeof closeDiscoverPanel === 'function') closeDiscoverPanel();
+      if(typeof openDashboard === 'function') openDashboard();
+    }
+    setTimeout(updateMapMarkerHierarchy, 0);
+  }
+
+  function bindDockButtonTriggers(){
+    Object.keys(NAV_DESTINATIONS).forEach(function(tab){
+      const btn = document.querySelector('.dock-item[data-tab="' + tab + '"]');
+      if(!btn || btn.dataset.sanvicTriggerBound === '1') return;
+      btn.dataset.sanvicTriggerBound = '1';
+      btn.onclick = function(event){
+        if(event){
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        triggerDockDestination(tab);
+        return false;
+      };
+    });
   }
 
   function restoreTalaFloatingOrb(){
@@ -176,6 +249,7 @@
     const timer = setInterval(function(){
       tries += 1;
       syncFloatingNavLabels();
+      bindDockButtonTriggers();
       restoreTalaFloatingOrb();
       ensureDestinationClose();
       applyMapOpening();
