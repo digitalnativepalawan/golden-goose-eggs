@@ -613,7 +613,13 @@ function rebuildMarkers(){
   for(const k in markersByCat) delete markersByCat[k];
   destinations.forEach(d=>{
     if(!markersByCat[d.category]) markersByCat[d.category]=[];
-    const m = L.marker([d.lat,d.lng],{icon:L.divIcon({className:'',html:`<div class="mk-wrap" style="animation-delay:${Math.random()*2}s"><div class="mk-glow" style="color:${d.color}"></div><div class="mk-ring" style="border-color:${d.color}"></div><div class="mk-dot" style="background:${d.color};box-shadow:0 0 12px ${d.color}"></div></div>`,iconSize:[32,32],iconAnchor:[16,16]})});
+    const cat = catStyle[d.category] || {};
+    const color = cat.color || d.color || '#0ea5e9';
+    const iconName = cat.icon || 'map-pin';
+    const glyph = lucideSvg(iconName, 14);
+    const feat = d.featured ? ' is-featured' : '';
+    const html = `<div class="sv-pin${feat}" style="--pin-color:${color}"><span class="sv-pin__halo"></span><span class="sv-pin__chip">${glyph}</span></div>`;
+    const m = L.marker([d.lat,d.lng],{icon:L.divIcon({className:'sv-pin-icon',html,iconSize:[36,36],iconAnchor:[18,18]})});
     m._d=d; m.on('click',()=>openDest(d));
     markersByCat[d.category].push(m); allMarkers.push(m);
   });
