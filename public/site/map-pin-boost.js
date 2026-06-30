@@ -1,6 +1,18 @@
 // SANVIC mobile map/nav cleanup
-// Keeps footer Tala as the single primary Tala entry and cleans up map controls/pins.
+// Keeps the restored floating TALA orb visible while syncing the footer nav labels.
 (function(){
+  const NAV_LABELS = {
+    map: 'Today',
+    discover: 'Explorer',
+    tala: 'Pulse',
+    pulse: 'Hunt',
+    saved: 'MyTrip'
+  };
+
+  const BARANGAY_ONLY_MAX_ZOOM = 12;
+  const POI_VISIBLE_MIN_ZOOM = 13;
+  let barangayMarkerLayer = null;
+
   function addStyles(){
     if(document.getElementById('sanvicMapPinNoPulseCss')) return;
     const s = document.createElement('style');
@@ -9,12 +21,17 @@
       .splash-tagline{color:rgba(255,255,255,.72)!important;text-shadow:0 2px 12px rgba(0,0,0,.55)!important;font-weight:400!important;}
       .splash-footer{color:rgba(255,255,255,.72)!important;text-shadow:0 2px 12px rgba(0,0,0,.6)!important;font-weight:600!important;opacity:1!important;}
       .leaflet-control-zoom{display:none!important;visibility:hidden!important;pointer-events:none!important;}
-      #talaOrbWrap,.tala-orb-wrap{display:none!important;visibility:hidden!important;pointer-events:none!important;}
+      #talaOrbWrap,.tala-orb-wrap{display:flex!important;visibility:visible!important;pointer-events:auto!important;}
+      #talaOrbWrap.hidden,.tala-orb-wrap.hidden{opacity:0!important;pointer-events:none!important;transform:translateY(20px)!important;}
       .mk-wrap{width:28px!important;height:28px!important;filter:drop-shadow(0 3px 7px rgba(0,0,0,.55))!important;animation:none!important;}
       .mk-wrap *{animation:none!important;transition:none!important;}
       .mk-ring,.mk-glow{display:none!important;visibility:hidden!important;opacity:0!important;}
       .mk-dot{width:13px!important;height:13px!important;border:0!important;box-shadow:0 2px 7px rgba(0,0,0,.55),0 0 8px currentColor!important;}
       .leaflet-marker-icon{overflow:visible!important;}
+      .sv-brgy-icon{background:none!important;border:none!important;}
+      .sv-brgy-pin{display:flex;align-items:center;gap:8px;transform:translate(-10px,-10px);white-space:nowrap;pointer-events:auto;}
+      .sv-brgy-dot{width:14px;height:14px;border-radius:999px;background:#1d9bf0;border:2px solid rgba(255,255,255,.86);box-shadow:0 0 0 5px rgba(29,155,240,.18),0 0 18px rgba(29,155,240,.78),0 4px 12px rgba(0,0,0,.45);}
+      .sv-brgy-label{font-family:var(--font-body);font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(232,244,255,.94);text-shadow:0 2px 8px rgba(0,0,0,.8);background:rgba(4,12,30,.48);border:1px solid rgba(29,155,240,.22);border-radius:999px;padding:5px 9px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
 
       @media(max-width:767px){
         .splash-tagline{font-size:.98rem!important;line-height:1.75!important;color:rgba(255,255,255,.76)!important;}
@@ -30,6 +47,7 @@
         .dock-item[data-tab="tala"]{transform:none!important;}
         .dock-item[data-tab="tala"] svg{width:22px!important;height:22px!important;stroke-width:1.85!important;}
         .dock-item[data-tab="tala"].active{background:rgba(255,255,255,.055)!important;box-shadow:none!important;}
+        .sv-brgy-label{font-size:.62rem;padding:4px 8px;}
 
         .dest-sheet.expanded .sanvic-dest-close{display:flex!important;}
         .sanvic-dest-close{position:fixed;top:calc(var(--safe-top) + 12px);right:14px;z-index:130;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.12);background:rgba(4,12,30,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);color:rgba(255,255,255,.92);align-items:center;justify-content:center;font-size:24px;line-height:1;box-shadow:0 8px 24px rgba(0,0,0,.32);}
@@ -38,13 +56,37 @@
     document.head.appendChild(s);
   }
 
-  function restoreTalaDockIcon(){
-    const btn = document.querySelector('.dock-item[data-tab="tala"]');
-    if(!btn || btn.dataset.talaIconFixed === 'reference') return;
-    const svg = btn.querySelector('svg');
-    if(!svg) return;
-    svg.outerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>';
-    btn.dataset.talaIconFixed = 'reference';
+  function syncFloatingNavLabels(){
+    Object.entries(NAV_LABELS).forEach(function(entry){
+      const tab = entry[0];
+      const label = entry[1];
+      const btn = document.querySelector('.dock-item[data-tab="' + tab + '"]');
+      if(!btn) return;
+      const span = btn.querySelector('span');
+      if(span) span.textContent = label;
+      btn.setAttribute('aria-label', label);
+      btn.setAttribute('title', label);
+      btn.dataset.adminNavLabel = label;
+    });
+    document.documentElement.dataset.sanvicNavLabels = JSON.stringify(NAV_LABELS);
+    window.SANVIC_NAV_LABELS = NAV_LABELS;
+  }
+
+  function restoreTalaFloatingOrb(){
+    const wrap = document.getElementById('talaOrbWrap');
+    const orb = document.getElementById('talaOrb');
+    if(wrap){
+      wrap.style.removeProperty('display');
+      wrap.style.removeProperty('visibility');
+      wrap.setAttribute('aria-label', 'Ask TALA');
+      wrap.dataset.adminNavLabel = 'TALA';
+    }
+    if(orb){
+      orb.setAttribute('aria-label', 'Ask TALA');
+      orb.setAttribute('title', 'Ask TALA');
+    }
+    const label = document.querySelector('#talaOrbWrap .tala-orb-label');
+    if(label) label.textContent = 'Ask TALA';
   }
 
   function ensureDestinationClose(){
@@ -65,17 +107,66 @@
     sheet.appendChild(b);
   }
 
+  function escapeText(value){
+    const div = document.createElement('div');
+    div.textContent = value || '';
+    return div.innerHTML;
+  }
+
+  function ensureBarangayMarkers(){
+    try{
+      if(barangayMarkerLayer || typeof L === 'undefined' || typeof map === 'undefined' || !map || typeof SAN_VICENTE_BARANGAYS === 'undefined') return;
+      barangayMarkerLayer = L.layerGroup();
+      SAN_VICENTE_BARANGAYS.features.forEach(function(feature){
+        const name = feature && feature.properties && feature.properties.name;
+        if(!name) return;
+        const center = L.geoJSON(feature).getBounds().getCenter();
+        const html = '<div class="sv-brgy-pin"><span class="sv-brgy-dot"></span><span class="sv-brgy-label">' + escapeText(name) + '</span></div>';
+        const marker = L.marker(center, {
+          icon: L.divIcon({ className:'sv-brgy-icon', html: html, iconSize:[160,32], iconAnchor:[8,16] }),
+          interactive: true,
+          keyboard: false
+        });
+        marker.on('click', function(){ map.flyTo(center, POI_VISIBLE_MIN_ZOOM, { duration:.8 }); });
+        marker.addTo(barangayMarkerLayer);
+      });
+      updateMapMarkerHierarchy();
+      map.on('zoomend moveend', updateMapMarkerHierarchy);
+    }catch(e){}
+  }
+
+  function updateMapMarkerHierarchy(){
+    try{
+      if(typeof map === 'undefined' || !map || !barangayMarkerLayer) return;
+      const zoom = map.getZoom();
+      const municipalityView = zoom <= BARANGAY_ONLY_MAX_ZOOM;
+
+      if(municipalityView){
+        if(!map.hasLayer(barangayMarkerLayer)) barangayMarkerLayer.addTo(map);
+        if(typeof allMarkers !== 'undefined' && Array.isArray(allMarkers)){
+          allMarkers.forEach(function(marker){ if(map.hasLayer(marker)) map.removeLayer(marker); });
+        }
+        if(typeof pinsCurrentlyVisible !== 'undefined') pinsCurrentlyVisible = false;
+      } else {
+        if(map.hasLayer(barangayMarkerLayer)) map.removeLayer(barangayMarkerLayer);
+        if(zoom >= POI_VISIBLE_MIN_ZOOM && typeof activeMarkerSet !== 'undefined' && Array.isArray(activeMarkerSet)){
+          activeMarkerSet.forEach(function(marker){ if(!map.hasLayer(marker)) marker.addTo(map); });
+          if(typeof pinsCurrentlyVisible !== 'undefined') pinsCurrentlyVisible = true;
+        }
+      }
+    }catch(e){}
+  }
+
   function applyMapOpening(){
     try{
       if(typeof map !== 'undefined' && map && !window.__sanvicMunicipalityViewDone){
         window.__sanvicMunicipalityViewDone = true;
         map.setView([10.50, 119.20], 10, { animate:false });
       }
-      if(typeof allMarkers !== 'undefined' && Array.isArray(allMarkers) && allMarkers.length){
-        if(typeof activeMarkerSet !== 'undefined') activeMarkerSet = allMarkers;
-        if(typeof pinVisibilityOverride !== 'undefined') pinVisibilityOverride = true;
-        if(typeof applyPinVisibility === 'function') applyPinVisibility();
-      }
+      if(typeof activeMarkerSet !== 'undefined' && typeof allMarkers !== 'undefined' && Array.isArray(allMarkers)) activeMarkerSet = allMarkers;
+      if(typeof pinVisibilityOverride !== 'undefined') pinVisibilityOverride = false;
+      ensureBarangayMarkers();
+      updateMapMarkerHierarchy();
     }catch(e){}
   }
 
@@ -84,7 +175,8 @@
     let tries = 0;
     const timer = setInterval(function(){
       tries += 1;
-      restoreTalaDockIcon();
+      syncFloatingNavLabels();
+      restoreTalaFloatingOrb();
       ensureDestinationClose();
       applyMapOpening();
       if(tries > 80) clearInterval(timer);
