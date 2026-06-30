@@ -4,14 +4,6 @@
   let overviewApplied = false;
   let overviewTimer = null;
 
-  const ORIGINAL_DOCK_ROUTES = {
-    map: 'map',
-    discover: 'discover',
-    tala: 'tala',
-    pulse: 'pulse',
-    saved: 'saved'
-  };
-
   function addStyles(){
     if(document.getElementById('sanvicBarangayMarkerPolishCss')) return;
     const style = document.createElement('style');
@@ -33,22 +25,6 @@
       }
     `;
     document.head.appendChild(style);
-  }
-
-  function restoreOriginalDockHandlers(){
-    try{
-      Object.keys(ORIGINAL_DOCK_ROUTES).forEach((tab) => {
-        const btn = document.querySelector('.dock-item[data-tab="' + tab + '"]');
-        if(!btn) return;
-        const route = ORIGINAL_DOCK_ROUTES[tab];
-        btn.dataset.sanvicTriggerBound = '1';
-        btn.setAttribute('onclick', "dockNav('" + route + "')");
-        btn.onclick = function(){
-          if(typeof dockNav === 'function') dockNav(route);
-          return false;
-        };
-      });
-    }catch(e){}
   }
 
   function fitMunicipalityOverview(force){
@@ -102,17 +78,13 @@
     let tries = 0;
     overviewTimer = setInterval(function(){
       tries += 1;
-      restoreOriginalDockHandlers();
       fitMunicipalityOverview(false);
       layoutLabels();
       if(tries > 120) clearInterval(overviewTimer);
     }, 150);
-    setTimeout(restoreOriginalDockHandlers, 1000);
-    setTimeout(restoreOriginalDockHandlers, 2500);
-    setTimeout(restoreOriginalDockHandlers, 5000);
     window.addEventListener('resize', () => {
       overviewApplied = false;
-      setTimeout(() => { fitMunicipalityOverview(true); layoutLabels(); restoreOriginalDockHandlers(); }, 160);
+      setTimeout(() => { fitMunicipalityOverview(true); layoutLabels(); }, 160);
     }, { passive:true });
     try{
       if(typeof map !== 'undefined' && map && map.on){
