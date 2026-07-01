@@ -246,32 +246,46 @@ function updateAuthUI(){
 // ═══════════════════════════════════════════════════════
 let dashSection = 'overview';
 
-function openDashboard(){
-  requireAuth(()=>{
-    closeAllPanels();
-    document.getElementById('dashboardPanel').classList.add('open');
-    renderDashProfileCard();
-    selectDashSection('overview');
-  });
+function openDashboard(section){
+  closeAllPanels();
+  document.getElementById('dashboardPanel').classList.add('open');
+  renderDashProfileCard();
+  selectDashSection(section || 'overview');
 }
 
 function closeDashboard(){
   document.getElementById('dashboardPanel').classList.remove('open');
 }
 
+const DASH_GUEST_AVATAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>';
+
 function renderDashProfileCard(){
   const nameEl = document.getElementById('dashUserName');
-  const initialEl = document.getElementById('dashUserInitial');
+  const subEl = document.getElementById('dashUserSub');
   const avatarWrap = document.getElementById('dashUserAvatarWrap');
-  if(!currentUser) return;
+  const signinBtn = document.getElementById('dashProfileSigninBtn');
+  const signoutBtn = document.getElementById('dashSignoutBtn');
+
+  if(!currentUser){
+    avatarWrap.innerHTML = DASH_GUEST_AVATAR;
+    nameEl.textContent = 'Welcome, Explorer';
+    subEl.textContent = 'Sign in to save places and plan trips';
+    if(signinBtn) signinBtn.style.display = '';
+    if(signoutBtn) signoutBtn.style.display = 'none';
+    return;
+  }
+
+  if(signinBtn) signinBtn.style.display = 'none';
+  if(signoutBtn) signoutBtn.style.display = '';
 
   const displayName = (currentProfile && currentProfile.display_name) || currentUser.email.split('@')[0];
   nameEl.textContent = `Hello, ${displayName}`;
+  subEl.textContent = 'Welcome back to San Vicente';
 
   if(currentProfile && currentProfile.avatar_url){
     avatarWrap.innerHTML = `<img src="${currentProfile.avatar_url}" alt="">`;
   } else {
-    initialEl.textContent = displayName.slice(0,1).toUpperCase();
+    avatarWrap.innerHTML = `<span>${escapeHtml(displayName.slice(0,1).toUpperCase())}</span>`;
   }
 }
 
@@ -294,6 +308,10 @@ function selectDashSection(section){
 
 async function renderDashOverview(){
   const body = document.getElementById('dashSectionBody');
+  if(!currentUser){
+    body.innerHTML = `<div class="dash-section-title">Overview</div><div class="dash-empty-state">Sign in to track your saved places and Pulse activity.<br><button class="login-provider-btn" style="margin-top:12px;" onclick="openLoginModal()">Sign in</button></div>`;
+    return;
+  }
   try {
     const { data: saved } = await sb.from('saved_places').select('id').eq('user_id', currentUser.id);
     const { data: posts } = await sb.from('pulse_posts').select('id').eq('user_id', currentUser.id);
@@ -317,6 +335,10 @@ async function renderDashOverview(){
 
 async function renderDashSaved(){
   const body = document.getElementById('dashSectionBody');
+  if(!currentUser){
+    body.innerHTML = `<div class="dash-section-title">Saved Places</div><div class="dash-empty-state">Sign in to save places and sync them across your devices.<br><button class="login-provider-btn" style="margin-top:12px;" onclick="openLoginModal()">Sign in</button></div>`;
+    return;
+  }
   try {
     const { data, error } = await sb.from('saved_places')
       .select('id, destination_id, destinations(name, image, category)')
@@ -348,6 +370,10 @@ async function renderDashSaved(){
 
 async function renderDashActivity(){
   const body = document.getElementById('dashSectionBody');
+  if(!currentUser){
+    body.innerHTML = `<div class="dash-section-title">Activity</div><div class="dash-empty-state">Sign in to see your Pulse posts and saves here.<br><button class="login-provider-btn" style="margin-top:12px;" onclick="openLoginModal()">Sign in</button></div>`;
+    return;
+  }
   try {
     const { data, error } = await sb.from('pulse_posts')
       .select('id, text_content, category, created_at')
@@ -376,6 +402,10 @@ async function renderDashActivity(){
 
 async function renderDashSettings(){
   const body = document.getElementById('dashSectionBody');
+  if(!currentUser){
+    body.innerHTML = `<div class="dash-section-title">Settings</div><div class="dash-empty-state">Sign in to edit your traveler profile.<br><button class="login-provider-btn" style="margin-top:12px;" onclick="openLoginModal()">Sign in</button></div>`;
+    return;
+  }
   body.innerHTML = `
     <div class="dash-section-title">Settings</div>
     <div class="admin-field"><label>Display name</label><input id="dashSettingsName" value="${escapeHtml((currentProfile&&currentProfile.display_name)||'')}"></div>
@@ -1949,7 +1979,7 @@ function dockNav(tab){
     case 'discover': closeAllPanels(); openDiscoverPanel(); if(map){filterCategory('all');} break;
     case 'tala': closeAllPanels(); closeDiscoverPanel(); openTalaSheet(); break;
     case 'pulse': closeAllPanels(); closeDiscoverPanel(); openPulsePanel(); break;
-    case 'saved': closeAllPanels(); closeDiscoverPanel(); openDashboard(); break;
+    case 'saved': closeAllPanels(); closeDiscoverPanel(); openDashboard('saved'); break;
   }
 }
 
