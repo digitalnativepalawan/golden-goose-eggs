@@ -247,12 +247,10 @@ function updateAuthUI(){
 let dashSection = 'overview';
 
 function openDashboard(){
-  requireAuth(()=>{
-    closeAllPanels();
-    document.getElementById('dashboardPanel').classList.add('open');
-    renderDashProfileCard();
-    selectDashSection('overview');
-  });
+  closeAllPanels();
+  document.getElementById('dashboardPanel').classList.add('open');
+  renderDashProfileCard();
+  selectDashSection('overview');
 }
 
 function closeDashboard(){
@@ -294,6 +292,10 @@ function selectDashSection(section){
 
 async function renderDashOverview(){
   const body = document.getElementById('dashSectionBody');
+  if(!currentUser){
+    body.innerHTML = `<div class="dash-section-title">Overview</div><div class="dash-empty-state">Sign in to track your saved places and Pulse activity.<br><button class="login-provider-btn" style="margin-top:12px;" onclick="openLoginModal()">Sign in</button></div>`;
+    return;
+  }
   try {
     const { data: saved } = await sb.from('saved_places').select('id').eq('user_id', currentUser.id);
     const { data: posts } = await sb.from('pulse_posts').select('id').eq('user_id', currentUser.id);
@@ -317,6 +319,10 @@ async function renderDashOverview(){
 
 async function renderDashSaved(){
   const body = document.getElementById('dashSectionBody');
+  if(!currentUser){
+    body.innerHTML = `<div class="dash-section-title">Saved Places</div><div class="dash-empty-state">Sign in to save places and sync them across your devices.<br><button class="login-provider-btn" style="margin-top:12px;" onclick="openLoginModal()">Sign in</button></div>`;
+    return;
+  }
   try {
     const { data, error } = await sb.from('saved_places')
       .select('id, destination_id, destinations(name, image, category)')
@@ -348,6 +354,10 @@ async function renderDashSaved(){
 
 async function renderDashActivity(){
   const body = document.getElementById('dashSectionBody');
+  if(!currentUser){
+    body.innerHTML = `<div class="dash-section-title">Activity</div><div class="dash-empty-state">Sign in to see your Pulse posts and saves here.<br><button class="login-provider-btn" style="margin-top:12px;" onclick="openLoginModal()">Sign in</button></div>`;
+    return;
+  }
   try {
     const { data, error } = await sb.from('pulse_posts')
       .select('id, text_content, category, created_at')
@@ -376,6 +386,10 @@ async function renderDashActivity(){
 
 async function renderDashSettings(){
   const body = document.getElementById('dashSectionBody');
+  if(!currentUser){
+    body.innerHTML = `<div class="dash-section-title">Settings</div><div class="dash-empty-state">Sign in to edit your traveler profile.<br><button class="login-provider-btn" style="margin-top:12px;" onclick="openLoginModal()">Sign in</button></div>`;
+    return;
+  }
   body.innerHTML = `
     <div class="dash-section-title">Settings</div>
     <div class="admin-field"><label>Display name</label><input id="dashSettingsName" value="${escapeHtml((currentProfile&&currentProfile.display_name)||'')}"></div>
