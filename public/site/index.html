@@ -69,6 +69,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 .leaflet-control-attribution{background:var(--glass-bg)!important;backdrop-filter:blur(20px);color:var(--white-dim)!important;font-family:var(--font-body)!important;font-size:.55rem!important;padding:3px 8px!important;border-radius:10px 0 0 0!important;border:none!important}
 .leaflet-control-attribution a{color:var(--ocean-teal-light)!important}
 
+/* "My location" control — sits above the zoom control, one tap = one fix */
+.sv-locate-control{margin-bottom:10px!important}
+.sv-locate-control a{display:flex!important;align-items:center;justify-content:center;width:32px;height:32px;border-radius:14px!important;background:var(--glass-bg-heavy)!important;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);color:var(--white-soft)!important;box-shadow:0 4px 16px rgba(0,0,0,.3)!important;cursor:pointer;transition:background .2s,color .2s}
+.sv-locate-control a:hover{background:rgba(255,255,255,.15)!important}
+.sv-locate-control a.locating{color:var(--ocean-teal-light)!important}
+.sv-locate-control a.locating svg{animation:svLocateSpin 1s linear infinite}
+@keyframes svLocateSpin{to{transform:rotate(360deg)}}
+
 /* Custom markers — classic pulsing dot, tinted per category/destination color */
 .mk-wrap{position:relative;width:32px;height:32px;cursor:pointer;transition:transform .3s var(--ease-spring);animation:mkb 4s ease-in-out infinite}
 .mk-wrap:active{transform:scale(.85)}
@@ -77,6 +85,13 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
 .mk-glow{position:absolute;inset:-5px;border-radius:50%;background:radial-gradient(circle,currentColor 0%,transparent 70%);opacity:.1}
 @keyframes mkp{0%,100%{transform:scale(1);opacity:.3}50%{transform:scale(1.5);opacity:.1}}
 @keyframes mkb{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+
+/* "You are here" marker — one-shot fix, no live tracking (battery-friendly) */
+.sv-me-icon{background:none!important;border:none!important}
+.sv-me-wrap{position:relative;width:20px;height:20px}
+.sv-me-pulse{position:absolute;inset:0;border-radius:50%;background:rgba(20,184,166,.35);animation:svMePulse 2.2s ease-out infinite}
+.sv-me-dot{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:var(--ocean-teal-light);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+@keyframes svMePulse{0%{transform:scale(.4);opacity:.65}100%{transform:scale(2.4);opacity:0}}
 /* Admin icon picker */
 .sv-pin-preview{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:9px;background:rgba(13,28,54,.78);border:1.5px solid var(--pin-color,#0ea5e9);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .sv-icon-preview-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}

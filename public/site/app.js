@@ -674,6 +674,64 @@ function applyPinVisibility(){
   }
 }
 
+// ─── "MY LOCATION" ───
+// One-shot getCurrentPosition() on tap — no watchPosition/continuous
+// tracking, so it costs nothing while the visitor isn't actively asking
+// "where am I". Re-tapping the button gets a fresh fix.
+let userLocationMarker = null, userLocationAccuracyCircle = null;
+
+const LocateControl = L.Control.extend({
+  options: { position: 'bottomright' },
+  onAdd: function(){
+    const div = L.DomUtil.create('div', 'sv-locate-control leaflet-bar');
+    div.innerHTML = '<a href="#" id="locateMeBtn" role="button" aria-label="Show my location" title="My location">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></a>';
+    L.DomEvent.disableClickPropagation(div);
+    L.DomEvent.on(div, 'click', function(e){ L.DomEvent.stop(e); locateUser(); });
+    return div;
+  }
+});
+
+function locateUser(){
+  if(!navigator.geolocation){
+    alert('Geolocation is not available on this device.');
+    return;
+  }
+  if(!mapReady || !map){
+    alert('Give the map a second to finish loading, then try again.');
+    return;
+  }
+  const btn = document.getElementById('locateMeBtn');
+  if(btn) btn.classList.add('locating');
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      if(btn) btn.classList.remove('locating');
+      const { latitude:lat, longitude:lng, accuracy } = pos.coords;
+      const latlng = [lat, lng];
+
+      if(userLocationMarker) map.removeLayer(userLocationMarker);
+      if(userLocationAccuracyCircle) map.removeLayer(userLocationAccuracyCircle);
+
+      userLocationAccuracyCircle = L.circle(latlng, {
+        radius: accuracy, color: 'transparent', fillColor: '#14b8a6', fillOpacity: .12, interactive: false
+      }).addTo(map);
+      userLocationMarker = L.marker(latlng, {
+        icon: L.divIcon({ className:'sv-me-icon', html:'<div class="sv-me-wrap"><span class="sv-me-pulse"></span><span class="sv-me-dot"></span></div>', iconSize:[20,20], iconAnchor:[10,10] }),
+        interactive: false, keyboard: false, zIndexOffset: 500
+      }).addTo(map);
+
+      map.flyTo(latlng, Math.max(map.getZoom(), 15), { duration: 1 });
+    },
+    (err)=>{
+      if(btn) btn.classList.remove('locating');
+      alert(err.code === err.PERMISSION_DENIED
+        ? "Location access is blocked. Enable it in your browser/app settings to see yourself on the map."
+        : "Couldn't get your location right now. Try again in a moment.");
+    },
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+  );
+}
+
 async function initMap() {
   if (mapReady) return;
   mapReady = true;
@@ -712,6 +770,7 @@ async function initMap() {
   window._mS=street; window._mLight=light; window._mSat=sat; window._mSatLabels=satLabels; window._mView='street';
 
   L.control.zoom({position:'bottomright'}).addTo(map);
+  new LocateControl().addTo(map);
   document.getElementById('mapLayerToggle').classList.add('visible');
   
   document.getElementById('barangayToggle').classList.add('visible');
