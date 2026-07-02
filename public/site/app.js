@@ -680,18 +680,6 @@ function applyPinVisibility(){
 // "where am I". Re-tapping the button gets a fresh fix.
 let userLocationMarker = null, userLocationAccuracyCircle = null;
 
-const LocateControl = L.Control.extend({
-  options: { position: 'bottomright' },
-  onAdd: function(){
-    const div = L.DomUtil.create('div', 'sv-locate-control leaflet-bar');
-    div.innerHTML = '<a href="#" id="locateMeBtn" role="button" aria-label="Show my location" title="My location">'
-      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></a>';
-    L.DomEvent.disableClickPropagation(div);
-    L.DomEvent.on(div, 'click', function(e){ L.DomEvent.stop(e); locateUser(); });
-    return div;
-  }
-});
-
 function locateUser(){
   if(!navigator.geolocation){
     alert('Geolocation is not available on this device.');
@@ -701,6 +689,17 @@ function locateUser(){
     alert('Give the map a second to finish loading, then try again.');
     return;
   }
+  // Bring the map into view first (in case Discover/Hunt/Pulse/MyTrip is
+  // open) so the "you are here" marker lands somewhere the visitor can
+  // actually see, instead of updating a hidden map underneath a panel.
+  dismissDockIntro();
+  closeAllPanels();
+  closeDiscoverPanel();
+  document.getElementById('heroOverlay').classList.remove('hidden');
+  document.getElementById('heroFade').classList.remove('hidden');
+  document.querySelectorAll('.dock-item').forEach(d=>d.classList.remove('active'));
+  document.querySelector('.dock-item[data-tab="map"]')?.classList.add('active');
+
   const btn = document.getElementById('locateMeBtn');
   if(btn) btn.classList.add('locating');
   navigator.geolocation.getCurrentPosition(
@@ -770,7 +769,6 @@ async function initMap() {
   window._mS=street; window._mLight=light; window._mSat=sat; window._mSatLabels=satLabels; window._mView='street';
 
   L.control.zoom({position:'bottomright'}).addTo(map);
-  new LocateControl().addTo(map);
   document.getElementById('mapLayerToggle').classList.add('visible');
   
   document.getElementById('barangayToggle').classList.add('visible');
