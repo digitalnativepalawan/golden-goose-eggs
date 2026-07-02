@@ -674,6 +674,63 @@ function applyPinVisibility(){
   }
 }
 
+// ─── "MY LOCATION" ───
+// One-shot getCurrentPosition() on tap — no watchPosition/continuous
+// tracking, so it costs nothing while the visitor isn't actively asking
+// "where am I". Re-tapping the button gets a fresh fix.
+let userLocationMarker = null, userLocationAccuracyCircle = null;
+
+function locateUser(){
+  if(!navigator.geolocation){
+    alert('Geolocation is not available on this device.');
+    return;
+  }
+  if(!mapReady || !map){
+    alert('Give the map a second to finish loading, then try again.');
+    return;
+  }
+  // Bring the map into view first (in case Discover/Hunt/Pulse/MyTrip is
+  // open) so the "you are here" marker lands somewhere the visitor can
+  // actually see, instead of updating a hidden map underneath a panel.
+  dismissDockIntro();
+  closeAllPanels();
+  closeDiscoverPanel();
+  document.getElementById('heroOverlay').classList.remove('hidden');
+  document.getElementById('heroFade').classList.remove('hidden');
+  document.querySelectorAll('.dock-item').forEach(d=>d.classList.remove('active'));
+  document.querySelector('.dock-item[data-tab="map"]')?.classList.add('active');
+
+  const btn = document.getElementById('locateMeBtn');
+  if(btn) btn.classList.add('locating');
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      if(btn) btn.classList.remove('locating');
+      const { latitude:lat, longitude:lng, accuracy } = pos.coords;
+      const latlng = [lat, lng];
+
+      if(userLocationMarker) map.removeLayer(userLocationMarker);
+      if(userLocationAccuracyCircle) map.removeLayer(userLocationAccuracyCircle);
+
+      userLocationAccuracyCircle = L.circle(latlng, {
+        radius: accuracy, color: 'transparent', fillColor: '#14b8a6', fillOpacity: .12, interactive: false
+      }).addTo(map);
+      userLocationMarker = L.marker(latlng, {
+        icon: L.divIcon({ className:'sv-me-icon', html:'<div class="sv-me-wrap"><span class="sv-me-pulse"></span><span class="sv-me-dot"></span></div>', iconSize:[20,20], iconAnchor:[10,10] }),
+        interactive: false, keyboard: false, zIndexOffset: 500
+      }).addTo(map);
+
+      map.flyTo(latlng, Math.max(map.getZoom(), 15), { duration: 1 });
+    },
+    (err)=>{
+      if(btn) btn.classList.remove('locating');
+      alert(err.code === err.PERMISSION_DENIED
+        ? "Location access is blocked. Enable it in your browser/app settings to see yourself on the map."
+        : "Couldn't get your location right now. Try again in a moment.");
+    },
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+  );
+}
+
 async function initMap() {
   if (mapReady) return;
   mapReady = true;
