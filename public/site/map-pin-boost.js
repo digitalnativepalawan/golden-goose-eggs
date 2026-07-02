@@ -5,6 +5,96 @@
   const POI_VISIBLE_MIN_ZOOM = 13;
   let barangayMarkerLayer = null;
 
+  // ─── Barangay pin placement ───
+  // A polygon's bounding-box center (what Leaflet's getBounds().getCenter()
+  // gives you) is not guaranteed to fall inside the polygon — for coastal,
+  // crescent, or multi-island barangays it routinely lands in open water.
+  // This computes a real "visual center": the interior point farthest from
+  // every edge (a simplified pole-of-inaccessibility search), so the dot
+  // always sits on land, roughly centered in the barangay's main landmass.
+  function ringSignedArea(ring){
+    let a = 0;
+    for(let i=0, j=ring.length-1; i<ring.length; j=i++) a += ring[j][0]*ring[i][1] - ring[i][0]*ring[j][1];
+    return a/2;
+  }
+  function pointInRing(pt, ring){
+    let inside = false;
+    for(let i=0, j=ring.length-1; i<ring.length; j=i++){
+      const xi=ring[i][0], yi=ring[i][1], xj=ring[j][0], yj=ring[j][1];
+      if(((yi>pt[1])!==(yj>pt[1])) && (pt[0] < (xj-xi)*(pt[1]-yi)/(yj-yi)+xi)) inside = !inside;
+    }
+    return inside;
+  }
+  function pointInPolygon(pt, rings){
+    if(!pointInRing(pt, rings[0])) return false;
+    for(let i=1; i<rings.length; i++) if(pointInRing(pt, rings[i])) return false;
+    return true;
+  }
+  function distToSegment(pt, a, b){
+    const dx=b[0]-a[0], dy=b[1]-a[1];
+    const lenSq = dx*dx+dy*dy;
+    let t = lenSq ? ((pt[0]-a[0])*dx+(pt[1]-a[1])*dy)/lenSq : 0;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(pt[0]-(a[0]+t*dx), pt[1]-(a[1]+t*dy));
+  }
+  function distToPolygonBoundary(pt, rings){
+    let min = Infinity;
+    rings.forEach(function(ring){
+      for(let i=0, j=ring.length-1; i<ring.length; j=i++) min = Math.min(min, distToSegment(pt, ring[i], ring[j]));
+    });
+    return min;
+  }
+  function ringCentroid(ring){
+    let area=0, cx=0, cy=0;
+    for(let i=0, j=ring.length-1; i<ring.length; j=i++){
+      const cross = ring[j][0]*ring[i][1] - ring[i][0]*ring[j][1];
+      area += cross;
+      cx += (ring[j][0]+ring[i][0])*cross;
+      cy += (ring[j][1]+ring[i][1])*cross;
+    }
+    area *= 0.5;
+    if(Math.abs(area) < 1e-12) return null;
+    return [cx/(6*area), cy/(6*area)];
+  }
+  function visualCenterOfPolygon(rings){
+    const ring = rings[0];
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    ring.forEach(function(p){ if(p[0]<minX)minX=p[0]; if(p[0]>maxX)maxX=p[0]; if(p[1]<minY)minY=p[1]; if(p[1]>maxY)maxY=p[1]; });
+
+    let gx0=minX, gy0=minY, gw=maxX-minX, gh=maxY-minY, steps=14;
+    let best=null, bestDist=-Infinity;
+    for(let pass=0; pass<4; pass++){
+      for(let iy=0; iy<=steps; iy++){
+        for(let ix=0; ix<=steps; ix++){
+          const x = gx0 + gw*ix/steps, y = gy0 + gh*iy/steps;
+          if(!pointInPolygon([x,y], rings)) continue;
+          const d = distToPolygonBoundary([x,y], rings);
+          if(d > bestDist){ bestDist = d; best = [x,y]; }
+        }
+      }
+      if(!best) break;
+      gw/=3; gh/=3; gx0=best[0]-gw/2; gy0=best[1]-gh/2; steps=10;
+    }
+    if(best && bestDist > 0) return best;
+
+    const centroid = ringCentroid(ring);
+    if(centroid && pointInPolygon(centroid, rings)) return centroid;
+    return centroid || [(minX+maxX)/2, (minY+maxY)/2];
+  }
+  function visualCenterOfFeature(feature){
+    const geom = feature && feature.geometry;
+    if(!geom) return null;
+    const polys = geom.type === 'Polygon' ? [geom.coordinates] : (geom.type === 'MultiPolygon' ? geom.coordinates : null);
+    if(!polys || !polys.length) return null;
+    let bestPoly = polys[0], bestArea = -Infinity;
+    polys.forEach(function(rings){
+      const a = Math.abs(ringSignedArea(rings[0]));
+      if(a > bestArea){ bestArea = a; bestPoly = rings; }
+    });
+    const c = visualCenterOfPolygon(bestPoly);
+    return c ? { lat: c[1], lng: c[0] } : null;
+  }
+
   function addStyles(){
     if(document.getElementById('sanvicMapPinNoPulseCss')) return;
     const s = document.createElement('style');
@@ -96,7 +186,8 @@
       SAN_VICENTE_BARANGAYS.features.forEach(function(feature){
         const name = feature && feature.properties && feature.properties.name;
         if(!name) return;
-        const center = L.geoJSON(feature).getBounds().getCenter();
+        const vc = visualCenterOfFeature(feature);
+        const center = vc ? L.latLng(vc.lat, vc.lng) : L.geoJSON(feature).getBounds().getCenter();
         const html = '<div class="sv-brgy-pin"><span class="sv-brgy-dot"></span><span class="sv-brgy-label">' + escapeText(name) + '</span></div>';
         const marker = L.marker(center, {
           icon: L.divIcon({ className:'sv-brgy-icon', html: html, iconSize:[160,32], iconAnchor:[8,16] }),
