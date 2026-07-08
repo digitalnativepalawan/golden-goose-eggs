@@ -681,9 +681,13 @@ function rebuildMarkers(){
 // Skipped while pinVisibilityOverride is set (explicit category pick).
 function applyPinVisibility(){
   if(!map) return;
-  const shouldShow = pinVisibilityOverride || map.getZoom() >= PIN_VISIBLE_ZOOM;
+  const z = map.getZoom();
+  const shouldShow = pinVisibilityOverride || z >= PIN_VISIBLE_ZOOM;
+  // Zoom-based label suppression: at zoom <= 11, hide barangay text tooltips
+  // so the canvas reads as clean neon-dot nodes only.
+  const cont = map.getContainer();
+  if(cont) cont.classList.toggle('zoom-far', z <= 11);
   if(shouldShow === pinsCurrentlyVisible) {
-    // still sync membership in case activeMarkerSet changed (e.g. category filter)
     if(shouldShow) activeMarkerSet.forEach(m=>{ if(!map.hasLayer(m)) m.addTo(map); });
     return;
   }
