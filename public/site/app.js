@@ -908,7 +908,9 @@ function closeAllPanels() {
   closeTodaySheet();
   closeExploreSheet();
   if(typeof closeMySanvicPanel==='function') closeMySanvicPanel();
+  if(typeof closeHuntPanel==='function') closeHuntPanel();
 }
+
 
 
 // ─── TODAY DRAWER ───
