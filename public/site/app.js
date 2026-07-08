@@ -38,7 +38,7 @@ const DEFAULT_DESTINATIONS = [
     description:"A scenic viewpoint above San Vicente where the coast, green hills, and Long Beach reveal the scale of the municipality from above.",
     tip:"Go late afternoon for softer light. Use a motorbike or tricycle and allow extra time for the uphill route.",
     stats:{rating:"4.6",travel:"35m from Poblacion",temp:"28°C",season:"Nov–May"}, color:"#22c55e" },
-  { id:7, name:"San Vicente Poblacion", lat:10.5318, lng:119.2822, category:"culture",
+  { id:7, name:"San Vicente - Poblacion", lat:10.5318, lng:119.2822, category:"culture",
     image:"assets/san-vicente-long-beach.jpg",
     description:"The practical center of San Vicente, with access to Long Beach, transport, small eateries, municipal services, and local life away from the island-hopping crowds.",
     tip:"Use Poblacion for arrivals, supplies, and Long Beach access. Confirm van and boat schedules one day ahead.",
@@ -2076,13 +2076,13 @@ window.addEventListener('scroll',()=>{
 
 // ─── INIT ───
 window.addEventListener('load',()=>{
-  setTimeout(()=>{document.getElementById('splash').classList.add('hidden');},2200);
-  setTimeout(animPlaceholder,2800);
+  setTimeout(()=>{document.getElementById('splash').classList.add('hidden');},5000);
+  setTimeout(animPlaceholder,5600);
   setTimeout(loadVoices,800);
   initAuth();
   initHeroWeather();
 
-  // Show dock & orb after splash
+  // Show dock & orb after splash (kept in sync with the 5s splash hold)
   setTimeout(()=>{
     document.getElementById('bottomDock').classList.add('visible');
     document.getElementById('talaOrbWrap').classList.remove('hidden');
@@ -2093,7 +2093,7 @@ window.addEventListener('load',()=>{
       },400);
       setTimeout(dismissDockIntro,5200); // auto-dismiss if user never taps
     }
-  },2600);
+  },5200);
 });
 
 // ═══════════════════════════════════════════════════════
