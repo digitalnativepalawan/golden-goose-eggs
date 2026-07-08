@@ -1,56 +1,73 @@
-## Diagnosis
+## Scope
 
-I reproduced the mobile issue on `sanvic.merqato.digital` in an iPhone-sized browser and found the root cause: **the dock is being disabled by leftover CSS from the entry flow**, not by anything broken in the dock itself.
+Four surgical fixes across `public/site/entry-flow.js`, `public/site/app.js`, `public/site/map-pin-boost.js`, and `public/site/barangay-marker-polish.js`. No DB / route / component changes.
 
-Specifically, in `public/site/entry-flow.js` line 57 there is this global rule:
+---
 
+### 1. Landing splash — enforce 5s minimum before onboarding
+
+The intro splash currently fades at 2200ms (`app.js:2079`) and the entry-flow onboarding modal appears `DELAY = 2600ms` after `window.load` (`entry-flow.js:6, 154`). On a warm cache the two collapse into ~2.5s total.
+
+- Bump the entry-flow `DELAY` constant from `2600` to `5200` so the nickname / vibe / welcome modal never opens before ~5s.
+- Push the splash-hide timer in `app.js` from `2200` to `5000` so the "SANVIC — The San Vicente tourist hub" splash itself stays visible the full 5 seconds.
+- Also delay the "show dock & orb" cue that fires right after the splash by the same amount so the dock doesn't reveal early behind the splash.
+- Keep the returning-visitor fast-path in `entry-flow.js` (dock unlock) unchanged — it already works.
+
+### 2. Neon-dot markers (destinations)
+
+Replace the current triple-layer `.mk-wrap` / `.mk-glow` / `.mk-ring` / `.mk-dot` markup in `rebuildMarkers()` (`app.js:648`) with a single tiny glowing dot: ~7px core, colored `box-shadow` for a soft radial halo, one subtle CSS keyframe pulse (opacity + halo radius only, no scale jitter). Shrink the divIcon to `iconSize:[14,14], iconAnchor:[7,7]`.
+
+Add a colour resolver `neonColorForCategory(category)` used by `rebuildMarkers()`:
+
+| Category key(s)                                        | Colour               |
+| ------------------------------------------------------ | -------------------- |
+| `stays` (Accommodations)                               | Amber `#facc15`      |
+| `food` / any category labelled Food / F&B              | Neon Red `#ff3b47`   |
+| `beaches`, `nature` (viewpoints/waterfalls), `islands` | Matrix Green `#39ff88` |
+| `transport`, `airport` (public transport / airports)   | Cyber Purple `#a855f7` |
+| everything else / fallback                             | keeps `catStyle.color` so admin-defined categories still work |
+
+Barangay centre dots (rendered in `map-pin-boost.js`) get the Electric Blue `#00b3ff` treatment via the same tiny-dot styling.
+
+Override the old `.mk-*` CSS in `map-pin-boost.js` (already the central style sheet for markers) so any leftover ring/border markup is invisible — belt-and-braces in case admin data still references the old classes.
+
+Admin category editor keeps working as-is: the colour picker still writes `catStyle[key].color`; the neon resolver only overrides for the five reserved functional categories above. All existing custom admin categories continue to render with their chosen colour, just in the new tiny-dot style. No admin UI changes required for this pass.
+
+### 3. Zoom-based barangay labels
+
+Today `barangay-marker-polish.js` explicitly *forces* labels visible in overview view:
+
+```css
+body.sanvic-overview .sv-brgy-pin.label-hidden .sv-brgy-label{display:inline-flex!important;}
 ```
-body.sanvic-entry-lock #bottomDock.visible,
-body.sanvic-entry-lock #talaOrbWrap
-{ opacity:0 !important; pointer-events:none !important }
-```
 
-And `public/site/index.html` renders the body pre-locked:
+That single rule is what causes the stack-up.
 
-```html
-<body class="sanvic-entry-lock sanvic-overview">
-```
+- Remove that override.
+- In `layoutLabels()` treat the overview / low-zoom case as "hide all labels" instead of "show all". Concretely: when `map.getZoom() <= 11`, add `.label-hidden` to every `.sv-brgy-pin` (dots stay, labels gone). At zoom `>= 12` run the existing overlap-culling pass so labels appear as the user zooms in and de-cluster naturally.
+- Keep the mobile media queries; just let the dot-only state be the default at overview zoom on every viewport.
 
-The `sanvic-entry-lock` class is only removed inside `complete()` → `unlock()`, which only runs when the user finishes the nickname/vibe/welcome flow. For any **returning visitor** (has `localStorage['sanvic_entry_v1']` from a previous visit), `entry-flow.js` takes the fast path:
+### 4. Rename "Poblacion" → "San Vicente - Poblacion" on the map
 
-```js
-if(!shouldShow()){ setTimeout(applyProfile,0); return; }   // never unlocks
-```
+Only the on-map label needs to change; historical copy inside AI answers, Pulse posts, and admin help text stays as-is (those aren't map labels).
 
-Result: `sanvic-entry-lock` stays on `<body>` forever, which forces the dock to `pointer-events:none`. Taps on Today / Explorer / Pulse / Hunt / MyTrip do nothing.
+- In `map-pin-boost.js` `ensureBarangayMarkers()`, when the feature name is `"Poblacion"`, render the label as `"San Vicente - Poblacion"` (dot stays the same, positioning unchanged).
+- In the seed destination list (`app.js:41`) the entry `name:"San Vicente Poblacion"` becomes `name:"San Vicente - Poblacion"` so the destination card matches.
+- Leave `barangays.geojson.js` untouched — the underlying feature property stays `"Poblacion"` so any `barangay` lookups (nearby-places grouping, admin datalist) keep working.
 
-Why it looks fine on desktop: you completed the entry flow at least once in that browser session, so `unlock()` ran and stripped the class. On your phone you're a "returning visitor" (localStorage from a previous test) — the fast path skips the unlock, and the dock becomes dead.
+---
 
-I also confirmed the site JS, cache-busting, `dockNav`, `sb` client, and the `.visible` class on `#bottomDock` are all correct — the only thing wrong is that lingering `sanvic-entry-lock` body class.
+## Verification
 
-## Fix (small, surgical, no behavior change for first-time users)
+Playwright, iPhone-390 viewport, against `http://localhost:8080`:
 
-Edit **only** `public/site/entry-flow.js`:
-
-1. In the returning-visitor branch, unlock the dock immediately:
-   ```js
-   if(!shouldShow()){
-     document.body.classList.remove('sanvic-entry-lock');
-     const b=document.getElementById('bottomDock'); if(b) b.classList.add('visible');
-     const t=document.getElementById('talaOrbWrap'); if(t) t.classList.remove('hidden');
-     setTimeout(applyProfile,0);
-     return;
-   }
-   ```
-2. As a belt-and-suspenders safeguard, when `complete()` runs, also ensure the class is stripped even if the DOM node is already gone (already handled, keep as is).
-3. Add a one-time safety net at the top of the IIFE: if `localStorage['sanvic_entry_v1']` exists on load, remove `sanvic-entry-lock` synchronously before any paint, so previously-stuck users are auto-recovered on their next visit without needing `?resetEntry=1`.
-
-## Verify before reporting done
-
-- Playwright iPhone-390 emulation against the live domain: seed `localStorage['sanvic_entry_v1']`, reload, confirm dock is visible AND tapping Pulse opens the Pulse panel.
-- Also verify the first-time flow (no localStorage) still shows the nickname → vibe → welcome sequence and completes correctly.
-- No changes to `index.html`, `app.js`, dock markup, or any other file.
+1. Fresh visit (no localStorage): splash "SANVIC — The San Vicente tourist hub" stays fully visible ≥5s, then the nickname modal appears.
+2. Returning visitor (seed `sanvic_entry_v1`): splash still stays ≥5s, dock unlocks after, Pulse tap opens the panel.
+3. Zoomed out (default view): screenshot shows dots only, no stacked white labels.
+4. Zoom in to a barangay: labels reappear, no overlap.
+5. Poblacion label reads "San Vicente - Poblacion".
+6. Destination pins render as tiny glowing dots in the correct functional colour per category (spot-check beaches/green, stays/amber, culture-or-food/red, etc.).
 
 ## After merging
 
-Frontend change → you need to click **Publish → Update** so `sanvic.merqato.digital` picks it up. I won't publish for you unless you ask.
+Frontend-only changes → the user must click **Publish → Update** in Lovable for `sanvic.merqato.digital` to pick them up. No DB migration, no edge function redeploy.
