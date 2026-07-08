@@ -907,7 +907,9 @@ function closeAllPanels() {
   closeDashboard();
   closeTodaySheet();
   closeExploreSheet();
+  if(typeof closeMySanvicPanel==='function') closeMySanvicPanel();
 }
+
 
 // ─── TODAY DRAWER ───
 // The "Today" dock tab opens this bottom sheet. Peek state shows a
