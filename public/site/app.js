@@ -1496,59 +1496,299 @@ const PULSE_POSTS = [
 ];
 
 let pulseCategory = 'all';
-let pulseTab = 'feed';
+let pulseView = 'tribes';
+
+// ─── PULSE v2: Tribes / Events / Lounge / Form ───
+const PV2_CATS = ['All','Island Hopping','Sunset','Food & Drinks','Transport','Surf','Nightlife','Explore','Local Life'];
+const PV2_AV = [
+  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=80&h=80&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=80&h=80&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?w=80&h=80&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop&q=70',
+];
+const PULSE_TRIBES = [
+  { id:'t1', title:'Sunset Chasers 🌅', where:'Long Beach', when:'Today, 5:30 PM', sub:'Sunset, drinks, photos & good vibes.', cap:6, joined:4, extra:2, tags:['Sunset'],
+    thumb:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=200&h=260&fit=crop&q=70' },
+  { id:'t2', title:'Island Hopping Tomorrow 🚣', where:'Port Barton', when:'Tomorrow, 8:00 AM', sub:'3 island stops, crystal water.', cap:6, joined:4, extra:1, tags:['Island Hopping'], spots:2, warn:true,
+    thumb:'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=200&h=260&fit=crop&q=70' },
+  { id:'t3', title:'Sunset Drinks 🍸', where:'Poblacion', when:'Today, 6:00 PM', sub:"Let's catch the golden hour.", cap:5, joined:4, extra:3, tags:['Sunset','Food & Drinks','Nightlife'],
+    thumb:'https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=200&h=260&fit=crop&q=70' },
+  { id:'t4', title:'Sunrise Surf Crew 🌊', where:'Alimanguan', when:'Tomorrow, 6:00 AM', sub:'Waves, coffee, go!', cap:3, joined:4, extra:1, tags:['Surf'],
+    thumb:'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=200&h=260&fit=crop&q=70' },
+  { id:'t5', title:'Shared Ride to Port Barton 🚐', where:'Poblacion', when:'Tomorrow, 10:00 AM', sub:"2 seats open. Let's split gas!", cap:0, joined:4, extra:1, tags:['Transport'], seatsOpen:2, ok:true,
+    thumb:'https://images.unsplash.com/photo-1519638831568-d9897f54ed69?w=200&h=260&fit=crop&q=70' },
+];
+const PULSE_EVENTS = [
+  { id:'e1', title:'🎉 Full Moon Party at Baybay', org:'Baybay Beach Club', where:'Baybay Beach', when:'Tonight, 9:00 PM', price:'Free entry', tags:['Nightlife'] },
+  { id:'e2', title:'🍖 Lechon by the Beach', org:'Sunset Resort', where:'Sunset Resort', when:'Today, 6:00 PM', price:'₱650 / plate', tags:['Food & Drinks'] },
+  { id:'e3', title:'🎸 Acoustic Night in Poblacion', org:'The Deck', where:'Poblacion', when:'Tonight, 7:30 PM', price:'No cover', tags:['Nightlife','Food & Drinks'] },
+];
+const PULSE_LOUNGE = [
+  { id:'l1', name:'Marco', text:'Hey! Anyone at Long Beach right now? Weather is unreal 🌤️' },
+  { id:'l2', name:'Tara', text:'Just got to Port Barton — where should I grab lunch?' },
+  { id:'l3', name:'Kai', text:'Board rental at Alimanguan is 400/day fyi.' },
+];
+
+function pulseIsSignedIn(){
+  try{
+    if(window.pulseIsSignedIn_override) return true;
+    if(typeof supabase !== 'undefined' && supabase && supabase.auth){
+      // best-effort synchronous check via cached user
+      const u = supabase.auth.__cachedUser;
+      if(u) return true;
+    }
+    if(localStorage.getItem('sanvic_user')) return true;
+  }catch(_){ }
+  return false;
+}
+function openPulseAuthGate(){ const w=document.getElementById('pv2AuthWrap'); if(w) w.classList.add('on'); }
+function closePulseAuthGate(){ const w=document.getElementById('pv2AuthWrap'); if(w) w.classList.remove('on'); }
+function pulseSignInContinue(){
+  closePulseAuthGate();
+  if(typeof openAuthPanel==='function') openAuthPanel();
+  else if(typeof openDashboard==='function') openDashboard('account');
+  else alert('Sign-in coming soon.');
+}
 
 function openPulsePanel(){
   document.getElementById('pulsePanel').classList.add('open');
-  loadPulseCategoriesFromDB().then(applyPulseCategoryLabelsToChips);
-  renderPulseFeed();
+  renderPulseCatRibbon();
+  selectPulseView(pulseView || 'tribes');
 }
-
-// Updates the visible label under each category icon to match
-// whatever's currently in PULSE_CATEGORIES (which may have been
-// overlaid with admin-edited labels from the DB).
-function applyPulseCategoryLabelsToChips(){
-  document.querySelectorAll('.pulse-cat').forEach(btn=>{
-    const key = btn.dataset.cat;
-    const meta = PULSE_CATEGORIES[key];
-    const span = btn.querySelector('span');
-    if(meta && span) span.textContent = meta.label;
-  });
-}
-
-// Stable per-browser ID used to attribute likes & rate-limit posting (no auth).
-function pulseDeviceId(){
-  try{
-    let id = localStorage.getItem('pulse_device_id');
-    if(!id){ id = 'd_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('pulse_device_id', id); }
-    return id;
-  }catch(_){ return 'd_anon'; }
-}
-function pulseSavedName(){ try{ return localStorage.getItem('pulse_display_name') || ''; }catch(_){ return ''; } }
-function pulseSaveName(n){ try{ if(n) localStorage.setItem('pulse_display_name', n); }catch(_){ } }
-
 function closePulsePanel(){
   const panel = document.getElementById('pulsePanel');
   if(panel) panel.classList.remove('open');
-  closePulseCompose();
+  closePulseAuthGate();
 }
 
-function selectPulseCategory(cat){
+function pulseDeviceId(){
+  try{
+    let id = localStorage.getItem('pulse_device_id');
+    if(!id){ id = 'd_'+Math.random().toString(36).slice(2)+Date.now().toString(36); localStorage.setItem('pulse_device_id',id); }
+    return id;
+  }catch(_){ return 'd_anon'; }
+}
+function pulseSavedName(){ try{ return localStorage.getItem('pulse_display_name') || (window.todayNickname?todayNickname():'') || 'You'; }catch(_){ return 'You'; } }
+function pulseSaveName(n){ try{ if(n) localStorage.setItem('pulse_display_name',n); }catch(_){ } }
+
+function selectPulseView(view){
+  pulseView = view;
+  const panel = document.getElementById('pulsePanel');
+  if(panel) panel.dataset.view = view;
+  document.querySelectorAll('.pv2-vtab').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
+  // Hide ribbon on lounge/form
+  const rib = document.getElementById('pv2CatRibbon');
+  if(rib) rib.style.display = (view==='lounge'||view==='form') ? 'none' : '';
+  renderPulseBody();
+}
+function selectPulseCategoryV2(cat){
   pulseCategory = cat;
-  document.querySelectorAll('.pulse-cat').forEach(b=>b.classList.toggle('active', b.dataset.cat===cat));
-  const meta = PULSE_CATEGORIES[cat] || PULSE_CATEGORIES.all;
-  document.getElementById('pulseTitle').innerHTML = `${meta.label} <span class="live-dot"></span>`;
-  document.getElementById('pulseSubtitle').textContent = meta.subtitle;
-  renderPulseFeed();
+  document.querySelectorAll('.pv2-cat').forEach(b=>b.classList.toggle('active', b.dataset.cat===cat));
+  renderPulseBody();
+}
+function renderPulseCatRibbon(){
+  const el = document.getElementById('pv2CatScroll');
+  if(!el) return;
+  el.innerHTML = PV2_CATS.map(c=>{
+    const key = c==='All' ? 'all' : c;
+    const active = (pulseCategory===key || (pulseCategory==='all' && c==='All')) ? ' active' : '';
+    return `<button class="pv2-cat${active}" data-cat="${key}" onclick="selectPulseCategoryV2('${key.replace(/'/g,"\\'")}')">${c}</button>`;
+  }).join('');
+}
+function matchesCat(item){
+  if(!pulseCategory || pulseCategory==='all') return true;
+  return Array.isArray(item.tags) && item.tags.includes(pulseCategory);
+}
+function avStackHTML(count){
+  const n = Math.min(4, count||4);
+  return `<div class="pv2-avstack">${Array.from({length:n}).map((_,i)=>`<div class="pv2-av" style="background-image:url('${PV2_AV[i%PV2_AV.length]}')"></div>`).join('')}</div>`;
+}
+function guardOr(fn){ return pulseIsSignedIn() ? fn() : openPulseAuthGate(); }
+function joinTribe(id){ guardOr(()=>{ const t=PULSE_TRIBES.find(x=>x.id===id); if(t){ t.joined+=1; renderPulseBody(); } }); }
+function interestedEvent(id){ guardOr(()=>{ alert("You're on the list. We'll ping you nearer the time."); }); }
+
+function tribeCardHTML(t){
+  const metaExtra = t.spots
+    ? `<div class="pv2-metaline warn">${t.joined} travelers • ${t.spots} spots left</div>`
+    : t.seatsOpen
+      ? `<div class="pv2-metaline ok">${t.joined} travelers • ${t.seatsOpen} seats open</div>`
+      : `<div class="pv2-metaline">${t.cap||t.joined} travelers</div>`;
+  return `
+  <div class="pv2-tribe">
+    <div class="pv2-tribe-thumb" style="background-image:url('${t.thumb}')"></div>
+    <div class="pv2-tribe-body">
+      <div class="pv2-tribe-title">${t.title}</div>
+      <div class="pv2-tribe-meta">
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${t.where}</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${t.when}</span>
+      </div>
+      <div class="pv2-tribe-sub">${t.sub}</div>
+      <div class="pv2-tribe-foot">
+        <div>
+          <div style="display:flex;align-items:center">${avStackHTML(4)}<span class="pv2-av-count">+${t.extra||1}</span></div>
+          ${metaExtra}
+        </div>
+        <button class="pv2-join" onclick="joinTribe('${t.id}')">Join Tribe</button>
+      </div>
+    </div>
+  </div>`;
+}
+function eventCardHTML(e){
+  return `
+  <div class="pv2-event">
+    <div class="pv2-event-t">${e.title}</div>
+    <div class="pv2-event-org"><span class="pv2-event-org-dot">${e.org.slice(0,1)}</span>${e.org}</div>
+    <div class="pv2-event-meta"><span>📍 ${e.where}</span><span>🕒 ${e.when}</span></div>
+    <div class="pv2-event-foot">
+      ${e.price ? `<span class="pv2-pricechip">${e.price}</span>` : '<span></span>'}
+      <button class="pv2-join" onclick="interestedEvent('${e.id}')">I'm Interested</button>
+    </div>
+  </div>`;
 }
 
-function selectPulseTab(tab){
-  pulseTab = tab;
-  document.querySelectorAll('.pulse-tab').forEach(b=>{
-    if(!b.classList.contains('disabled')) b.classList.toggle('active', b.dataset.tab===tab);
-  });
-  renderPulseFeed();
+function emptyStateHTML(){
+  return `<div class="pv2-empty">
+    <div style="font-size:1.6rem">🤫</div>
+    <div>Quiet for now. Start the first tribe and see who joins!</div>
+    <button class="pv2-cta" onclick="selectPulseView('form')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Form Your Tribe</button>
+  </div>`;
 }
+
+function renderPulseBody(){
+  const body = document.getElementById('pulseBody');
+  if(!body) return;
+  if(pulseView==='tribes'){
+    const list = PULSE_TRIBES.filter(matchesCat);
+    if(!list.length){ body.innerHTML = emptyStateHTML(); return; }
+    body.innerHTML = `
+      <div class="pv2-listhead">
+        <div class="pv2-listhead-l">
+          <div class="pv2-listhead-t">👥 Active Tribes</div>
+          <div class="pv2-listhead-s">Groups of travelers planning something together.</div>
+        </div>
+        <button class="pv2-viewall">View all ›</button>
+      </div>
+      ${list.map(tribeCardHTML).join('')}
+      <div class="pv2-footbanner">
+        <div class="pv2-footbanner-i">👥</div>
+        <div class="pv2-footbanner-body">
+          <div class="pv2-footbanner-t">Can't find what you're looking for?</div>
+          <div class="pv2-footbanner-s">Start a tribe and see who joins!</div>
+        </div>
+        <button class="pv2-cta" onclick="selectPulseView('form')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Form Your Tribe</button>
+      </div>`;
+  } else if(pulseView==='events'){
+    const list = PULSE_EVENTS.filter(matchesCat);
+    if(!list.length){ body.innerHTML = emptyStateHTML(); return; }
+    body.innerHTML = `
+      <div class="pv2-listhead"><div class="pv2-listhead-l"><div class="pv2-listhead-t">🎉 Events &amp; Happenings</div><div class="pv2-listhead-s">Verified organizers only.</div></div></div>
+      ${list.map(eventCardHTML).join('')}`;
+  } else if(pulseView==='lounge'){
+    renderPulseLounge();
+  } else if(pulseView==='form'){
+    renderPulseWizard();
+  }
+}
+
+// ── LOUNGE ──
+let LOUNGE_MSGS = null;
+function renderPulseLounge(){
+  const body = document.getElementById('pulseBody');
+  if(!LOUNGE_MSGS) LOUNGE_MSGS = PULSE_LOUNGE.map(m=>({...m,me:false}));
+  const chat = LOUNGE_MSGS.map(m=>`
+    <div class="pv2-lmsg${m.me?' me':''}">
+      ${m.me?'':`<div class="pv2-lmsg-name">${m.name}</div>`}${m.text}
+    </div>
+    ${m.helper?`<div class="pv2-helper"><span>Want to turn this into a Tribe?</span><button onclick="selectPulseView('form')">Form Your Tribe</button></div>`:''}
+  `).join('');
+  body.innerHTML = `<div class="pv2-lounge" id="pv2LoungeScroll">${chat}</div>
+    <div class="pv2-linput">
+      <input id="pv2LoungeInput" type="text" placeholder="Say something to the lounge…" onkeydown="if(event.key==='Enter')sendLoungeMsg()"/>
+      <button onclick="sendLoungeMsg()">Send</button>
+    </div>`;
+  const el = body; el.scrollTop = el.scrollHeight;
+}
+function sendLoungeMsg(){
+  if(!pulseIsSignedIn()) return openPulseAuthGate();
+  const input = document.getElementById('pv2LoungeInput');
+  const text = (input?.value||'').trim();
+  if(!text) return;
+  const isCoord = /(anyone|who wants|looking for|split|share|join)/i.test(text) && /(tomorrow|tonight|today|hopping|surf|dinner|ride|boat|trip)/i.test(text);
+  LOUNGE_MSGS.push({ id:'my_'+Date.now(), name:pulseSavedName(), text, me:true, helper:isCoord });
+  renderPulseLounge();
+}
+
+// ── WIZARD ──
+const WIZ_STEPS = 5;
+let wizStep = 0;
+let formDraft = { plan:'', when:'', whenCustom:'', wherePick:'', whereText:'', size:'', note:'' };
+function selectPulseView_reset(){ wizStep=0; formDraft={plan:'',when:'',whenCustom:'',wherePick:'',whereText:'',size:'',note:''}; }
+function renderPulseWizard(){
+  const body = document.getElementById('pulseBody');
+  const progress = Array.from({length:WIZ_STEPS}).map((_,i)=>`<span class="${i<=wizStep?'done':''}"></span>`).join('');
+  let q='', opts='', valid=false;
+  if(wizStep===0){
+    q="What are you planning?";
+    const plans = ['Island Hopping','Sunset','Drinks','Surf','Dinner','Shared Ride','Explore'];
+    opts = `<div class="pv2-wiz-opts">${plans.map(p=>`<button class="pv2-wiz-chip${formDraft.plan===p?' on':''}" onclick="wizSet('plan','${p}')">${p}</button>`).join('')}</div>`;
+    valid = !!formDraft.plan;
+  } else if(wizStep===1){
+    q="When?";
+    opts = `<div class="pv2-wiz-opts">
+      <button class="pv2-wiz-chip${formDraft.when==='Today'?' on':''}" onclick="wizSet('when','Today')">Today</button>
+      <button class="pv2-wiz-chip${formDraft.when==='Tomorrow'?' on':''}" onclick="wizSet('when','Tomorrow')">Tomorrow</button>
+      <button class="pv2-wiz-chip${formDraft.when==='custom'?' on':''}" onclick="wizSet('when','custom')">Pick date/time</button>
+    </div>${formDraft.when==='custom'?`<input class="pv2-wiz-input" type="datetime-local" value="${formDraft.whenCustom}" onchange="formDraft.whenCustom=this.value;wizRender()"/>`:''}`;
+    valid = formDraft.when && (formDraft.when!=='custom' || formDraft.whenCustom);
+  } else if(wizStep===2){
+    q="Where?";
+    opts = `<div class="pv2-wiz-opts">
+      <button class="pv2-wiz-chip${formDraft.wherePick==='choose'?' on':''}" onclick="wizSet('wherePick','choose')">Choose Place</button>
+      <button class="pv2-wiz-chip${formDraft.wherePick==='current'?' on':''}" onclick="wizSet('wherePick','current')">Use Current Map Location</button>
+      <button class="pv2-wiz-chip${formDraft.wherePick==='type'?' on':''}" onclick="wizSet('wherePick','type')">Type Location</button>
+    </div>${formDraft.wherePick==='type'?`<input class="pv2-wiz-input" placeholder="Type a place…" value="${formDraft.whereText}" oninput="formDraft.whereText=this.value"/>`:''}`;
+    valid = formDraft.wherePick && (formDraft.wherePick!=='type' || formDraft.whereText.trim());
+  } else if(wizStep===3){
+    q="How many people?";
+    const sizes = ['2–4','5–10','10+'];
+    opts = `<div class="pv2-wiz-opts">${sizes.map(s=>`<button class="pv2-wiz-chip${formDraft.size===s?' on':''}" onclick="wizSet('size','${s}')">${s}</button>`).join('')}</div>`;
+    valid = !!formDraft.size;
+  } else {
+    q="Short note";
+    opts = `<textarea class="pv2-wiz-textarea" placeholder="Looking for 2 more people to split a boat tomorrow morning." oninput="formDraft.note=this.value">${formDraft.note}</textarea>`;
+    valid = formDraft.note.trim().length>0;
+  }
+  const last = wizStep===WIZ_STEPS-1;
+  body.innerHTML = `
+    <div class="pv2-wiz">
+      <div class="pv2-wiz-progress">${progress}</div>
+      <div class="pv2-wiz-q">${q}</div>
+      ${opts}
+      <div class="pv2-wiz-nav">
+        <button class="pv2-wiz-back" onclick="wizBack()" ${wizStep===0?'style="visibility:hidden"':''}>‹ Back</button>
+        <button class="pv2-wiz-next" ${valid?'':'disabled'} onclick="${last?'wizCreate()':'wizNext()'}">${last?'Create Tribe':'Next ›'}</button>
+      </div>
+    </div>`;
+}
+function wizRender(){ renderPulseWizard(); }
+function wizSet(k,v){ formDraft[k]=v; renderPulseWizard(); }
+function wizNext(){ if(wizStep<WIZ_STEPS-1) wizStep++; renderPulseWizard(); }
+function wizBack(){ if(wizStep>0) wizStep--; renderPulseWizard(); }
+function wizCreate(){
+  if(!pulseIsSignedIn()) return openPulseAuthGate();
+  const whereLabel = formDraft.wherePick==='current' ? 'Current map area' : (formDraft.wherePick==='type' ? formDraft.whereText : 'Chosen place');
+  const whenLabel = formDraft.when==='custom' ? formDraft.whenCustom.replace('T',', ') : formDraft.when;
+  PULSE_TRIBES.unshift({
+    id:'t_'+Date.now(), title:formDraft.plan+' 🆕', where:whereLabel, when:whenLabel, sub:formDraft.note||'Just formed.',
+    cap:formDraft.size, joined:1, extra:0, tags:[formDraft.plan],
+    thumb:'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=200&h=260&fit=crop&q=70'
+  });
+  selectPulseView_reset();
+  selectPulseView('tribes');
+}
+
+
 
 function pulseCardHtml(post){
   let avatarHtml;
