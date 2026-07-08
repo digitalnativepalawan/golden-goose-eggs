@@ -691,12 +691,15 @@ body.panel-open .hero-overlay{transform:translateY(-6px)}
   <div class="splash-footer" id="splashFooter">PALAWAN</div>
 </div>
 
-<!-- ═══ MAP ═══ -->
+<!-- ═══ MAP (background canvas, z:1 — no UI siblings inside) ═══ -->
 <div id="map"></div>
 
-<!-- ═══ HERO OVERLAY (on top of map) ═══ -->
-<div class="hero-overlay" id="heroOverlay">
-  <div class="hero-brand" id="heroBrand" onclick="adminBrandClick()" style="pointer-events:auto;cursor:pointer;background:transparent;padding:0;margin-bottom:24px"><img src="assets/sanvic-logo.png" alt="SANVIC.PH" style="height:32px;width:auto;display:block;filter:drop-shadow(0 2px 8px rgba(0,0,0,.6))"/></div>
+<!-- ═══ FOREGROUND UI LAYER (z:10, click-through by default) ═══ -->
+<div id="uiLayer" class="ui-layer">
+
+<!-- ═══ TOP HEADER: logo → greeting → weather → search ═══ -->
+<header class="mysv-top-header" id="heroOverlay">
+  <a class="mysv-logo" id="heroBrand" onclick="adminBrandClick()" role="button" aria-label="SANVIC.PH"><img src="assets/sanvic-logo.png" alt="SANVIC.PH"/></a>
   <h1 class="hero-headline" id="heroHeadline">Discover Palawan<br><em>Differently.</em></h1>
   <p class="hero-subtitle" id="heroSubtitle"></p>
   <div class="hero-weather" id="heroWeather" style="display:none;"></div>
@@ -709,7 +712,7 @@ body.panel-open .hero-overlay{transform:translateY(-6px)}
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
     </button>
   </div>
-</div>
+</header>
 <div class="hero-fade" id="heroFade"></div>
 
 <!-- ═══ LAYER TOGGLE ═══ -->
