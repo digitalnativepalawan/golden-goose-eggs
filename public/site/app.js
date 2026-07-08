@@ -2652,12 +2652,16 @@ function openTalaSheet() {
   renderTalaSuggestions();
 }
 
+const TALA_VIBE_CHIPS = [
+  {text:'Something quiet'},{text:'Food after swimming'},{text:'People to join'},
+  {text:'Sunset plan'},{text:'Hidden place nearby'},{text:"What’s happening tonight?"}
+];
 function renderTalaSuggestions(){
   const container = document.getElementById('talaSugs');
   if(!container) return;
-  const list = (talaSuggestions && talaSuggestions.length) ? talaSuggestions : DEFAULT_SUGGESTIONS;
-  const active = list.filter(isSuggestionActiveToday);
-  const shown = active.length ? active : list; // never show an empty bar
+  const list = (talaSuggestions && talaSuggestions.length) ? talaSuggestions : TALA_VIBE_CHIPS;
+  const active = list.filter(s => typeof isSuggestionActiveToday === 'function' ? isSuggestionActiveToday(s) : true);
+  const shown = active.length ? active : list;
   container.innerHTML = shown.map(s=>
     `<button class="tala-sug" onclick="askTala(this)">${escapeHtml(s.text)}</button>`
   ).join('');
