@@ -192,7 +192,8 @@
         if(!name) return;
         const vc = visualCenterOfFeature(feature);
         const center = vc ? L.latLng(vc.lat, vc.lng) : L.geoJSON(feature).getBounds().getCenter();
-        const html = '<div class="sv-brgy-pin"><span class="sv-brgy-dot"></span><span class="sv-brgy-label">' + escapeText(name) + '</span></div>';
+        const displayName = (name === 'Poblacion') ? 'San Vicente - Poblacion' : name;
+        const html = '<div class="sv-brgy-pin"><span class="sv-brgy-dot"></span><span class="sv-brgy-label">' + escapeText(displayName) + '</span></div>';
         const marker = L.marker(center, {
           icon: L.divIcon({ className:'sv-brgy-icon', html: html, iconSize:[160,32], iconAnchor:[8,16] }),
           interactive: true,
