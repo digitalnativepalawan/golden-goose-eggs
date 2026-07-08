@@ -965,10 +965,12 @@ function todayNickname(){
   }catch(e){ return ''; }
 }
 function updateTodayGreeting(){
-  const el = document.getElementById('todayGreeting');
-  if(!el) return;
+  const kicker = document.getElementById('todayGreetingKicker');
+  const nameEl = document.getElementById('todayGreetingName');
+  if(!kicker || !nameEl) return;
+  kicker.textContent = timeOfDayGreeting();
   const name = todayNickname();
-  el.textContent = name ? `${timeOfDayGreeting()}, ${name}` : timeOfDayGreeting();
+  nameEl.textContent = name || 'Traveler';
 }
 function openTodaySheet(){
   const s = document.getElementById('todaySheet');
