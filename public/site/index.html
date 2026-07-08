@@ -861,6 +861,79 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
   <div class="today-scroll" id="todayScroll"></div>
 </div>
 
+<!-- ═══ EXPLORE DRAWER (3-snap bottom sheet, permanent places only) ═══ -->
+<style>
+  .explore-sheet{position:fixed;left:0;right:0;bottom:calc(72px + var(--safe-bottom,0px));z-index:82;
+    display:flex;flex-direction:column;
+    background:linear-gradient(180deg,rgba(4,10,26,.96),rgba(2,6,18,.99));
+    backdrop-filter:blur(28px) saturate(140%);
+    -webkit-backdrop-filter:blur(28px) saturate(140%);
+    border-top:1px solid rgba(255,255,255,.08);
+    border-radius:24px 24px 0 0;
+    box-shadow:0 -20px 60px rgba(0,0,0,.5);
+    height:120px;overflow:hidden;
+    transition:height .32s cubic-bezier(.2,.8,.2,1),transform .32s cubic-bezier(.2,.8,.2,1);
+    transform:translateY(100%);will-change:height,transform}
+  .explore-sheet.open{transform:translateY(0)}
+  .explore-sheet.l1{height:140px}
+  .explore-sheet.l2{height:45dvh}
+  .explore-sheet.l3{height:min(92dvh,760px)}
+  .es-handle{width:40px;height:4px;border-radius:4px;background:rgba(255,255,255,.18);margin:8px auto 4px;flex-shrink:0;cursor:grab}
+  .es-peek{padding:6px 14px 10px;display:flex;flex-direction:column;gap:8px;flex-shrink:0}
+  .es-search{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:14px;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
+  .es-search svg{width:16px;height:16px;color:rgba(255,255,255,.55);flex-shrink:0}
+  .es-search input{flex:1;background:none;border:0;outline:0;color:rgba(255,255,255,.94);
+    font-family:var(--font-body);font-size:.92rem}
+  .es-search input::placeholder{color:rgba(255,255,255,.45)}
+  .es-ribbon{display:flex;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
+    scrollbar-width:none;padding:2px 0}
+  .es-ribbon::-webkit-scrollbar{display:none}
+  .es-chip{flex-shrink:0;font-size:.72rem;font-weight:600;padding:6px 12px;border-radius:999px;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.85);cursor:pointer;white-space:nowrap}
+  .es-chip.accent{background:rgba(20,184,166,.12);border-color:rgba(20,184,166,.28);color:rgba(153,246,228,.95)}
+  .es-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:4px 14px calc(24px + var(--safe-bottom,0px));
+    display:none;flex-direction:column;gap:14px}
+  .explore-sheet.l2 .es-body,.explore-sheet.l3 .es-body{display:flex}
+  .es-section{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:20px;padding:14px 14px 16px}
+  .es-kicker{font-size:.6rem;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.42);margin-bottom:6px}
+  .es-title{font-size:1.02rem;font-weight:600;color:rgba(255,255,255,.94);margin:0 0 10px;letter-spacing:-.01em}
+  .es-place{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:14px;
+    background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);cursor:pointer}
+  .es-place + .es-place{margin-top:8px}
+  .es-place-name{font-size:.92rem;font-weight:600;color:rgba(255,255,255,.94)}
+  .es-place-why{font-size:.8rem;color:rgba(255,255,255,.75);line-height:1.4}
+  .es-place-good{font-size:.7rem;color:rgba(255,255,255,.55);margin-top:2px}
+  .es-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .es-grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .es-tile{padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.05);cursor:pointer;min-width:0}
+  .es-tile-t{font-size:.86rem;font-weight:600;color:rgba(255,255,255,.94);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .es-tile-s{font-size:.72rem;color:rgba(255,255,255,.6);margin-top:2px;line-height:1.35}
+  .es-mood{padding:12px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05)}
+  .es-mood + .es-mood{margin-top:8px}
+  .es-mood-t{font-size:.88rem;font-weight:600;color:rgba(255,255,255,.94);margin-bottom:6px}
+  .es-mood-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .es-filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .es-fchip{font-size:.7rem;font-weight:600;padding:6px 10px;border-radius:999px;
+    background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.78);cursor:pointer}
+  .es-fchip.on{background:rgba(20,184,166,.14);border-color:rgba(20,184,166,.36);color:rgba(153,246,228,.98)}
+  @media(min-width:900px){
+    .explore-sheet{left:auto;right:24px;bottom:24px;width:min(440px,92vw);border-radius:24px}
+    .explore-sheet.l3{height:min(82vh,780px)}
+  }
+</style>
+<div class="explore-sheet" id="exploreSheet">
+  <div class="es-handle" id="esHandle" onclick="cycleExploreSnap()"></div>
+  <div class="es-peek">
+    <label class="es-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="esSearchInput" type="text" placeholder="Search or ask TALA…" onfocus="setExploreSnap(2)"/>
+    </label>
+    <div class="es-ribbon" id="esRibbon"></div>
+  </div>
+  <div class="es-body" id="exploreContent"></div>
+</div>
+
 
 <!-- ═══ DESTINATION BOTTOM SHEET ═══ -->
 <div class="dest-overlay" id="destOverlay"></div>
