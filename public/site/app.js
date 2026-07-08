@@ -2734,7 +2734,7 @@ function dockNav(tab){
     case 'discover': closeAllPanels(); closeDiscoverPanel(); openExploreSheet(); break;
     case 'tala': closeAllPanels(); closeDiscoverPanel(); openTalaSheet(); break;
     case 'pulse': closeAllPanels(); closeDiscoverPanel(); openPulsePanel(); break;
-    case 'saved': closeAllPanels(); closeDiscoverPanel(); openDashboard('saved'); break;
+    case 'saved': closeAllPanels(); closeDiscoverPanel(); openMySanvicPanel(); break;
     case 'hunt': closeAllPanels(); closeDiscoverPanel(); (typeof openTalaSheet==='function') ? openTalaSheet() : (typeof locateUser==='function' && locateUser()); break;
   }
 }
