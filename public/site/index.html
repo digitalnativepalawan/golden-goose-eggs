@@ -1421,7 +1421,123 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
       <button onclick="closeAdminPanel()">Done</button>
     </div>
   </div>
+  </div>
 </div>
+
+<style>
+  /* ═══ MY SANVIC PANEL ═══ */
+  #mySanvicPanel{position:fixed;inset:0;z-index:80;background:var(--charcoal-deep);transform:translateY(100%);transition:transform .5s var(--ease-out-expo);display:flex;flex-direction:column;overflow:hidden}
+  #mySanvicPanel.open{transform:translateY(0)}
+  .mysv-body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:18px 16px 110px;scrollbar-width:none}
+  .mysv-body::-webkit-scrollbar{display:none}
+  .mysv-close{position:absolute;top:14px;right:14px;z-index:5;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .mysv-head{padding:26px 4px 6px;position:relative}
+  .mysv-title-row{display:flex;align-items:center;gap:12px}
+  .mysv-title{font-family:'Playfair Display',serif;font-size:2.1rem;font-weight:600;color:#fff;letter-spacing:-.5px}
+  .mysv-heart{color:var(--ocean-teal-light,#3fd6d6);width:26px;height:26px}
+  .mysv-sub{margin-top:6px;color:rgba(255,255,255,.72);font-size:.92rem;line-height:1.5;max-width:560px}
+  .mysv-tag{margin-top:6px;color:rgba(255,255,255,.4);font-size:.75rem;font-style:italic}
+
+  .mysv-sync{margin:18px 0 6px;display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:18px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);backdrop-filter:blur(20px)}
+  .mysv-sync-ico{flex:0 0 42px;height:42px;border-radius:50%;background:rgba(63,214,214,.08);border:1px solid rgba(63,214,214,.2);display:flex;align-items:center;justify-content:center;color:var(--ocean-teal-light,#3fd6d6)}
+  .mysv-sync-body{flex:1;min-width:0}
+  .mysv-sync-t{font-size:.95rem;color:#fff;font-weight:600}
+  .mysv-sync-s{font-size:.78rem;color:rgba(255,255,255,.55);margin-top:2px;line-height:1.4}
+  .mysv-sync-actions{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+  .mysv-btn-teal{background:var(--ocean-teal-light,#3fd6d6);color:#052024;border:none;padding:9px 22px;border-radius:999px;font-weight:600;font-size:.85rem;cursor:pointer}
+  .mysv-btn-teal:hover{filter:brightness(1.08)}
+  .mysv-link{background:none;border:none;color:var(--ocean-teal-light,#3fd6d6);font-size:.75rem;cursor:pointer;padding:0}
+
+  .mysv-section{margin-top:22px}
+  .mysv-sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px;padding:0 2px}
+  .mysv-sec-title{font-size:1.05rem;color:#fff;font-weight:600;display:flex;gap:8px;align-items:center}
+  .mysv-sec-sub{font-size:.75rem;color:rgba(255,255,255,.5);margin-top:2px}
+  .mysv-viewall{background:none;border:none;color:var(--ocean-teal-light,#3fd6d6);font-size:.8rem;cursor:pointer;padding:4px 0;white-space:nowrap}
+
+  .mysv-hscroll{display:flex;gap:12px;overflow-x:auto;overflow-y:hidden;padding:4px 2px 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .mysv-hscroll::-webkit-scrollbar{display:none}
+
+  /* Upcoming cards */
+  .mysv-up-card{flex:0 0 240px;height:200px;border-radius:18px;position:relative;overflow:hidden;background:linear-gradient(135deg,#1a2f3a,#0b1620);border:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;justify-content:space-between;padding:12px}
+  .mysv-up-card::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 40%,rgba(0,0,0,.85) 100%);z-index:1}
+  .mysv-up-card > *{position:relative;z-index:2}
+  .mysv-badge{align-self:flex-start;background:var(--ocean-teal-light,#3fd6d6);color:#052024;padding:5px 11px;border-radius:999px;font-size:.7rem;font-weight:700;letter-spacing:.3px}
+  .mysv-badge.soft{background:rgba(255,255,255,.14);color:#fff;backdrop-filter:blur(10px)}
+  .mysv-up-info{display:flex;flex-direction:column;gap:6px}
+  .mysv-up-title{color:#fff;font-weight:600;font-size:.98rem;line-height:1.2}
+  .mysv-up-meta{color:rgba(255,255,255,.72);font-size:.75rem}
+  .mysv-up-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px}
+  .mysv-avatars{display:flex;align-items:center}
+  .mysv-avatar{width:22px;height:22px;border-radius:50%;border:1.5px solid #0b1620;margin-left:-8px;background:linear-gradient(135deg,#3fd6d6,#0b6b7a);flex-shrink:0}
+  .mysv-avatar:first-child{margin-left:0}
+  .mysv-avatar-more{margin-left:-8px;height:22px;min-width:22px;padding:0 6px;border-radius:11px;background:rgba(255,255,255,.14);color:#fff;font-size:.65rem;display:flex;align-items:center;justify-content:center;font-weight:600}
+  .mysv-cap-btn{background:transparent;border:1px solid rgba(63,214,214,.5);color:var(--ocean-teal-light,#3fd6d6);padding:6px 14px;border-radius:999px;font-size:.73rem;cursor:pointer;font-weight:500;white-space:nowrap}
+  .mysv-cap-btn:hover{background:rgba(63,214,214,.1)}
+
+  /* Saved cards */
+  .mysv-sv-card{flex:0 0 160px;height:200px;border-radius:16px;position:relative;overflow:hidden;background:linear-gradient(135deg,#1a3a4a,#0b1620);border:1px solid rgba(255,255,255,.06)}
+  .mysv-sv-card::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 30%,rgba(0,0,0,.9) 100%);z-index:1}
+  .mysv-sv-heart{position:absolute;top:8px;right:8px;z-index:3;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.35);backdrop-filter:blur(8px);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .mysv-sv-info{position:absolute;bottom:0;left:0;right:0;z-index:2;padding:10px 12px}
+  .mysv-sv-title{color:#fff;font-weight:600;font-size:.85rem;line-height:1.2}
+  .mysv-sv-cat{color:rgba(255,255,255,.6);font-size:.66rem;margin-top:2px}
+  .mysv-sv-row{display:flex;align-items:center;justify-content:space-between;margin-top:8px;gap:6px}
+  .mysv-km{background:rgba(255,255,255,.12);color:#fff;padding:3px 8px;border-radius:999px;font-size:.65rem;backdrop-filter:blur(8px)}
+  .mysv-dot{background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;padding:2px 6px;font-size:1rem}
+
+  /* Joined tribes rows */
+  .mysv-tribe-row{display:flex;align-items:center;gap:12px;padding:12px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);margin-bottom:8px}
+  .mysv-tribe-thumb{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#3fd6d6,#0b6b7a);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.1rem}
+  .mysv-tribe-body{flex:1;min-width:0}
+  .mysv-tribe-title{color:#fff;font-size:.9rem;font-weight:600}
+  .mysv-tribe-meta{color:rgba(255,255,255,.55);font-size:.72rem;margin-top:2px}
+
+  /* Split grid */
+  .mysv-split{display:grid;grid-template-columns:1fr;gap:14px}
+  @media (min-width:768px){ .mysv-split{grid-template-columns:1fr 1fr} }
+  .mysv-col{display:flex;flex-direction:column;gap:10px}
+  .mysv-ev-card{display:flex;gap:10px;padding:10px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);align-items:center}
+  .mysv-ev-thumb{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#f59e0b,#7c2d12);flex-shrink:0}
+  .mysv-ev-body{flex:1;min-width:0}
+  .mysv-ev-title{color:#fff;font-size:.85rem;font-weight:600}
+  .mysv-ev-meta{color:rgba(255,255,255,.55);font-size:.7rem;margin-top:2px}
+  .mysv-ev-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px}
+
+  .mysv-hunt{padding:16px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)}
+  .mysv-hunt-main{display:flex;align-items:center;gap:14px}
+  .mysv-ring{position:relative;width:74px;height:74px;flex-shrink:0}
+  .mysv-ring svg{transform:rotate(-90deg)}
+  .mysv-ring-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.95rem}
+  .mysv-hunt-info{flex:1;min-width:0}
+  .mysv-hunt-title{color:#fff;font-size:.9rem;font-weight:600}
+  .mysv-hunt-meta{color:rgba(255,255,255,.6);font-size:.72rem;margin-top:3px;line-height:1.4}
+  .mysv-gift{flex-shrink:0;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;color:var(--ocean-teal-light,#3fd6d6)}
+  .mysv-reward{margin-top:12px;padding:10px;border-radius:12px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.05);display:flex;align-items:center;gap:10px}
+  .mysv-reward-thumb{width:38px;height:38px;border-radius:8px;background:linear-gradient(135deg,#3fd6d6,#0b6b7a);flex-shrink:0}
+  .mysv-reward-body{flex:1;min-width:0}
+  .mysv-reward-lab{color:rgba(255,255,255,.5);font-size:.65rem;text-transform:uppercase;letter-spacing:.5px}
+  .mysv-reward-t{color:#fff;font-size:.85rem;font-weight:600;margin-top:2px}
+
+  /* Recently viewed pills */
+  .mysv-pill{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;padding:6px 14px 6px 6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:999px;color:#fff;font-size:.78rem;cursor:pointer;white-space:nowrap}
+  .mysv-pill-thumb{width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#3fd6d6,#0b6b7a);flex-shrink:0}
+
+  /* Empty state */
+  .mysv-empty{padding:28px 20px;border-radius:20px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);text-align:center;margin-top:20px}
+  .mysv-empty-t{color:#fff;font-size:1rem;font-weight:600;margin-bottom:6px}
+  .mysv-empty-s{color:rgba(255,255,255,.6);font-size:.85rem;line-height:1.5;margin-bottom:16px;max-width:340px;margin-left:auto;margin-right:auto}
+  .mysv-empty-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+
+  @media (min-width:640px){ .mysv-body{max-width:900px;margin:0 auto;width:100%} }
+</style>
+
+<div id="mySanvicPanel" aria-hidden="true">
+  <button class="mysv-close" onclick="closeMySanvicPanel()" aria-label="Close">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
+  <div class="mysv-body" id="mysvBody"></div>
+</div>
+
 
 <script>
   // Single deploy stamp for ALL scripts. Bump on every deploy that changes
