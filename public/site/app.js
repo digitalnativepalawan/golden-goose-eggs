@@ -4504,3 +4504,277 @@ function mysvAction(kind, id){
   }
 }
 
+
+// ═══════════════════════════════════════════════════════
+// THE HUNT — discovery, unlock, earn
+// ═══════════════════════════════════════════════════════
+const HUNT_TARGETS = { 'sunset-hunter': { lat:10.7920, lng:119.3160, name:'Long Beach' } };
+
+const HUNT_NEARBY = [
+  { id:'n1', title:'Wild Beach Marker', desc:'A quiet beach access locals love.', diff:'🟢 Easy', pts:50, km:0.4, locked:true, grad:'linear-gradient(135deg,#38bdf8,#0c4a6e)' },
+  { id:'n2', title:'Market Morning Clue', desc:'Find the local snack stall before 9 AM.', diff:'🟢 Easy', pts:40, km:1.2, exploreLink:true, grad:'linear-gradient(135deg,#f59e0b,#78350f)' },
+  { id:'n3', title:'Waterfall Entrance', desc:'Scan the hidden QR near the rocks.', diff:'🟡 Medium', pts:60, km:3.8, locked:true, grad:'linear-gradient(135deg,#34d399,#064e3b)' },
+  { id:'n4', title:'Secret Viewpoint', desc:'The best view is not on the map.', diff:'🟡 Medium', pts:60, km:2.1, exploreLink:true, grad:'linear-gradient(135deg,#a78bfa,#1e1b4b)' }
+];
+const HUNT_TRAILS = [
+  { id:'t1', title:'Long Beach Explorer', desc:'Discover the hidden gems along 14km of paradise.', done:4, total:10, grad:'linear-gradient(135deg,#f97316,#7c2d12)' },
+  { id:'t2', title:'Local Life Trail', desc:'Experience Poblacion like a local.', done:3, total:8, grad:'linear-gradient(135deg,#f59e0b,#78350f)' },
+  { id:'t3', title:'Island Hopper Trail', desc:'Unlock the best of our pristine islands.', done:2, total:7, grad:'linear-gradient(135deg,#0ea5e9,#0c4a6e)' }
+];
+const HUNT_REWARDS = [
+  { id:'r1', title:'Free Sunset Drink', sub:'Complete 3 Long Beach discoveries. Valid for 7 days.', badge:'NEW', grad:'linear-gradient(135deg,#f97316,#7c2d12)' }
+];
+
+function huntLoadState(){
+  try{
+    return {
+      unlocked: JSON.parse(localStorage.getItem('sanvic_hunt_unlocked') || '[]'),
+      points: parseInt(localStorage.getItem('sanvic_hunt_points') || '0', 10) || 0,
+      progress: JSON.parse(localStorage.getItem('sanvic_hunt_progress') || '{}')
+    };
+  }catch(_){ return { unlocked:[], points:0, progress:{} }; }
+}
+function huntSaveState(s){
+  try{
+    localStorage.setItem('sanvic_hunt_unlocked', JSON.stringify(s.unlocked||[]));
+    localStorage.setItem('sanvic_hunt_points', String(s.points||0));
+    localStorage.setItem('sanvic_hunt_progress', JSON.stringify(s.progress||{}));
+  }catch(_){}
+}
+
+function openHuntPanel(){
+  const p = document.getElementById('huntPanel');
+  if(!p) return;
+  p.classList.add('open');
+  p.setAttribute('aria-hidden','false');
+  renderHunt();
+}
+function closeHuntPanel(){
+  const p = document.getElementById('huntPanel');
+  if(!p) return;
+  p.classList.remove('open');
+  p.setAttribute('aria-hidden','true');
+  closeHuntOverlay();
+}
+function showHuntOverlay(title, sub){
+  const o = document.getElementById('huntOverlay');
+  if(!o) return;
+  if(title) document.getElementById('huntOverlayTitle').textContent = title;
+  if(sub) document.getElementById('huntOverlaySub').textContent = sub;
+  o.classList.add('show');
+}
+function closeHuntOverlay(evt){
+  if(evt && evt.target && evt.target.closest && evt.target.closest('.hunt-overlay-card')) return;
+  const o = document.getElementById('huntOverlay');
+  if(o) o.classList.remove('show');
+}
+
+function huntAvatars(count, more){
+  const dots = Array.from({length:count}).map((_,i)=>`<div class="hunt-avatar" style="background:linear-gradient(135deg,hsl(${i*60+20},60%,55%),hsl(${i*60+80},55%,25%))"></div>`).join('');
+  const moreEl = more ? `<div class="hunt-avatar-more">+${more}</div>` : '';
+  return `<div class="hunt-avatars">${dots}${moreEl}</div>`;
+}
+
+function huntSelectTab(tab){
+  document.querySelectorAll('.hunt-vtab').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  const map = { today:'huntToday', nearby:'huntNearby', trails:'huntTrails', collections:'huntTrails', rewards:'huntSplit', progress:'huntSplit' };
+  const target = document.getElementById(map[tab] || 'huntToday');
+  if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function huntScrollToSplit(){
+  const el = document.getElementById('huntSplit');
+  if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function huntStart(id){
+  const target = HUNT_TARGETS[id];
+  const onFail = () => showHuntOverlay('Marker out of range', 'Marker out of range. Head to the location in San Vicente to unlock this story layer.');
+  if(!target || !navigator.geolocation) return onFail();
+  navigator.geolocation.getCurrentPosition(pos => {
+    const R = 6371000;
+    const toRad = d => d*Math.PI/180;
+    const dLat = toRad(target.lat - pos.coords.latitude);
+    const dLng = toRad(target.lng - pos.coords.longitude);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(pos.coords.latitude))*Math.cos(toRad(target.lat))*Math.sin(dLng/2)**2;
+    const dist = 2*R*Math.asin(Math.sqrt(a));
+    if(dist > 100) return onFail();
+    const s = huntLoadState();
+    if(!s.unlocked.includes(id)){ s.unlocked.push(id); s.points += 100; huntSaveState(s); renderHunt(); }
+    showHuntOverlay('Unlocked!', `You earned 100 pts near ${target.name}.`);
+  }, () => onFail(), { timeout: 4000 });
+}
+function huntNearbyTap(id){
+  const card = HUNT_NEARBY.find(c=>c.id===id);
+  if(!card) return;
+  if(card.locked) return showHuntOverlay('Locked marker', 'Get closer to unlock this discovery.');
+  if(card.exploreLink){ closeHuntPanel(); if(typeof dockNav==='function') dockNav('discover'); }
+}
+function huntOpenTrail(id){ console.log('trail', id); }
+function huntRedeem(id){ showHuntOverlay('Reward pending', 'Complete the required discoveries to redeem this reward.'); }
+
+function renderHunt(){
+  const body = document.getElementById('huntBody');
+  if(!body) return;
+  const discoveries = 7;
+  const readyRewards = 2;
+  const tabs = [
+    { k:'today', label:"Today's Hunt", svg:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor"/>' },
+    { k:'nearby', label:'Nearby', svg:'<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>' },
+    { k:'trails', label:'Trails', svg:'<path d="M3 20l4-8 4 4 4-10 6 14"/>' },
+    { k:'collections', label:'Collections', svg:'<path d="M4 4h13a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2V4z"/><line x1="8" y1="8" x2="15" y2="8"/><line x1="8" y1="12" x2="15" y2="12"/>' },
+    { k:'rewards', label:'Rewards', svg:'<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>' },
+    { k:'progress', label:'My Progress', svg:'<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>' }
+  ];
+
+  body.innerHTML = `
+    <div class="hunt-head">
+      <div class="hunt-head-top">
+        <div style="min-width:0">
+          <div class="hunt-title-row">
+            <h1 class="hunt-title">The Hunt</h1>
+            <svg class="hunt-cross" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>
+          </div>
+          <div class="hunt-sub">Discover. Unlock. Earn.</div>
+        </div>
+        <button class="hunt-status" onclick="huntScrollToSplit()" aria-label="Jump to progress">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18 3h-3V1H9v2H6a2 2 0 0 0-2 2v3a5 5 0 0 0 4 4.9V13a4 4 0 0 0 3 3.87V19H8v2h8v-2h-3v-2.13A4 4 0 0 0 16 13v-.1A5 5 0 0 0 20 8V5a2 2 0 0 0-2-2zM6 8V5h2v5.83A3 3 0 0 1 6 8zm12 0a3 3 0 0 1-2 2.83V5h2z"/></svg>
+          <span>${discoveries} discoveries / ${readyRewards} rewards ready ›</span>
+        </button>
+      </div>
+      <div class="hunt-copy">Find hidden spots, unlock stories, collect badges, and earn rewards across San Vicente.</div>
+    </div>
+
+    <div class="hunt-viewtabs">
+      ${tabs.map((t,i)=>`<button class="hunt-vtab ${i===0?'active':''}" data-tab="${t.k}" onclick="huntSelectTab('${t.k}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${t.svg}</svg>
+        <span>${escapeHtml(t.label)}</span>
+      </button>`).join('')}
+    </div>
+
+    <div class="hunt-section" id="huntToday">
+      <div class="hunt-today">
+        <div class="hunt-today-body">
+          <span class="hunt-today-badge">TODAY</span>
+          <div class="hunt-today-title">Sunset Hunter 🌅</div>
+          <div class="hunt-today-desc">Find the hidden marker near Long Beach before the sun goes down.</div>
+          <div class="hunt-meta-row">
+            <span class="hunt-meta-pill">📍 Long Beach</span>
+            <span class="hunt-meta-pill">📶 Easy</span>
+            <span class="hunt-meta-pill">🕒 Before 6:30 PM</span>
+          </div>
+          <div class="hunt-reward-strip">REWARD: 100 pts • Sunset Badge 🏅</div>
+        </div>
+        <div class="hunt-today-side">
+          ${huntAvatars(4, 12)}
+          <div class="hunt-avatar-label">+12 travelers active today</div>
+          <button class="hunt-cta-teal" onclick="huntStart('sunset-hunter')">Start Hunt</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="hunt-section" id="huntNearby">
+      <div class="hunt-sec-head">
+        <div><div class="hunt-sec-title">Nearby Discoveries</div><div class="hunt-sec-sub">Hidden spots near you.</div></div>
+        <button class="hunt-viewall">View all ›</button>
+      </div>
+      <div class="hunt-hscroll">
+        ${HUNT_NEARBY.map(c=>`
+          <div class="hunt-near-card" style="background-image:${c.grad}" onclick="huntNearbyTap('${c.id}')">
+            <span class="hunt-chip-dist">↖ ${c.km} km</span>
+            ${c.locked ? `<span class="hunt-chip-lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>` : ''}
+            <div class="hunt-near-info">
+              <div class="hunt-near-title">${escapeHtml(c.title)}</div>
+              <div class="hunt-near-desc">${escapeHtml(c.desc)}</div>
+              <div class="hunt-near-meta">${c.diff} • ${c.pts} pts</div>
+              ${c.exploreLink ? `<div class="hunt-near-link">Open in Explore ›</div>` : ''}
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="hunt-section" id="huntTrails">
+      <div class="hunt-sec-head">
+        <div><div class="hunt-sec-title">Trails</div><div class="hunt-sec-sub">Complete trails, unlock badges, earn rewards.</div></div>
+        <button class="hunt-viewall">View all ›</button>
+      </div>
+      <div class="hunt-hscroll">
+        ${HUNT_TRAILS.map(t=>`
+          <div class="hunt-trail-card">
+            <div class="hunt-trail-top">
+              <div class="hunt-trail-thumb" style="background:${t.grad}"></div>
+              <div class="hunt-trail-body">
+                <div class="hunt-trail-title">${escapeHtml(t.title)}</div>
+                <div class="hunt-trail-desc">${escapeHtml(t.desc)}</div>
+              </div>
+            </div>
+            <div class="hunt-trail-foot">
+              <div class="hunt-progress"><div class="hunt-progress-fill" style="width:${(t.done/t.total)*100}%"></div></div>
+              <div class="hunt-progress-count">${t.done} / ${t.total}</div>
+              <button class="hunt-chev" onclick="huntOpenTrail('${t.id}')" aria-label="Open trail">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="hunt-section" id="huntSplit">
+      <div class="hunt-split">
+        <div class="hunt-col">
+          <div class="hunt-sec-head" style="margin-bottom:6px">
+            <div><div class="hunt-sec-title">🎁 Rewards</div><div class="hunt-sec-sub">Redeem your unlocked rewards.</div></div>
+            <button class="hunt-viewall">View all ›</button>
+          </div>
+          ${HUNT_REWARDS.map(r=>`
+            <div class="hunt-reward-card" style="background:${r.grad}">
+              <span class="hunt-reward-badge">${escapeHtml(r.badge)}</span>
+              <div>
+                <div class="hunt-reward-t">${escapeHtml(r.title)}</div>
+                <div class="hunt-reward-s">${escapeHtml(r.sub)}</div>
+              </div>
+              <div class="hunt-reward-row">
+                <div></div>
+                <button class="hunt-glass-btn" onclick="huntRedeem('${r.id}')">Redeem</button>
+              </div>
+            </div>`).join('')}
+          <div class="hunt-dots"><span class="active"></span><span></span><span></span></div>
+        </div>
+        <div class="hunt-col">
+          <div class="hunt-sec-head" style="margin-bottom:6px">
+            <div><div class="hunt-sec-title">📊 My Progress</div><div class="hunt-sec-sub">Your journey so far.</div></div>
+            <button class="hunt-viewall">›</button>
+          </div>
+          <div class="hunt-progress-panel">
+            <div class="hunt-donut">
+              <svg width="96" height="96" viewBox="0 0 96 96">
+                <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8"/>
+                <circle cx="48" cy="48" r="40" fill="none" stroke="#3fd6d6" stroke-width="8" stroke-linecap="round" stroke-dasharray="${2*Math.PI*40}" stroke-dashoffset="${2*Math.PI*40*(1-0.42)}"/>
+              </svg>
+              <div class="hunt-donut-label">42%</div>
+            </div>
+            <div class="hunt-progress-list">
+              <div class="hunt-progress-item">🎯 7 discoveries unlocked</div>
+              <div class="hunt-progress-item">🗺️ 2 trails in progress</div>
+              <div class="hunt-progress-item">🏆 3 badges earned</div>
+              <div class="hunt-progress-item">🎁 2 rewards ready</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hunt-rare">
+      <div class="hunt-rare-ico">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M3 12h18"/><path d="M12 8v12"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/></svg>
+      </div>
+      <div class="hunt-rare-body">
+        <div class="hunt-rare-t">Rare Finds</div>
+        <div class="hunt-rare-s">Only a few travelers have found these.</div>
+      </div>
+      <div class="hunt-rare-actions">
+        ${huntAvatars(3, 7)}
+        <button class="hunt-glass-btn">View all</button>
+      </div>
+    </div>
+  `;
+}
