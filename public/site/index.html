@@ -763,7 +763,7 @@ body.panel-open .hero-overlay{transform:translateY(-6px)}
   <svg class="dock-coachmark-arrow" viewBox="0 0 24 12" fill="none"><path d="M0 0 L12 12 L24 0 Z" fill="currentColor"/></svg>
 </div>
 
-<!-- ═══ BOTTOM DOCK (5 items) ═══ -->
+<!-- ═══ BOTTOM DOCK (5 items — Today · Explore · Pulse · My Sanvic · The Hunt) ═══ -->
 <div class="bottom-dock" id="bottomDock">
   <button class="dock-item active" onclick="dockNav('map')" data-tab="map">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
@@ -774,19 +774,24 @@ body.panel-open .hero-overlay{transform:translateY(-6px)}
     <span>Explore</span>
   </button>
   <button class="dock-item" onclick="dockNav('pulse')" data-tab="pulse">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 12 6 12 9 4 15 20 18 12 22 12"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M8.5 8.5a5 5 0 0 0 0 7"/><path d="M15.5 15.5a5 5 0 0 0 0 -7"/><path d="M5 5a9 9 0 0 0 0 14"/><path d="M19 19a9 9 0 0 0 0 -14"/></svg>
     <span>Pulse</span>
   </button>
   <button class="dock-item" onclick="dockNav('saved')" data-tab="saved">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-    <span>MY TRIP</span>
+    <span>My Sanvic</span>
   </button>
   <button class="dock-item" onclick="dockNav('hunt')" data-tab="hunt">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>
-    <span>THE HUNT</span>
-
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>
+    <span>The Hunt</span>
   </button>
 </div>
+
+<!-- ═══ TOP-RIGHT MAP UTILITIES (Locate + Layers) ═══ -->
+<button id="locateMeBtn" class="map-util-btn" onclick="locateUser()" aria-label="Locate me" title="Center on my location">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+  <span>Locate</span>
+</button>
 
 <!-- ═══ TALA ORB ═══ -->
 <div class="tala-orb-wrap" id="talaOrbWrap">
