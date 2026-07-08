@@ -906,6 +906,7 @@ function closeAllPanels() {
   closePulsePanel();
   closeDashboard();
   closeTodaySheet();
+  closeExploreSheet();
 }
 
 // ─── TODAY DRAWER ───
