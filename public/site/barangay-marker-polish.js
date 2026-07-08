@@ -13,7 +13,6 @@
       .sv-brgy-dot{width:7px!important;height:7px!important;border:none!important;box-shadow:none!important;}
       .sv-brgy-label{font-size:.56rem!important;letter-spacing:.035em!important;padding:2px 6px!important;line-height:1.05!important;background:rgba(4,12,30,.32)!important;border-color:rgba(29,155,240,.14)!important;}
       .sv-brgy-pin.label-hidden .sv-brgy-label{display:none!important;}
-      body.sanvic-overview .sv-brgy-pin.label-hidden .sv-brgy-label{display:inline-flex!important;}
       @media(min-width:768px) and (max-width:1024px){
         .sv-brgy-dot{width:7px!important;height:7px!important;border:none!important;box-shadow:none!important;}
         .sv-brgy-label{font-size:.52rem!important;padding:2px 5px!important;letter-spacing:.03em!important;}
@@ -54,14 +53,20 @@
 
       const w = window.innerWidth || 1024;
       const phone = w <= 767;
-      const visible = [];
       const z = (typeof map !== 'undefined' && map && map.getZoom) ? map.getZoom() : 10;
-      const overview = document.body.classList.contains('sanvic-overview') && z <= 10;
 
+      // Zoomed out: dots only, no labels — keeps the overview map clean.
+      // Labels reveal as the user zooms in and are then de-cluttered by
+      // an overlap pass so nothing stacks.
+      if(z <= 11){
+        pins.forEach(pin => pin.classList.add('label-hidden'));
+        return;
+      }
+
+      const visible = [];
       pins.forEach((pin) => {
         const label = pin.querySelector('.sv-brgy-label');
         if(!label) return;
-        if(overview) return;
         const rect = label.getBoundingClientRect();
         const pad = phone ? 6 : 5;
         if(visible.some(existing => overlap(rect, existing, pad))){

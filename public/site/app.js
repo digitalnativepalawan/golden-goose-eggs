@@ -38,7 +38,7 @@ const DEFAULT_DESTINATIONS = [
     description:"A scenic viewpoint above San Vicente where the coast, green hills, and Long Beach reveal the scale of the municipality from above.",
     tip:"Go late afternoon for softer light. Use a motorbike or tricycle and allow extra time for the uphill route.",
     stats:{rating:"4.6",travel:"35m from Poblacion",temp:"28°C",season:"Nov–May"}, color:"#22c55e" },
-  { id:7, name:"San Vicente Poblacion", lat:10.5318, lng:119.2822, category:"culture",
+  { id:7, name:"San Vicente - Poblacion", lat:10.5318, lng:119.2822, category:"culture",
     image:"assets/san-vicente-long-beach.jpg",
     description:"The practical center of San Vicente, with access to Long Beach, transport, small eateries, municipal services, and local life away from the island-hopping crowds.",
     tip:"Use Poblacion for arrivals, supplies, and Long Beach access. Confirm van and boat schedules one day ahead.",
@@ -636,6 +636,28 @@ let pinsCurrentlyVisible = true;
 let activeMarkerSet = []; // tracks whichever markers are "supposed" to be on the map right now (all, or a filtered category)
 let pinVisibilityOverride = false; // true once the user explicitly picks a category — keeps pins on regardless of zoom until they go back to 'All'/Map tab
 
+// Signature neon-dot palette. Reserved functional categories always
+// map to a fixed colour so the map reads at a glance; any other
+// admin-defined category falls through to its configured colour.
+const NEON_CATEGORY_COLORS = {
+  stays: '#facc15',       // Amber — Accommodations
+  food: '#ff3b47',        // Neon Red — F&B
+  beaches: '#39ff88',     // Matrix Green — Beaches
+  nature: '#39ff88',      // Matrix Green — Viewpoints / Waterfalls
+  islands: '#39ff88',     // Matrix Green
+  transport: '#a855f7',   // Cyber Purple — Public Transport
+  airport: '#a855f7'      // Cyber Purple — Airports
+};
+function neonColorForCategory(key){
+  if(NEON_CATEGORY_COLORS[key]) return NEON_CATEGORY_COLORS[key];
+  const label = (catStyle[key] && catStyle[key].label || '').toLowerCase();
+  if(label.includes('food') || label.includes('f&b') || label.includes('restaurant')) return NEON_CATEGORY_COLORS.food;
+  if(label.includes('stay') || label.includes('accommodation') || label.includes('hotel') || label.includes('resort')) return NEON_CATEGORY_COLORS.stays;
+  if(label.includes('beach') || label.includes('waterfall') || label.includes('viewpoint') || label.includes('nature')) return NEON_CATEGORY_COLORS.beaches;
+  if(label.includes('transport') || label.includes('airport') || label.includes('port') || label.includes('station')) return NEON_CATEGORY_COLORS.transport;
+  return (catStyle[key] && catStyle[key].color) || '#39ff88';
+}
+
 function rebuildMarkers(){
   if(!map) return;
   allMarkers.forEach(m=>map.removeLayer(m));
@@ -643,10 +665,9 @@ function rebuildMarkers(){
   for(const k in markersByCat) delete markersByCat[k];
   destinations.forEach(d=>{
     if(!markersByCat[d.category]) markersByCat[d.category]=[];
-    const cat = catStyle[d.category] || {};
-    const color = cat.color || d.color || '#0ea5e9';
-    const html = `<div class="mk-wrap" style="animation-delay:${Math.random()*2}s"><div class="mk-glow" style="color:${color}"></div><div class="mk-ring" style="border-color:${color}"></div><div class="mk-dot" style="background:${color};box-shadow:0 0 12px ${color}"></div></div>`;
-    const m = L.marker([d.lat,d.lng],{icon:L.divIcon({className:'',html,iconSize:[32,32],iconAnchor:[16,16]})});
+    const color = neonColorForCategory(d.category);
+    const html = `<div class="sv-neon-pin" style="--sv-neon:${color}"><span class="sv-neon-core"></span></div>`;
+    const m = L.marker([d.lat,d.lng],{icon:L.divIcon({className:'sv-neon-icon',html,iconSize:[14,14],iconAnchor:[7,7]})});
     m._d=d; m.on('click',()=>openDest(d));
     markersByCat[d.category].push(m); allMarkers.push(m);
   });
@@ -2076,13 +2097,13 @@ window.addEventListener('scroll',()=>{
 
 // ─── INIT ───
 window.addEventListener('load',()=>{
-  setTimeout(()=>{document.getElementById('splash').classList.add('hidden');},2200);
-  setTimeout(animPlaceholder,2800);
+  setTimeout(()=>{document.getElementById('splash').classList.add('hidden');},5000);
+  setTimeout(animPlaceholder,5600);
   setTimeout(loadVoices,800);
   initAuth();
   initHeroWeather();
 
-  // Show dock & orb after splash
+  // Show dock & orb after splash (kept in sync with the 5s splash hold)
   setTimeout(()=>{
     document.getElementById('bottomDock').classList.add('visible');
     document.getElementById('talaOrbWrap').classList.remove('hidden');
@@ -2093,7 +2114,7 @@ window.addEventListener('load',()=>{
       },400);
       setTimeout(dismissDockIntro,5200); // auto-dismiss if user never taps
     }
-  },2600);
+  },5200);
 });
 
 // ═══════════════════════════════════════════════════════

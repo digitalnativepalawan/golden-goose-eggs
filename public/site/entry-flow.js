@@ -3,7 +3,7 @@
 (function(){
   const KEY = 'sanvic_entry_v1';
   const MAX = 4;
-  const DELAY = 2600;
+  const DELAY = 5200;
   const VIBES = [
     ['Mojito by the beach',['beach','drink','social']],
     ['Smashed burger after swimming',['food','beach']],
