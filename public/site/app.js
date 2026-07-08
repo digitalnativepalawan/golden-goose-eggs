@@ -962,6 +962,227 @@ function closeTodaySheet(){
   s.classList.add('hidden');
 }
 
+// ─── EXPLORE DRAWER (permanent places only — time-sensitive stuff belongs in TODAY) ───
+function exploreEntry(){
+  try{ return JSON.parse(localStorage.getItem('sanvic_entry_v1')||'{}')||{}; }catch(e){ return {}; }
+}
+function exploreChoices(){
+  const p = exploreEntry();
+  const arr = [];
+  if(Array.isArray(p.choices)) arr.push(...p.choices);
+  if(Array.isArray(p.moods)) arr.push(...p.moods);
+  if(Array.isArray(p.picks)) arr.push(...p.picks);
+  return arr.map(x=>String(x).toLowerCase());
+}
+function openExploreSheet(){
+  const s = document.getElementById('exploreSheet');
+  if(!s) return;
+  renderExploreContent();
+  s.classList.add('open');
+  setExploreSnap(1);
+}
+function closeExploreSheet(){
+  const s = document.getElementById('exploreSheet');
+  if(!s) return;
+  s.classList.remove('open','l1','l2','l3');
+}
+function setExploreSnap(level){
+  const s = document.getElementById('exploreSheet');
+  if(!s) return;
+  s.classList.remove('l1','l2','l3');
+  s.classList.add('l'+level);
+  s.dataset.snap = String(level);
+}
+function cycleExploreSnap(){
+  const s = document.getElementById('exploreSheet');
+  if(!s) return;
+  const cur = parseInt(s.dataset.snap||'1',10);
+  setExploreSnap(cur>=3 ? 1 : cur+1);
+}
+
+// Drag-to-snap on handle (touch + pointer)
+(function(){
+  let startY=0, dragging=false, startLevel=1;
+  function down(e){
+    const t = e.touches ? e.touches[0] : e;
+    startY = t.clientY; dragging = true;
+    const s = document.getElementById('exploreSheet');
+    startLevel = parseInt(s?.dataset.snap||'1',10);
+  }
+  function up(e){
+    if(!dragging) return; dragging=false;
+    const t = (e.changedTouches ? e.changedTouches[0] : e);
+    const dy = t.clientY - startY;
+    let next = startLevel;
+    if(dy < -40) next = Math.min(3, startLevel+1);
+    else if(dy < -120) next = 3;
+    else if(dy > 40) next = Math.max(1, startLevel-1);
+    else if(dy > 120) next = 1;
+    setExploreSnap(next);
+  }
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const h = document.getElementById('esHandle');
+    if(!h) return;
+    h.addEventListener('touchstart', down, {passive:true});
+    h.addEventListener('touchend', up);
+    h.addEventListener('mousedown', down);
+    window.addEventListener('mouseup', up);
+  });
+})();
+
+// Editorial seed data — permanent places only.
+const EXPLORE_PLACES = {
+  long_beach_quiet: {emoji:'🌅', name:'Long Beach — quiet stretch', why:'Best sunset canvas', good:'long walks, wild space, scooter stops'},
+  alimanguan: {emoji:'🏄', name:'Alimanguan', why:'Surf + sunset energy', good:'waves, north coast, beach bars'},
+  new_agutaya: {emoji:'🌾', name:'New Agutaya', why:'Empty coast most tourists skip', good:'quiet swims, slow afternoons'},
+  boayan: {emoji:'🌊', name:'Boayan Island', why:'Best when the sea is calm', good:'island hopping, photos, quiet beaches'},
+  sunset_view: {emoji:'📸', name:'Sunset viewpoints', why:'Golden hour hits different up here', good:'photos, first-date pauses'},
+  port_barton_hop: {emoji:'⛵', name:'Port Barton island hopping', why:'The classic three-island loop', good:'lagoons, snorkel, lunch on sand'},
+  poblacion_market: {emoji:'🧺', name:'Poblacion Market', why:'Local life in motion', good:'snacks, seafood, morning wandering'},
+  slow_cafe: {emoji:'☕', name:'Slow cafés in Poblacion', why:'Where mornings actually breathe', good:'brunch, wifi, hammock energy'},
+  wellness: {emoji:'💆', name:'Beachfront massage slots', why:'The kind of hour you remember', good:'post-swim recovery, sunset wind-down'},
+};
+function placeCardHTML(p){
+  return `<div class="es-place" onclick="closeExploreSheet();">
+    <div class="es-place-name">${p.emoji} ${p.name}</div>
+    <div class="es-place-why">${p.why}</div>
+    <div class="es-place-good">Good for: ${p.good}</div>
+  </div>`;
+}
+function forYouSeed(){
+  const c = exploreChoices();
+  const has = (k)=> c.some(x=>x.includes(k));
+  const picks = [];
+  const push = (k)=>{ if(!picks.includes(k)) picks.push(k); };
+  if(has('wild')||has('beach')) { push('long_beach_quiet'); push('alimanguan'); push('new_agutaya'); }
+  if(has('photo')) { push('sunset_view'); push('boayan'); }
+  if(has('chardonnay')||has('private')||has('boat')) { push('port_barton_hop'); push('boayan'); }
+  if(has('market')||has('local')) { push('poblacion_market'); }
+  if(has('massage')||has('brunch')||has('wellness')) { push('wellness'); push('slow_cafe'); }
+  if(!picks.length){ push('long_beach_quiet'); push('boayan'); push('poblacion_market'); push('sunset_view'); }
+  return picks.slice(0,5).map(k=>EXPLORE_PLACES[k]).filter(Boolean);
+}
+
+const EXPLORE_AREAS = [
+  {k:'Poblacion', d:'Practical base, food, transport, local life.', c:[10.539,119.230]},
+  {k:'Port Barton', d:'Social, boats, backpackers, island hopping.', c:[10.454,119.222]},
+  {k:'Long Beach', d:'Huge, open, cinematic, quiet.', c:[10.610,119.180]},
+  {k:'Alimanguan', d:'Surf, sunsets, north coast energy.', c:[10.665,119.156]},
+  {k:'New Agutaya', d:'Empty coast, slow afternoons.', c:[10.700,119.145]},
+  {k:'San Isidro', d:'Farming roads, quiet inland pockets.', c:[10.560,119.260]},
+  {k:'Kemdeng', d:'Green hills, hidden coves.', c:[10.500,119.270]},
+  {k:'Binga', d:'Rural, off-highway, real Palawan quiet.', c:[10.480,119.290]},
+  {k:'Caruray', d:'South frontier, jungle-meets-sea.', c:[10.350,119.300]},
+];
+const EXPLORE_CATEGORIES = [
+  {k:'beaches',l:'🏖 Beaches'},{k:'islands',l:'🏝 Islands'},{k:'nature',l:'💧 Waterfalls'},
+  {k:'food',l:'🍽 Food & Drink'},{k:'nature',l:'🌿 Nature'},{k:'culture',l:'🎭 Culture'},
+  {k:'activities',l:'🚵 Activities'},{k:'wellness',l:'💆 Wellness'},{k:'surf',l:'🏄 Surf'},
+  {k:'transport',l:'🛵 Transport'},{k:'viewpoints',l:'📸 Viewpoints'},
+];
+const EXPLORE_MOODS = [
+  {t:'I want something quiet', chips:['Wild beaches','Hammock spaces','Calm cafés']},
+  {t:'I want to eat well', chips:['Seafood','Smashed burgers','Local markets','Beach dinners']},
+  {t:'I want adventure', chips:['Jungle tracks','Waterfalls','Surf breaks','Scooter routes']},
+  {t:'I want beauty', chips:['Photo spots','Viewpoints','Sunset locations','Turquoise water']},
+  {t:'I want local life', chips:['Markets','Fiestas','Videoke spots','Fishermen rows']},
+];
+const EXPLORE_COLLECTIONS = [
+  {t:'Places most tourists miss', s:'The corners of San Vicente the guidebooks skipped.'},
+  {t:'Best places before sunset', s:'Where to be an hour before the sky turns.'},
+  {t:'Where to go when Port Barton feels too busy', s:'Quieter shores, ten minutes away.'},
+  {t:'Scooter routes worth getting dusty for', s:'The rides locals take on their day off.'},
+];
+const EXPLORE_NEARBY = [
+  {l:'🍽️ Lunch within 10 minutes', cat:'food'},
+  {l:'🌅 Sunset spot nearby', cat:'viewpoints'},
+  {l:'🛵 Scooter route close to you', cat:'transport'},
+  {l:'☕ Coffee nearby', cat:'food'},
+];
+const EXPLORE_SITUATIONAL = ['Open Now','Good for Sunset','Good when Raining','Hard to Reach','Easy to Reach','Social Travelers','Free','Bookable'];
+
+function renderExploreContent(){
+  const nick = todayNickname();
+  const forYou = forYouSeed();
+
+  // Peek ribbon
+  const rib = document.getElementById('esRibbon');
+  if(rib){
+    rib.innerHTML = ['For You', ...forYou.map(p=>p.name.split('—')[0].trim())]
+      .map((label,i)=>`<button class="es-chip${i===0?' accent':''}" onclick="setExploreSnap(2)">${label}</button>`).join('');
+  }
+
+  const foryouHTML = `
+    <section class="es-section">
+      <div class="es-kicker">For You</div>
+      <h3 class="es-title">${nick ? `For ${nick} — Places worth leaving your hammock for` : 'Places worth leaving your hammock for'}</h3>
+      ${forYou.map(placeCardHTML).join('')}
+    </section>`;
+
+  const nearbyHTML = `
+    <section class="es-section">
+      <div class="es-kicker">Nearby</div>
+      <h3 class="es-title">What's close, right now on the map</h3>
+      <div class="es-grid">
+        ${EXPLORE_NEARBY.map(n=>`<button class="es-tile" onclick="filterCategory('${n.cat}');setExploreSnap(1);"><div class="es-tile-t">${n.l}</div></button>`).join('')}
+      </div>
+    </section>`;
+
+  const moodsHTML = `
+    <section class="es-section">
+      <div class="es-kicker">By Mood</div>
+      <h3 class="es-title">What kind of day is it?</h3>
+      ${EXPLORE_MOODS.map(m=>`
+        <div class="es-mood">
+          <div class="es-mood-t">${m.t}</div>
+          <div class="es-mood-chips">${m.chips.map(c=>`<span class="es-chip">${c}</span>`).join('')}</div>
+        </div>`).join('')}
+    </section>`;
+
+  const collectionsHTML = `
+    <section class="es-section">
+      <div class="es-kicker">TALA Collections</div>
+      <h3 class="es-title">Resident wisdom, quietly kept</h3>
+      <div class="es-grid">
+        ${EXPLORE_COLLECTIONS.map(c=>`<div class="es-tile"><div class="es-tile-t">${c.t}</div><div class="es-tile-s">${c.s}</div></div>`).join('')}
+      </div>
+    </section>`;
+
+  const areasHTML = `
+    <section class="es-section">
+      <div class="es-kicker">Areas / Barangays</div>
+      <h3 class="es-title">How the map actually reads</h3>
+      <div class="es-grid">
+        ${EXPLORE_AREAS.map(a=>`<button class="es-tile" onclick="if(window.map){map.flyTo([${a.c[0]},${a.c[1]}],13,{duration:1});} setExploreSnap(1);"><div class="es-tile-t">${a.k}</div><div class="es-tile-s">${a.d}</div></button>`).join('')}
+      </div>
+    </section>`;
+
+  const catsHTML = `
+    <section class="es-section">
+      <div class="es-kicker">Categories</div>
+      <h3 class="es-title">Quick lookups</h3>
+      <div class="es-grid-3">
+        ${EXPLORE_CATEGORIES.map(c=>`<button class="es-tile" onclick="filterCategory('${c.k}');setExploreSnap(1);"><div class="es-tile-t">${c.l}</div></button>`).join('')}
+      </div>
+    </section>`;
+
+  const allPlacesList = Object.values(EXPLORE_PLACES).map(placeCardHTML).join('');
+  const allPlacesHTML = `
+    <section class="es-section">
+      <div class="es-kicker">All Places</div>
+      <h3 class="es-title">The obvious places and the ones people forget to tell you</h3>
+      <div class="es-filters">
+        ${EXPLORE_SITUATIONAL.map(f=>`<button class="es-fchip" onclick="this.classList.toggle('on')">${f}</button>`).join('')}
+      </div>
+      ${allPlacesList}
+    </section>`;
+
+  const body = document.getElementById('exploreContent');
+  if(body){
+    body.innerHTML = foryouHTML + nearbyHTML + moodsHTML + collectionsHTML + areasHTML + catsHTML + allPlacesHTML;
+  }
+}
+
 // ─── TODAY DAILY DATA (demo seed; DB wiring is a follow-up) ───
 const TODAY_DATA = {
   snapshot: {
