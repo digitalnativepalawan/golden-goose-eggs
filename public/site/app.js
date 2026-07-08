@@ -681,9 +681,13 @@ function rebuildMarkers(){
 // Skipped while pinVisibilityOverride is set (explicit category pick).
 function applyPinVisibility(){
   if(!map) return;
-  const shouldShow = pinVisibilityOverride || map.getZoom() >= PIN_VISIBLE_ZOOM;
+  const z = map.getZoom();
+  const shouldShow = pinVisibilityOverride || z >= PIN_VISIBLE_ZOOM;
+  // Zoom-based label suppression: at zoom <= 11, hide barangay text tooltips
+  // so the canvas reads as clean neon-dot nodes only.
+  const cont = map.getContainer();
+  if(cont) cont.classList.toggle('zoom-far', z <= 11);
   if(shouldShow === pinsCurrentlyVisible) {
-    // still sync membership in case activeMarkerSet changed (e.g. category filter)
     if(shouldShow) activeMarkerSet.forEach(m=>{ if(!map.hasLayer(m)) m.addTo(map); });
     return;
   }
@@ -965,10 +969,12 @@ function todayNickname(){
   }catch(e){ return ''; }
 }
 function updateTodayGreeting(){
-  const el = document.getElementById('todayGreeting');
-  if(!el) return;
+  const kicker = document.getElementById('todayGreetingKicker');
+  const nameEl = document.getElementById('todayGreetingName');
+  if(!kicker || !nameEl) return;
+  kicker.textContent = timeOfDayGreeting();
   const name = todayNickname();
-  el.textContent = name ? `${timeOfDayGreeting()}, ${name}` : timeOfDayGreeting();
+  nameEl.textContent = name || 'Traveler';
 }
 function openTodaySheet(){
   const s = document.getElementById('todaySheet');
@@ -2646,12 +2652,16 @@ function openTalaSheet() {
   renderTalaSuggestions();
 }
 
+const TALA_VIBE_CHIPS = [
+  {text:'Something quiet'},{text:'Food after swimming'},{text:'People to join'},
+  {text:'Sunset plan'},{text:'Hidden place nearby'},{text:"What’s happening tonight?"}
+];
 function renderTalaSuggestions(){
   const container = document.getElementById('talaSugs');
   if(!container) return;
-  const list = (talaSuggestions && talaSuggestions.length) ? talaSuggestions : DEFAULT_SUGGESTIONS;
-  const active = list.filter(isSuggestionActiveToday);
-  const shown = active.length ? active : list; // never show an empty bar
+  const list = (talaSuggestions && talaSuggestions.length) ? talaSuggestions : TALA_VIBE_CHIPS;
+  const active = list.filter(s => typeof isSuggestionActiveToday === 'function' ? isSuggestionActiveToday(s) : true);
+  const shown = active.length ? active : list;
   container.innerHTML = shown.map(s=>
     `<button class="tala-sug" onclick="askTala(this)">${escapeHtml(s.text)}</button>`
   ).join('');
