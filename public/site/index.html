@@ -771,6 +771,97 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--charcoal-deep)
   </button>
 </div>
 
+<!-- ═══ TODAY DRAWER (bottom sheet with peek greeting + editorial cards) ═══ -->
+<style>
+  .today-sheet{position:fixed;left:0;right:0;bottom:0;z-index:82;display:flex;flex-direction:column;
+    background:linear-gradient(180deg,rgba(4,10,26,.96),rgba(2,6,18,.99));
+    backdrop-filter:blur(28px) saturate(140%);
+    border-top:1px solid rgba(255,255,255,.06);
+    border-radius:24px 24px 0 0;
+    box-shadow:0 -20px 60px rgba(0,0,0,.5);
+    transform:translateY(100%);transition:transform .5s var(--ease-out-expo);
+    max-height:min(90dvh,720px);will-change:transform;overflow:hidden}
+  .today-sheet.peek{transform:translateY(calc(100% - 76px - var(--safe-bottom,0px)))}
+  .today-sheet.expanded{transform:translateY(0)}
+  .today-sheet.hidden{transform:translateY(100%);pointer-events:none}
+  .today-handle{width:40px;height:4px;border-radius:4px;background:rgba(255,255,255,.18);margin:8px auto 0;flex-shrink:0}
+  .today-peek{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;
+    padding:8px 18px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .today-greet{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-family:var(--font-body);font-size:1.02rem;font-weight:500;color:rgba(255,255,255,.94);letter-spacing:-.01em}
+  .today-chip{flex-shrink:0;font-size:.62rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;
+    color:rgba(20,184,166,.95);background:rgba(20,184,166,.12);border:1px solid rgba(20,184,166,.28);
+    padding:5px 10px;border-radius:999px}
+  .today-header-expanded{display:none;align-items:center;justify-content:space-between;padding:10px 18px 8px}
+  .today-sheet.expanded .today-header-expanded{display:flex}
+  .today-sheet.expanded .today-peek{padding-top:2px;padding-bottom:8px;cursor:pointer}
+  .today-title-lg{font-size:.72rem;font-weight:700;letter-spacing:.28em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+  .today-close{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);
+    color:rgba(255,255,255,.85);font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .today-scroll{display:none;flex-direction:column;gap:12px;padding:6px 16px calc(28px + var(--safe-bottom));overflow-y:auto;overscroll-behavior:contain}
+  .today-sheet.expanded .today-scroll{display:flex}
+  .today-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:20px;padding:16px 16px 18px}
+  .today-card-muted{background:rgba(255,255,255,.02)}
+  .today-kicker{font-size:.6rem;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.42);margin-bottom:6px}
+  .today-title{font-size:1.05rem;font-weight:600;letter-spacing:-.01em;color:rgba(255,255,255,.94);margin:0 0 12px}
+  .today-lede{font-size:.94rem;line-height:1.5;color:rgba(255,255,255,.82);margin:2px 0 14px}
+  .today-snap-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  @media(min-width:640px){.today-snap-grid{grid-template-columns:repeat(6,minmax(0,1fr))}}
+  .today-snap{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 10px 12px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.05);min-width:0}
+  .tsn-glyph{font-size:1.15rem;line-height:1}
+  .tsn-val{font-size:.86rem;font-weight:600;color:rgba(255,255,255,.94);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+  .tsn-lbl{font-size:.62rem;letter-spacing:.08em;color:rgba(255,255,255,.5);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+  .today-path{display:flex;align-items:stretch;gap:6px;flex-wrap:wrap}
+  .today-node{flex:1 1 100px;min-width:100px;padding:10px 12px;border-radius:14px;background:rgba(20,184,166,.08);border:1px solid rgba(20,184,166,.22)}
+  .tnode-label{font-size:.88rem;font-weight:600;color:rgba(255,255,255,.95)}
+  .tnode-sub{font-size:.7rem;color:rgba(255,255,255,.6);margin-top:2px}
+  .today-arrow{align-self:center;color:rgba(255,255,255,.35);font-size:1rem;padding:0 2px}
+  .today-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+  .today-row{display:flex;flex-direction:column;gap:8px;padding:12px 12px 14px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05)}
+  .trow-main{min-width:0}
+  .trow-title{font-size:.95rem;font-weight:600;color:rgba(255,255,255,.94)}
+  .trow-meta{font-size:.75rem;color:rgba(255,255,255,.58);margin-top:2px}
+  .trow-chips{display:flex;gap:6px;flex-wrap:wrap}
+  .tchip{font-size:.66rem;letter-spacing:.06em;font-weight:600;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);color:rgba(255,255,255,.78);text-transform:uppercase}
+  .tchip-accent{background:rgba(20,184,166,.12);border-color:rgba(20,184,166,.28);color:rgba(153,246,228,.95)}
+  .trow-actions{display:flex;gap:6px;flex-wrap:wrap}
+  .tbtn{flex:0 0 auto;font-family:var(--font-body);font-size:.78rem;font-weight:600;padding:8px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:rgba(255,255,255,.88);cursor:pointer}
+  .tbtn-primary{background:linear-gradient(135deg,var(--sand,#e8dcc8),var(--limestone,#c4a882));color:var(--charcoal-deep,#020e26);border-color:transparent}
+  .tavatars{display:flex}
+  .tav{width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,rgba(20,184,166,.5),rgba(255,255,255,.15));border:2px solid var(--charcoal-deep,#020e26);margin-left:calc(var(--i,0)*-6px + -8px)}
+  .tav:first-child{margin-left:0}
+  .today-verdicts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+  .tverdict{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:flex-start;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05)}
+  .tv-icon{font-size:1.15rem;line-height:1.2}
+  .tv-label{font-size:.62rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+  .tv-text{font-size:.88rem;color:rgba(255,255,255,.88);line-height:1.45;margin-top:2px}
+  .today-locals{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+  .tlocal{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:flex-start;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05)}
+  .tl-badge{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;font-size:1.05rem}
+  .tl-text{font-size:.9rem;color:rgba(255,255,255,.9);line-height:1.4}
+  .tl-meta{font-size:.7rem;color:rgba(255,255,255,.5);margin-top:2px}
+  .today-notices{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .tnotice{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:flex-start;font-size:.82rem;color:rgba(255,255,255,.72);line-height:1.45}
+  .tn-glyph{color:rgba(245,158,11,.85);font-size:.9rem;line-height:1.4}
+  @media(min-width:900px){
+    .today-sheet{left:auto;right:24px;bottom:24px;width:min(440px,92vw);border-radius:24px;max-height:min(82vh,780px)}
+    .today-sheet.peek{transform:translateY(calc(100% - 76px))}
+  }
+</style>
+<div class="today-sheet hidden" id="todaySheet">
+  <div class="today-handle" onclick="toggleTodaySheet()"></div>
+  <div class="today-header-expanded">
+    <span class="today-title-lg">San Vicente Daily</span>
+    <button class="today-close" onclick="collapseTodaySheet()" aria-label="Collapse">×</button>
+  </div>
+  <div class="today-peek" onclick="toggleTodaySheet()">
+    <span class="today-greet" id="todayGreeting">Good morning</span>
+    <span class="today-chip">Today</span>
+  </div>
+  <div class="today-scroll" id="todayScroll"></div>
+</div>
+
+
 <!-- ═══ DESTINATION BOTTOM SHEET ═══ -->
 <div class="dest-overlay" id="destOverlay"></div>
 <div class="dest-sheet" id="destSheet">
