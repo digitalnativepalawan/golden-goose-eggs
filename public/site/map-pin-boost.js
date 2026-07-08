@@ -105,15 +105,19 @@
       .leaflet-control-zoom{display:none!important;visibility:hidden!important;pointer-events:none!important;}
       #talaOrbWrap,.tala-orb-wrap{display:flex!important;visibility:visible!important;pointer-events:auto!important;}
       #talaOrbWrap.hidden,.tala-orb-wrap.hidden{opacity:0!important;pointer-events:none!important;transform:translateY(20px)!important;}
-      .mk-wrap{width:28px!important;height:28px!important;filter:drop-shadow(0 3px 7px rgba(0,0,0,.55))!important;animation:none!important;}
-      .mk-wrap *{animation:none!important;transition:none!important;}
-      .mk-ring,.mk-glow{display:none!important;visibility:hidden!important;opacity:0!important;}
-      .mk-dot{width:13px!important;height:13px!important;border:0!important;box-shadow:0 2px 7px rgba(0,0,0,.55),0 0 8px currentColor!important;}
+      /* Legacy triple-layer markers removed in favour of neon dots. */
+      .mk-wrap,.mk-ring,.mk-glow,.mk-dot{display:none!important;visibility:hidden!important;opacity:0!important;}
       .leaflet-marker-icon{overflow:visible!important;}
+      /* ─── Signature neon-dot markers ─── */
+      .sv-neon-icon{background:none!important;border:none!important;}
+      .sv-neon-pin{position:relative;width:14px;height:14px;display:flex;align-items:center;justify-content:center;pointer-events:auto;}
+      .sv-neon-core{width:7px;height:7px;border-radius:999px;background:var(--sv-neon,#39ff88);box-shadow:0 0 6px var(--sv-neon,#39ff88),0 0 14px color-mix(in oklab,var(--sv-neon,#39ff88) 65%,transparent),0 0 26px color-mix(in oklab,var(--sv-neon,#39ff88) 30%,transparent);animation:svNeonPulse 2.6s ease-in-out infinite;}
+      @keyframes svNeonPulse{0%,100%{opacity:.88;box-shadow:0 0 5px var(--sv-neon,#39ff88),0 0 11px color-mix(in oklab,var(--sv-neon,#39ff88) 55%,transparent),0 0 20px color-mix(in oklab,var(--sv-neon,#39ff88) 22%,transparent);}50%{opacity:1;box-shadow:0 0 8px var(--sv-neon,#39ff88),0 0 18px color-mix(in oklab,var(--sv-neon,#39ff88) 70%,transparent),0 0 32px color-mix(in oklab,var(--sv-neon,#39ff88) 34%,transparent);}}
+      @media(max-width:767px){.sv-neon-core{width:6px;height:6px;}}
       .sv-brgy-icon{background:none!important;border:none!important;}
       .sv-brgy-pin{display:flex;align-items:center;gap:8px;transform:translate(-10px,-10px);white-space:nowrap;pointer-events:auto;}
-      .sv-brgy-dot{width:7px;height:7px;border-radius:999px;background:#2196f3;border:none;box-shadow:none;}
-      .sv-brgy-label{font-family:var(--font-body);font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(232,244,255,.94);text-shadow:0 2px 8px rgba(0,0,0,.8);background:rgba(4,12,30,.48);border:1px solid rgba(29,155,240,.22);border-radius:999px;padding:5px 9px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
+      .sv-brgy-dot{width:7px;height:7px;border-radius:999px;background:#00b3ff;border:none;box-shadow:0 0 6px #00b3ff,0 0 14px rgba(0,179,255,.55),0 0 24px rgba(0,179,255,.28);animation:svNeonPulse 2.8s ease-in-out infinite;}
+      .sv-brgy-label{font-family:var(--font-body);font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(232,244,255,.94);text-shadow:0 2px 8px rgba(0,0,0,.8);background:rgba(4,12,30,.48);border:1px solid rgba(0,179,255,.28);border-radius:999px;padding:5px 9px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
 
       @media(max-width:767px){
         .splash-tagline{font-size:.98rem!important;line-height:1.75!important;color:rgba(255,255,255,.76)!important;}
