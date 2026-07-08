@@ -909,7 +909,42 @@ function closeAllPanels() {
   closeExploreSheet();
   if(typeof closeMySanvicPanel==='function') closeMySanvicPanel();
   if(typeof closeHuntPanel==='function') closeHuntPanel();
+  refreshPanelOpen();
 }
+
+// ─── PANEL-OPEN BODY STATE ───
+// Toggles body.panel-open whenever any drawer/sheet/panel is visible so we
+// can dampen the hero greeting + weather bar and prevent visual bleed.
+function refreshPanelOpen(){
+  try{
+    const sel = [
+      '.today-sheet.peek', '.today-sheet.expanded',
+      '.explore-sheet.open',
+      '#pulsePanel:not(.hidden)',
+      '#mySanvicPanel:not(.hidden)',
+      '#huntPanel:not(.hidden)',
+      '#discoverPanel.open',
+      '#aroundMePanel.open',
+      '#destSheet.open',
+      '#talaSheet.open',
+      '#dashboard.open'
+    ].join(',');
+    const open = !!document.querySelector(sel);
+    document.body.classList.toggle('panel-open', open);
+  }catch(e){}
+}
+// Re-check on next frame so class mutations settle before we read them.
+function schedulePanelOpen(){ requestAnimationFrame(refreshPanelOpen); }
+// Observe body subtree for class changes on the panel roots and auto-sync.
+if(typeof window!=='undefined'){
+  window.addEventListener('DOMContentLoaded', ()=>{
+    try{
+      const mo = new MutationObserver(schedulePanelOpen);
+      mo.observe(document.body, { attributes:true, subtree:true, attributeFilter:['class','hidden','style'] });
+    }catch(e){}
+  });
+}
+
 
 
 

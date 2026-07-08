@@ -1,94 +1,70 @@
+# Map Interface Structural Cleanup
 
-## Goal
-Build a full-featured `#huntPanel` view mirroring the "My Sanvic" pattern I just shipped — premium glassmorphic dark UI, single-stream fluid mobile-first layout that scales identically from 390 → 1280+, absolutely no page scrollbars. Frontend only. State via `sanvic_hunt_unlocked`, `sanvic_hunt_points`, `sanvic_hunt_progress` localStorage keys plus seeded arrays.
+Scope: `public/site/index.html` and `public/site/app.js`. Presentation only — no data / routing changes.
+
+## 1. Dock backdrop hardening (`.bottom-dock`)
+
+In `index.html` (line ~160), replace the current `background:var(--glass-bg-heavy)` on `.bottom-dock` with a defensive opaque glass:
+
+- `background: rgba(10, 20, 32, 0.85)`
+- `backdrop-filter: blur(16px) saturate(140%)` + `-webkit-backdrop-filter` twin (Tailwind-safe form)
+- Keep existing border, radius, shadow, opacity/transform transitions
+
+Result: white text or scroll content passing behind the dock never bleeds through.
+
+## 2. `body.panel-open` state class
+
+`app.js` currently opens/closes panels via `openTodaySheet`, `openExploreSheet`, `openPulsePanel`, `openMySanvicPanel`, `openHuntPanel`, `openDiscoverPanel`, `openDashboard`, `openAroundMePanel`, `openDestSheet`, `openTalaSheet`, and `closeAllPanels()`.
+
+Introduce two tiny helpers at the top of the panel section:
+
+```js
+function setPanelOpen(on){ document.body.classList.toggle('panel-open', !!on); }
+```
+
+- Each `open*` function calls `setPanelOpen(true)` at the end.
+- `closeAllPanels()` and every individual `close*` sibling call `setPanelOpen(false)` (guarded so closing one panel while another is still open re-checks: after close, if any known panel element still has an "open/peek/expanded/visible" class, keep the flag on — simple `document.querySelector('.today-sheet.peek, .today-sheet.expanded, .explore-sheet.open, #pulsePanel:not(.hidden), #mySanvicPanel:not(.hidden), #huntPanel:not(.hidden), #discoverPanel.open, #aroundMePanel.open, #destSheet.open, #talaSheet.open, #dashboard.open')` check).
+
+CSS in `index.html` (new small block near the hero styles):
+
+```css
+.hero-overlay, #heroWeather, .today-peek .today-greet {
+  transition: opacity .28s ease, transform .28s ease;
+}
+body.panel-open .hero-overlay,
+body.panel-open #heroWeather,
+body.panel-open .today-peek .today-greet {
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+}
+```
+
+This hides the "Good afternoon, {name}" greeting and the floating weather alert row whenever any drawer/panel is expanded, eliminating the observed text overlap.
+
+## 3. Symmetrical header alignment
+
+Currently `.hero-overlay` stacks brand → headline → subtitle → weather → search with default left-aligned spacing, which lets the greeting/weather drift out of column when the weather line wraps.
+
+Adjust `.hero-overlay` block:
+
+- Add `display:flex; flex-direction:column; align-items:center; text-align:center; padding-top: calc(env(safe-area-inset-top,0px) + 20px);`
+- Give `#heroWeather` fixed `min-height:26px`, `margin-top:10px`, `justify-content:center` so the "Be aware • Drizzle" pill sits on a stable line directly below the greeting/headline regardless of severity variant.
+- Give the greeting/headline row a fixed `min-height` (e.g. `min-height:64px`) so time-of-day switches don't shift the alert bar vertically.
+
+No JS logic change — purely CSS tokens on existing elements.
+
+## 4. Zero layout distortion pass
+
+- Confirm the new `.bottom-dock` rule is inside the mobile-first block and the existing `@media(min-width:768px)` override (line ~554) still applies only spacing tweaks.
+- Confirm `.hero-overlay` centering rules don't collide with existing `hero-brand`/`hero-search` widths — set `max-width:min(560px,92vw); width:100%; margin-inline:auto` on inner rows.
+- Verify with Playwright at 390×844, 820×1180, 1280×800 that:
+  - Dock is fully opaque against a light scroll behind it
+  - Opening Today / Explore / Pulse / My Sanvic / Hunt hides greeting + weather
+  - Closing all panels restores them
+  - Header greeting stays centered above weather badge at all breakpoints
+  - No horizontal scrollbars, no JS errors
 
 ## Files touched
-- `public/site/index.html` — dock label sync + `#huntPanel` markup and scoped `.hunt-*` CSS
-- `public/site/app.js` — rewire `dockNav('hunt')` from Tala fallback → `openHuntPanel()`, add renderers, seed data, mock proximity check, `closeAllPanels` hook
-
-No new packages, no new assets (uses inline SVG + CSS gradient placeholders, same convention as My Sanvic).
-
----
-
-## 1. Dock sync
-- Ensure Tab 5 stays labeled `THE HUNT` with crosshair/target SVG. Add `.dock-item.active` state color = `--pulse-teal` (verify existing CSS; add if missing).
-- `dockNav('hunt')` → `closeAllPanels(); openHuntPanel();` (drop existing Tala fallback).
-
-## 2. Panel shell
-- `#huntPanel` positioned like `#mySanvicPanel` (fixed inset:0, z-index 80, translateY animation, flex column, overflow hidden). Body scrolls internally with `scrollbar-width:none` + webkit-scrollbar hidden.
-- Global CSS enforcement at panel scope: any `.hunt-hscroll` uses `scrollbar-width:none !important; -ms-overflow-style:none !important` and `::-webkit-scrollbar{display:none !important;height:0 !important;width:0 !important}`.
-
-## 3. Header
-- Title: **The Hunt** + inline teal crosshair SVG (concentric circles + cross).
-- Subtitle: `Discover. Unlock. Earn.`
-- Body copy: `Find hidden spots, unlock stories, collect badges, and earn rewards across San Vicente.`
-- Right-aligned floating glass status pill (single-line, gold trophy + `7 discoveries / 2 rewards ready ›`). On click: smooth-scroll `#huntSplit` into view.
-
-## 4. Sub-nav filter slider (`.hunt-viewtabs`)
-Horizontal, scroll-hidden, 6 buttons with SVG icon + label. Default active = `today`. Active state = teal icon + 2px teal underline. Buttons filter which section is highlighted/scrolled to (each section keeps a stable `id` so clicking a tab scrolls it into view — content stays on one continuous scroll, matching the "single-stream" rule):
-1. Today's Hunt (target)
-2. Nearby Discoveries (map pin)
-3. Trails (winding path)
-4. Collections (book)
-5. Rewards (gift)
-6. My Progress (clock/history)
-
-## 5. Featured Today's Hunt card (`#huntToday`)
-Full-width premium card:
-- `TODAY` solid teal capsule top-left.
-- Left dark gradient bg with title `Sunset Hunter 🌅` + description "Find the hidden marker near Long Beach before the sun goes down."
-- Meta pill row: `📍 Long Beach`, `📶 Easy`, `🕒 Before 6:30 PM`.
-- Reward strip (emerald-tinted band): `REWARD: 100 pts • Sunset Badge 🏅`.
-- Right: overlapping avatar stack (+12) + solid teal `Start Hunt` CTA → `huntStart('sunset-hunter')`.
-- Uses `aspect-ratio` container so the hero bg image doesn't distort at any width.
-
-## 6. Section 1 — Nearby Discoveries (`#huntNearby`)
-Horizontal carousel of 160×200 cards (aspect-preserved via fixed w/h, `object-fit:cover` on bg). Each seeded from `HUNT_NEARBY`:
-1. Wild Beach Marker · locked · Easy · 50 pts · 0.4 km
-2. Market Morning Clue · Easy · 40 pts · 1.2 km
-3. Waterfall Entrance · locked · Medium · 60 pts · 3.8 km
-4. Secret Viewpoint · Medium · 60 pts · 2.1 km
-
-Top-left distance chip (`↖ X.X km`), top-right lock badge when `locked:true`. Bottom info block: title + description + `🟢 Easy • 50 pts`. On tap:
-- If `exploreLink` set → card also renders inline helper link `Open in Explore` → `dockNav('discover')`.
-- Otherwise → toast/log `Marker locked — get closer to unlock`.
-
-## 7. Section 2 — Trails (`#huntTrails`)
-Horizontal carousel of wide status cards with circular thumb (gradient), title, description, and horizontal progress bar (teal fill) + count + circular right-chevron button. Seeded `HUNT_TRAILS`:
-1. Long Beach Explorer · 4/10 · "Discover the hidden gems along 14km of paradise."
-2. Local Life Trail · 3/8 · "Experience Poblacion like a local."
-3. Island Hopper Trail · 2/7 · "Unlock the best of our pristine islands."
-
-## 8. Section 3 — Split Grid (`#huntSplit`) — Rewards × My Progress
-Two columns via `grid-template-columns: repeat(2, minmax(0, 1fr))` at ≥768px, stacked below.
-- **Left "🎁 Rewards"**: single visible card + bottom carousel dots. Card: bg image gradient, `NEW` amber badge, title `Free Sunset Drink`, subtext "Complete 3 Long Beach discoveries. Valid for 7 days.", hollow glass `Redeem` capsule.
-- **Right "📊 My Progress"**: SVG donut (42%) left; right stacked bullets: `🎯 7 discoveries unlocked`, `🗺️ 2 trails in progress`, `🏆 3 badges earned`, `🎁 2 rewards ready`.
-
-## 9. Section 4 — Rare Finds banner (`#huntRare`)
-Horizontal glass banner: treasure-chest inline SVG (left) · title `Rare Finds` + sub `Only a few travelers have found these.` · right: avatar cluster (+7) + hollow `View all` capsule.
-
-## 10. State & Interactions (app.js)
-- `HUNT_STATE = { unlocked:[], points:0, progress:{} }` loaded/persisted via the three localStorage keys.
-- `huntStart(id)` runs mock proximity check: `navigator.geolocation.getCurrentPosition` → compare against seeded target coord (Long Beach ~10.79/119.32). If unavailable or delta > 100 m, show overlay banner inside panel: `Marker out of range. Head to the location in San Vicente to unlock this story layer.` (dismissible). If within range, increment `points`, push to `unlocked`, persist, re-render.
-- `huntSelectTab(tab)` sets active underline + `scrollIntoView({behavior:'smooth', block:'start'})` on the matching section.
-- `huntRedeem(id)` / `huntOpenTrail(id)` / `huntOpenCard(id)` — client-only handlers wired to placeholders/log for now.
-- `openHuntPanel()` / `closeHuntPanel()` — pattern-identical to My Sanvic. Add to `closeAllPanels`.
-
-## 11. Global compliance rules
-- No mobile/tablet/desktop preview branches — single markup path, fluid CSS. (Nothing to remove — never existed.)
-- `html, body { overflow:hidden }` already enforced by earlier Pulse work; hunt panel body is the only scroller.
-- All `.hunt-hscroll`, sub-nav, category rows carry the strict scrollbar-erase CSS block above.
-- Split grid uses `grid-template-columns: repeat(2, minmax(0, 1fr))` at ≥768px with `min-width:0` on children to prevent text clipping.
-- All bg images use `aspect-ratio` (fixed W/H containers) + `object-fit:cover` (via CSS `background-size:cover`).
-- Identical spacing/radius/typography tokens across breakpoints (reuse `--ocean-teal-light`, `--pulse-teal`, radius 16–20).
-
-## Verification
-Playwright at 390×844, 820×1180, 1280×800:
-- Dock tab 5 shows THE HUNT with target icon; active state teal.
-- Panel opens; header + status pill + 6-tab sub-nav render.
-- Featured Today card, Nearby carousel (4), Trails carousel (3), Split grid (stacked <768, side-by-side ≥768), Rare Finds banner all present.
-- Zero page-level horizontal or vertical scrollbars at all three widths.
-- Clicking the status pill scrolls to Split section; clicking `Start Hunt` with denied geolocation shows the out-of-range overlay.
-- Screenshots at each viewport confirm identical spacing and no clipping.
-
-Publish → Update required to push to the live domain.
+- `public/site/index.html` — dock CSS, hero-overlay CSS, new `body.panel-open` rules
+- `public/site/app.js` — `setPanelOpen` helper wired into every `open*`/`close*`/`closeAllPanels`
