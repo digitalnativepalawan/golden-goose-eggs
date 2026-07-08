@@ -905,6 +905,219 @@ function closeAllPanels() {
   closeAroundMePanel();
   closePulsePanel();
   closeDashboard();
+  closeTodaySheet();
+}
+
+// ─── TODAY DRAWER ───
+// The "Today" dock tab opens this bottom sheet. Peek state shows a
+// greeting ("Good morning, {Name}") and a Today chip; expanded state
+// reveals the seven "San Vicente Daily" editorial cards.
+function timeOfDayGreeting(){
+  const h = new Date().getHours();
+  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+}
+function todayNickname(){
+  try{
+    const raw = localStorage.getItem('sanvic_entry_v1');
+    if(!raw) return '';
+    const p = JSON.parse(raw);
+    return (p && p.nickname ? String(p.nickname).trim() : '');
+  }catch(e){ return ''; }
+}
+function updateTodayGreeting(){
+  const el = document.getElementById('todayGreeting');
+  if(!el) return;
+  const name = todayNickname();
+  el.textContent = name ? `${timeOfDayGreeting()}, ${name}` : timeOfDayGreeting();
+}
+function openTodaySheet(){
+  const s = document.getElementById('todaySheet');
+  if(!s) return;
+  renderTodayContent();
+  updateTodayGreeting();
+  s.classList.remove('hidden','expanded');
+  s.classList.add('peek');
+}
+function toggleTodaySheet(){
+  const s = document.getElementById('todaySheet');
+  if(!s) return;
+  if(s.classList.contains('expanded')){
+    s.classList.remove('expanded'); s.classList.add('peek');
+  } else {
+    s.classList.remove('peek'); s.classList.add('expanded');
+    updateTodayGreeting();
+  }
+}
+function collapseTodaySheet(){
+  const s = document.getElementById('todaySheet');
+  if(!s) return;
+  s.classList.remove('expanded');
+  s.classList.add('peek');
+}
+function closeTodaySheet(){
+  const s = document.getElementById('todaySheet');
+  if(!s) return;
+  s.classList.remove('peek','expanded');
+  s.classList.add('hidden');
+}
+
+// ─── TODAY DAILY DATA (demo seed; DB wiring is a follow-up) ───
+const TODAY_DATA = {
+  snapshot: {
+    weather: { icon:'☀️', temp:'29°C', label:'Sunny' },
+    sea: 'Calm swell',
+    sunset: '17:52',
+    moon: { glyph:'🌔', label:'Waxing gibbous' },
+    tribes: 3,
+    happenings: 6
+  },
+  talaPick: {
+    intro: "Go north today. The sea looks calmer near Alimanguan, and the light will thank you at sunset.",
+    path: [
+      { label:'Late lunch',   sub:'12:30 · Port Barton' },
+      { label:'Wild beach',   sub:'14:00 · Alimanguan'  },
+      { label:'Sunset drink', sub:'17:30 · Long Beach'  }
+    ]
+  },
+  happening: [
+    { title:'Acoustic night at Nauti Beach', place:'Long Beach',   time:'19:30', dist:'2.4 km', vibe:'Chill' },
+    { title:'Sunset paddle out',              place:'Alimanguan',   time:'16:30', dist:'11 km',  vibe:'Surf'  },
+    { title:'Fiesta procession',              place:'Poblacion',    time:'18:00', dist:'0.6 km', vibe:'Local' },
+    { title:'Beach bonfire jam',              place:'Port Barton',  time:'20:30', dist:'28 km',  vibe:'Social'}
+  ],
+  joinable: [
+    { title:'Island hop from Port Barton', detail:'3 seats left · departs 8:00 tomorrow', crowd:3 },
+    { title:'Dinner in Poblacion tonight',  detail:'2 travelers looking for company · 19:30', crowd:2 },
+    { title:'Van to Puerto Princesa',       detail:'1 seat left · Friday 06:00 pickup',      crowd:4 }
+  ],
+  weather: [
+    { icon:'🏝️', label:'Island hopping', verdict:'Good morning for it. Wind picks up after 2 PM — head out early.' },
+    { icon:'🏄', label:'Surf',            verdict:'Small and clean at Alimanguan. Fine for longboards, patient shortboarders.' },
+    { icon:'🌧️', label:'Rain risk',       verdict:'Low until early evening. A short shower possible around 18:00.' },
+    { icon:'🌊', label:'Tide',            verdict:'Low tide at 14:20 — good for tidepools, not great for shallow boat launches.' }
+  ],
+  locals: [
+    { biz:'Long Beach Grill',   badge:'🐟', text:'Fresh yellowfin tuna just came in. Ask for kinilaw.',        meta:'Poblacion · 18m ago' },
+    { biz:'Nauti Beach Bar',    badge:'🍹', text:'2-for-1 sunset drinks, 17:00 to 18:30 only.',                meta:'Long Beach · 42m ago' },
+    { biz:'Aling Rosa Bakery',  badge:'🥖', text:'Fresh pandesal from 6 AM. Ube version back tomorrow.',       meta:'Poblacion · 2h ago' }
+  ],
+  notices: [
+    { text:'BPI ATM Poblacion — cash available, no queue right now.' },
+    { text:'Alimanguan gas station: out of unleaded until Thursday.' },
+    { text:'Weak cell signal past Bato ni Ningning — download offline maps first.' },
+    { text:'Muddy road to Pamuayan Falls after last night’s rain. 4×4 or scooter only.' }
+  ]
+};
+
+function escT(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function renderTodayContent(){
+  const host = document.getElementById('todayScroll');
+  if(!host || host.dataset.rendered === '1') return;
+  const d = TODAY_DATA;
+  const snap = `
+    <article class="today-card">
+      <div class="today-kicker">Daily snapshot</div>
+      <div class="today-title">San Vicente, right now</div>
+      <div class="today-snap-grid">
+        <div class="today-snap"><span class="tsn-glyph">${d.snapshot.weather.icon}</span><span class="tsn-val">${escT(d.snapshot.weather.temp)}</span><span class="tsn-lbl">${escT(d.snapshot.weather.label)}</span></div>
+        <div class="today-snap"><span class="tsn-glyph">🌊</span><span class="tsn-val">${escT(d.snapshot.sea)}</span><span class="tsn-lbl">Sea</span></div>
+        <div class="today-snap"><span class="tsn-glyph">🌇</span><span class="tsn-val">${escT(d.snapshot.sunset)}</span><span class="tsn-lbl">Sunset</span></div>
+        <div class="today-snap"><span class="tsn-glyph">${d.snapshot.moon.glyph}</span><span class="tsn-val">${escT(d.snapshot.moon.label)}</span><span class="tsn-lbl">Moon</span></div>
+        <div class="today-snap"><span class="tsn-glyph">👥</span><span class="tsn-val">${d.snapshot.tribes}</span><span class="tsn-lbl">Tribes forming</span></div>
+        <div class="today-snap"><span class="tsn-glyph">✨</span><span class="tsn-val">${d.snapshot.happenings}</span><span class="tsn-lbl">Happening today</span></div>
+      </div>
+    </article>`;
+  const pick = `
+    <article class="today-card">
+      <div class="today-kicker">TALA’s pick of the day</div>
+      <p class="today-lede">${escT(d.talaPick.intro)}</p>
+      <div class="today-path">
+        ${d.talaPick.path.map((n,i)=>`
+          <div class="today-node">
+            <div class="tnode-label">${escT(n.label)}</div>
+            <div class="tnode-sub">${escT(n.sub)}</div>
+          </div>
+          ${i<d.talaPick.path.length-1?'<div class="today-arrow">→</div>':''}
+        `).join('')}
+      </div>
+    </article>`;
+  const happening = `
+    <article class="today-card">
+      <div class="today-kicker">Happening today</div>
+      <ul class="today-list">
+        ${d.happening.map(e=>`
+          <li class="today-row">
+            <div class="trow-main">
+              <div class="trow-title">${escT(e.title)}</div>
+              <div class="trow-meta">${escT(e.place)} · ${escT(e.time)}</div>
+            </div>
+            <div class="trow-chips">
+              <span class="tchip">${escT(e.dist)}</span>
+              <span class="tchip tchip-accent">${escT(e.vibe)}</span>
+            </div>
+            <div class="trow-actions">
+              <button class="tbtn tbtn-primary">Join</button>
+              <button class="tbtn">Save</button>
+              <button class="tbtn">Directions</button>
+            </div>
+          </li>
+        `).join('')}
+      </ul>
+    </article>`;
+  const joinable = `
+    <article class="today-card">
+      <div class="today-kicker">Joinable today</div>
+      <div class="today-title">Open spots, right now</div>
+      <ul class="today-list">
+        ${d.joinable.map(j=>`
+          <li class="today-row">
+            <div class="trow-main">
+              <div class="trow-title">${escT(j.title)}</div>
+              <div class="trow-meta">${escT(j.detail)}</div>
+            </div>
+            <div class="tavatars">${Array.from({length:j.crowd}).map((_,i)=>`<span class="tav" style="--i:${i}"></span>`).join('')}</div>
+            <div class="trow-actions">
+              <button class="tbtn tbtn-primary">Ask to join</button>
+            </div>
+          </li>
+        `).join('')}
+      </ul>
+    </article>`;
+  const weather = `
+    <article class="today-card">
+      <div class="today-kicker">Sea &amp; weather</div>
+      <div class="today-title">What the day is telling you</div>
+      <ul class="today-verdicts">
+        ${d.weather.map(w=>`
+          <li class="tverdict">
+            <span class="tv-icon">${w.icon}</span>
+            <div><div class="tv-label">${escT(w.label)}</div><div class="tv-text">${escT(w.verdict)}</div></div>
+          </li>
+        `).join('')}
+      </ul>
+    </article>`;
+  const locals = `
+    <article class="today-card">
+      <div class="today-kicker">Fresh from locals</div>
+      <ul class="today-locals">
+        ${d.locals.map(l=>`
+          <li class="tlocal">
+            <span class="tl-badge">${l.badge}</span>
+            <div><div class="tl-text">${escT(l.text)}</div><div class="tl-meta">${escT(l.biz)} · ${escT(l.meta)}</div></div>
+          </li>
+        `).join('')}
+      </ul>
+    </article>`;
+  const notices = `
+    <article class="today-card today-card-muted">
+      <div class="today-kicker">Small notices</div>
+      <ul class="today-notices">
+        ${d.notices.map(n=>`<li class="tnotice"><span class="tn-glyph">⚠︎</span><span>${escT(n.text)}</span></li>`).join('')}
+      </ul>
+    </article>`;
+  host.innerHTML = snap + pick + happening + joinable + weather + locals + notices;
+  host.dataset.rendered = '1';
 }
 
 // ─── DESTINATION SHEET ───
@@ -2053,7 +2266,7 @@ function dockNav(tab){
   document.querySelector(`.dock-item[data-tab="${tab}"]`).classList.add('active');
 
   switch(tab){
-    case 'map': closeAllPanels(); closeDiscoverPanel(); document.getElementById('heroOverlay').classList.remove('hidden'); document.getElementById('heroFade').classList.remove('hidden'); if(map){ pinVisibilityOverride=false; activeMarkerSet=allMarkers; map.flyTo([10.50,119.22],11,{duration:1}); applyPinVisibility(); } break;
+    case 'map': closeAllPanels(); closeDiscoverPanel(); document.getElementById('heroOverlay').classList.remove('hidden'); document.getElementById('heroFade').classList.remove('hidden'); if(map){ pinVisibilityOverride=false; activeMarkerSet=allMarkers; map.flyTo([10.50,119.22],11,{duration:1}); applyPinVisibility(); } openTodaySheet(); break;
     case 'discover': closeAllPanels(); openDiscoverPanel(); if(map){filterCategory('all');} break;
     case 'tala': closeAllPanels(); closeDiscoverPanel(); openTalaSheet(); break;
     case 'pulse': closeAllPanels(); closeDiscoverPanel(); openPulsePanel(); break;

@@ -1,59 +1,50 @@
 ## Scope
 
-Four surgical fixes across `public/site/entry-flow.js`, `public/site/app.js`, `public/site/map-pin-boost.js`, and `public/site/barangay-marker-polish.js`. No DB / route / component changes.
+Build a dedicated **Today drawer** as the destination of the "Today" dock button (currently it only resets the map — there is no Today panel today). Edits stay in `public/site/index.html`, `public/site/app.js`, and `public/site/personalize.js`. No DB / route changes. The bottom dock, TALA orb, destSheet, discoverPanel are untouched.
 
 ---
 
-### 1. Landing splash — enforce 5s minimum before onboarding
+### Part 1 — Bottom drawer shell & greeting peek fix
 
-The intro splash currently fades at 2200ms (`app.js:2079`) and the entry-flow onboarding modal appears `DELAY = 2600ms` after `window.load` (`entry-flow.js:6, 154`). On a warm cache the two collapse into ~2.5s total.
+A new `#todaySheet` bottom drawer, structurally modelled on `.dest-sheet` (same slide-up transition, same handle affordance) but with its own class so styling is independent and can't break destination cards.
 
-- Bump the entry-flow `DELAY` constant from `2600` to `5200` so the nickname / vibe / welcome modal never opens before ~5s.
-- Push the splash-hide timer in `app.js` from `2200` to `5000` so the "SANVIC — The San Vicente tourist hub" splash itself stays visible the full 5 seconds.
-- Also delay the "show dock & orb" cue that fires right after the splash by the same amount so the dock doesn't reveal early behind the splash.
-- Keep the returning-visitor fast-path in `entry-flow.js` (dock unlock) unchanged — it already works.
+- Container `.today-sheet` fixed to bottom, z-index above the map, below dock. Peek/collapsed state shows a **72px** header row (handle + one-line greeting + right-side "Today" chip). Expanded state fills up to `min(90dvh, 720px)` for the 7 cards.
+- Fully opaque backdrop:
+  - `background: linear-gradient(180deg, rgba(4,10,26,0.96), rgba(2,6,18,0.99))`
+  - plus `backdrop-filter: blur(28px) saturate(140%)` (standard property only — no `-webkit-` twin, per the modern stack rule that Lightning CSS drops the un-prefixed version).
+  - top border `1px solid rgba(255,255,255,0.06)`; soft `box-shadow: 0 -20px 60px rgba(0,0,0,0.5)` so it visually detaches from map.
+- Handle bar kept exactly as-is (same 40×4 pill, `rgba(255,255,255,.18)` background, centred, 8px top margin) — this is the requested "sleek top scroll bar handle".
+- Peek row layout follows the responsive-layout rule from useful-context (grid on mobile, promote to flex at `sm:` — done with matching CSS since this file is vanilla, not Tailwind): `grid-template-columns: minmax(0,1fr) auto`, `min-width:0` on the greeting so it truncates cleanly, `flex-shrink:0` on the chip. Fixes the "greeting clipping" issue.
+- Greeting text set from `personalize.js`:
+  - `greeting()` already returns "Good morning" / "Good afternoon" / "Good evening" based on `new Date().getHours()`.
+  - Read nickname from `sanvic_entry_v1` localStorage → render `"Good morning, {Name}"` (no trailing period in the peek; kept short so it never clips on 375px viewports). If no nickname, render `"Good morning"` only.
+  - Refresh whenever the drawer opens (so 11:59am → 12:00pm switches without a page reload).
 
-### 2. Neon-dot markers (destinations)
+### Part 2 — Wire it to the "Today" dock tap
 
-Replace the current triple-layer `.mk-wrap` / `.mk-glow` / `.mk-ring` / `.mk-dot` markup in `rebuildMarkers()` (`app.js:648`) with a single tiny glowing dot: ~7px core, colored `box-shadow` for a soft radial halo, one subtle CSS keyframe pulse (opacity + halo radius only, no scale jitter). Shrink the divIcon to `iconSize:[14,14], iconAnchor:[7,7]`.
+- In `dockNav('map')`, before doing the existing map reset, call `openTodaySheet()`. Tapping the handle or the greeting row toggles peek ↔ expanded (`onclick` on the handle + on the peek row, matching `destSheet` behaviour). A `×` close button in the expanded header collapses back to peek (never fully off-screen — the greeting stays as the always-available Today entry).
+- On any other tab (`discover`, `tala`, `pulse`, `saved`), call `closeTodaySheet()` (fully off-screen) via `closeAllPanels()`.
+- Opening `destSheet` or `discoverPanel` also auto-collapses the Today drawer to peek so nothing stacks.
 
-Add a colour resolver `neonColorForCategory(category)` used by `rebuildMarkers()`:
+### Part 3 — The 7 editorial cards ("San Vicente Daily")
 
-| Category key(s)                                        | Colour               |
-| ------------------------------------------------------ | -------------------- |
-| `stays` (Accommodations)                               | Amber `#facc15`      |
-| `food` / any category labelled Food / F&B              | Neon Red `#ff3b47`   |
-| `beaches`, `nature` (viewpoints/waterfalls), `islands` | Matrix Green `#39ff88` |
-| `transport`, `airport` (public transport / airports)   | Cyber Purple `#a855f7` |
-| everything else / fallback                             | keeps `catStyle.color` so admin-defined categories still work |
+Rendered inside `.today-scroll` (scrollable body of the expanded drawer). All copy is written to feel human and local — first-person, dry humour where appropriate — never bureaucratic. Data source: static demo content in `app.js` for now, structured so admin/DB wiring can slot in later (each card is rendered by its own render function reading from a plain JS object so a follow-up pass can swap the object for a Supabase fetch).
 
-Barangay centre dots (rendered in `map-pin-boost.js`) get the Electric Blue `#00b3ff` treatment via the same tiny-dot styling.
+Card order and content shape:
 
-Override the old `.mk-*` CSS in `map-pin-boost.js` (already the central style sheet for markers) so any leftover ring/border markup is invisible — belt-and-braces in case admin data still references the old classes.
+1. **Daily Snapshot** — six inline chips (weather icon + temp, sea condition word, sunset time HH:MM, moon phase glyph, "X tribes forming", "Y things today"). Grid of 3×2 on mobile, 6×1 from `sm:`.
+2. **TALA's Pick of the Day** — one line intro ("Go north today. The sea looks calmer near Alimanguan."), then a three-node whisper path rendered as horizontal pills with `→` separators: **Late lunch → Wild beach → Sunset drink**. Each pill has a subtle time hint below.
+3. **Happening Today** — vertical list of event rows. Each row: title, place · time, distance chip, vibe chip, three actions (Join / Save / Directions) as icon-buttons. Demo seed of 3-4 items covering Party / Acoustic / Surf meetup / Fiesta.
+4. **Joinable Today** — real-time-feeling connection cards: "3 seats left on island-hop from Port Barton, 8am tomorrow", "2 travelers looking for dinner in Poblacion tonight", "Van from Puerto Princesa, 1 seat open". Each has a single primary action ("Ask to join") and a small avatar cluster.
+5. **Sea & Weather (Decision Weather)** — three plain-language verdict rows: 🏝️ Island hopping · 🏄 Surf · 🌧️ Rain risk · 🌊 Tide. Each is a one-sentence recommendation, not raw numbers ("Good morning for island hopping. Wind may get annoying after 2 PM.").
+6. **Fresh From Locals** — small feed: business avatar, one-line update, business name · barangay · time posted. Seed 3 items ("Fresh tuna arrived at Long Beach Grill", "2-for-1 sunset drinks at Nauti Beach", "Fresh pandesal from 6am, Aling Rosa"). No promo shouting, no ALL CAPS.
+7. **Small Notices** — muted, low-emphasis list with a caution glyph per row: "BPI ATM Poblacion — cash available", "Gas station in Alimanguan out of unleaded until Thu", "Weak signal past Bato ni Ningning", "Muddy road to Pamuayan after last night's rain — 4x4 or scooter only".
 
-Admin category editor keeps working as-is: the colour picker still writes `catStyle[key].color`; the neon resolver only overrides for the five reserved functional categories above. All existing custom admin categories continue to render with their chosen colour, just in the new tiny-dot style. No admin UI changes required for this pass.
+Each card uses the same visual grammar: `border-radius:20px`, `background: rgba(255,255,255,.03)`, `border: 1px solid rgba(255,255,255,.06)`, `padding:16px`, uppercase kicker + title + body. No hero images (keeps drawer light and scannable). Copy is intentionally short and human.
 
-### 3. Zoom-based barangay labels
+### Part 4 — Publishing
 
-Today `barangay-marker-polish.js` explicitly *forces* labels visible in overview view:
-
-```css
-body.sanvic-overview .sv-brgy-pin.label-hidden .sv-brgy-label{display:inline-flex!important;}
-```
-
-That single rule is what causes the stack-up.
-
-- Remove that override.
-- In `layoutLabels()` treat the overview / low-zoom case as "hide all labels" instead of "show all". Concretely: when `map.getZoom() <= 11`, add `.label-hidden` to every `.sv-brgy-pin` (dots stay, labels gone). At zoom `>= 12` run the existing overlap-culling pass so labels appear as the user zooms in and de-cluster naturally.
-- Keep the mobile media queries; just let the dot-only state be the default at overview zoom on every viewport.
-
-### 4. Rename "Poblacion" → "San Vicente - Poblacion" on the map
-
-Only the on-map label needs to change; historical copy inside AI answers, Pulse posts, and admin help text stays as-is (those aren't map labels).
-
-- In `map-pin-boost.js` `ensureBarangayMarkers()`, when the feature name is `"Poblacion"`, render the label as `"San Vicente - Poblacion"` (dot stays the same, positioning unchanged).
-- In the seed destination list (`app.js:41`) the entry `name:"San Vicente Poblacion"` becomes `name:"San Vicente - Poblacion"` so the destination card matches.
-- Leave `barangays.geojson.js` untouched — the underlying feature property stays `"Poblacion"` so any `barangay` lookups (nearby-places grouping, admin datalist) keep working.
+Frontend-only. After merging the user must click **Publish → Update** in Lovable for `sanvic.merqato.digital` to pick up the change.
 
 ---
 
@@ -61,13 +52,13 @@ Only the on-map label needs to change; historical copy inside AI answers, Pulse 
 
 Playwright, iPhone-390 viewport, against `http://localhost:8080`:
 
-1. Fresh visit (no localStorage): splash "SANVIC — The San Vicente tourist hub" stays fully visible ≥5s, then the nickname modal appears.
-2. Returning visitor (seed `sanvic_entry_v1`): splash still stays ≥5s, dock unlocks after, Pulse tap opens the panel.
-3. Zoomed out (default view): screenshot shows dots only, no stacked white labels.
-4. Zoom in to a barangay: labels reappear, no overlap.
-5. Poblacion label reads "San Vicente - Poblacion".
-6. Destination pins render as tiny glowing dots in the correct functional colour per category (spot-check beaches/green, stays/amber, culture-or-food/red, etc.).
+1. Tap **Today** in the dock → drawer slides up to peek; greeting reads "Good morning, {Name}" (or greeting only, no name) and is not clipped on 375px.
+2. Drag / tap handle → drawer expands, all 7 cards visible and scrollable.
+3. Screenshot the peek collapsed against a bright map area → no text or map lines bleed through the drawer background.
+4. Switch to Explorer / Pulse / MyTrip → Today drawer closes cleanly, dock still functional.
+5. Return to Today → drawer reopens at peek, greeting still correct for the current hour.
+6. Desktop 1280 viewport → same behaviour, drawer is a right-side sheet if `destSheet`'s desktop treatment applies, otherwise centred bottom sheet capped at 520px width (match existing patterns).
 
-## After merging
+## Open question (non-blocking)
 
-Frontend-only changes → the user must click **Publish → Update** in Lovable for `sanvic.merqato.digital` to pick them up. No DB migration, no edge function redeploy.
+Card 3 (Happening Today) and Card 4 (Joinable Today) are demo-seeded in this pass because there are no `events` / `join_requests` tables yet. A later pass can wire them to Supabase once those tables exist — no schema is being added here. Confirm this is acceptable, otherwise I'll add the tables in a follow-up plan.
