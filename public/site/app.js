@@ -2268,7 +2268,7 @@ function dockNav(tab){
 
   switch(tab){
     case 'map': closeAllPanels(); closeDiscoverPanel(); document.getElementById('heroOverlay').classList.remove('hidden'); document.getElementById('heroFade').classList.remove('hidden'); if(map){ pinVisibilityOverride=false; activeMarkerSet=allMarkers; map.flyTo([10.50,119.22],11,{duration:1}); applyPinVisibility(); } openTodaySheet(); break;
-    case 'discover': closeAllPanels(); openDiscoverPanel(); if(map){filterCategory('all');} break;
+    case 'discover': closeAllPanels(); closeDiscoverPanel(); openExploreSheet(); break;
     case 'tala': closeAllPanels(); closeDiscoverPanel(); openTalaSheet(); break;
     case 'pulse': closeAllPanels(); closeDiscoverPanel(); openPulsePanel(); break;
     case 'saved': closeAllPanels(); closeDiscoverPanel(); openDashboard('saved'); break;
