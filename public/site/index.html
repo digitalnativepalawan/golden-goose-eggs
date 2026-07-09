@@ -823,9 +823,10 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
     border-radius:24px 24px 0 0;
     box-shadow:0 -20px 60px rgba(0,0,0,.5);
     transform:translateY(100%);transition:transform .5s var(--ease-out-expo);
-    max-height:min(80dvh,700px);will-change:transform;overflow:hidden}
-  .today-sheet.peek{transform:translateY(calc(100% - 168px))}
-  .today-sheet.expanded{transform:translateY(0)}
+    max-height:100dvh;will-change:transform;overflow:hidden}
+  .today-sheet.peek{transform:translateY(calc(100% - 168px));max-height:min(80dvh,700px)}
+  .today-sheet.mid{transform:translateY(0);max-height:50dvh}
+  .today-sheet.expanded{transform:translateY(0);max-height:100dvh;bottom:0;border-radius:0}
   .today-sheet.hidden{transform:translateY(100%);pointer-events:none}
   .today-handle{width:44px;height:5px;border-radius:5px;background:rgba(255,255,255,.28);margin:8px auto 4px;flex-shrink:0;cursor:grab}
   .today-peek{display:flex;flex-direction:column;gap:8px;padding:10px 20px 18px;cursor:pointer;-webkit-tap-highlight-color:transparent}
