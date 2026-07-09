@@ -987,17 +987,24 @@ function openTodaySheet(){
 function toggleTodaySheet(){
   const s = document.getElementById('todaySheet');
   if(!s) return;
-  if(s.classList.contains('expanded')){
-    s.classList.remove('expanded'); s.classList.add('peek');
-  } else {
-    s.classList.remove('peek'); s.classList.add('expanded');
-    updateTodayGreeting();
-  }
+  const cur = s.classList.contains('expanded') ? 'expanded'
+    : s.classList.contains('mid') ? 'mid'
+    : s.classList.contains('peek') ? 'peek' : 'hidden';
+  s.classList.remove('peek','mid','expanded','hidden');
+  const next = cur==='peek' ? 'mid' : cur==='mid' ? 'expanded' : 'peek';
+  s.classList.add(next);
+  if(next!=='peek') updateTodayGreeting();
+}
+function setTodaySnap(level){
+  const s = document.getElementById('todaySheet');
+  if(!s) return;
+  s.classList.remove('peek','mid','expanded','hidden');
+  s.classList.add(level===3?'expanded':level===2?'mid':'peek');
 }
 function collapseTodaySheet(){
   const s = document.getElementById('todaySheet');
   if(!s) return;
-  s.classList.remove('expanded');
+  s.classList.remove('expanded','mid');
   s.classList.add('peek');
 }
 function closeTodaySheet(){
@@ -1146,8 +1153,17 @@ const EXPLORE_NEARBY = [
 ];
 const EXPLORE_SITUATIONAL = ['Open Now','Good for Sunset','Good when Raining','Hard to Reach','Easy to Reach','Social Travelers','Free','Bookable'];
 
+const FOR_YOU_VIBES = [
+  "San Vicente's shades",
+  "Salty hair, slow hours",
+  "Where the map fades",
+  "Off the grid, on the pulse",
+  "Low-tide secrets",
+  "Raw and unwritten",
+];
+const FOR_YOU_VIBE = FOR_YOU_VIBES[Math.floor(Math.random()*FOR_YOU_VIBES.length)];
+
 function renderExploreContent(){
-  const nick = todayNickname();
   const forYou = forYouSeed();
 
   // Peek ribbon
@@ -1160,7 +1176,7 @@ function renderExploreContent(){
   const foryouHTML = `
     <section class="es-section">
       <div class="es-kicker">For You</div>
-      <h3 class="es-title">${nick ? `For ${nick} — Places worth leaving your hammock for` : 'Places worth leaving your hammock for'}</h3>
+      <h3 class="es-title">${FOR_YOU_VIBE}</h3>
       ${forYou.map(placeCardHTML).join('')}
     </section>`;
 
@@ -1196,7 +1212,7 @@ function renderExploreContent(){
   const areasHTML = `
     <section class="es-section">
       <div class="es-kicker">Areas / Barangays</div>
-      <h3 class="es-title">How the map actually reads</h3>
+      <h3 class="es-title">San Vicente's shades</h3>
       <div class="es-grid">
         ${EXPLORE_AREAS.map(a=>`<button class="es-tile" onclick="if(window.map){map.flyTo([${a.c[0]},${a.c[1]}],13,{duration:1});} setExploreSnap(1);"><div class="es-tile-t">${a.k}</div><div class="es-tile-s">${a.d}</div></button>`).join('')}
       </div>

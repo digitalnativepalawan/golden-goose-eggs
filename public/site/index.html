@@ -823,9 +823,10 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
     border-radius:24px 24px 0 0;
     box-shadow:0 -20px 60px rgba(0,0,0,.5);
     transform:translateY(100%);transition:transform .5s var(--ease-out-expo);
-    max-height:min(80dvh,700px);will-change:transform;overflow:hidden}
-  .today-sheet.peek{transform:translateY(calc(100% - 168px))}
-  .today-sheet.expanded{transform:translateY(0)}
+    max-height:100dvh;will-change:transform;overflow:hidden}
+  .today-sheet.peek{transform:translateY(calc(100% - 168px));max-height:min(80dvh,700px)}
+  .today-sheet.mid{transform:translateY(0);max-height:50dvh}
+  .today-sheet.expanded{transform:translateY(0);max-height:100dvh;bottom:0;border-radius:0}
   .today-sheet.hidden{transform:translateY(100%);pointer-events:none}
   .today-handle{width:44px;height:5px;border-radius:5px;background:rgba(255,255,255,.28);margin:8px auto 4px;flex-shrink:0;cursor:grab}
   .today-peek{display:flex;flex-direction:column;gap:8px;padding:10px 20px 18px;cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -839,13 +840,13 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
   .today-metric svg{width:16px;height:16px;flex-shrink:0}
   .today-chip{display:none}
   .today-header-expanded{display:none;align-items:center;justify-content:space-between;padding:10px 18px 8px}
-  .today-sheet.expanded .today-header-expanded{display:flex}
-  .today-sheet.expanded .today-peek{padding-top:2px;padding-bottom:8px;cursor:pointer}
+  .today-sheet.expanded .today-header-expanded,.today-sheet.mid .today-header-expanded{display:flex}
+  .today-sheet.expanded .today-peek,.today-sheet.mid .today-peek{padding-top:2px;padding-bottom:8px;cursor:pointer}
   .today-title-lg{font-size:.72rem;font-weight:700;letter-spacing:.28em;text-transform:uppercase;color:rgba(255,255,255,.55)}
   .today-close{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);
     color:rgba(255,255,255,.85);font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer}
   .today-scroll{display:none;flex-direction:column;gap:12px;padding:6px 16px calc(28px + var(--safe-bottom));overflow-y:auto;overscroll-behavior:contain}
-  .today-sheet.expanded .today-scroll{display:flex}
+  .today-sheet.expanded .today-scroll,.today-sheet.mid .today-scroll{display:flex}
   .today-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:20px;padding:16px 16px 18px}
   .today-card-muted{background:rgba(255,255,255,.02)}
   .today-kicker{font-size:.6rem;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.42);margin-bottom:6px}
@@ -930,9 +931,9 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
     transition:height .32s cubic-bezier(.2,.8,.2,1),transform .32s cubic-bezier(.2,.8,.2,1);
     transform:translateY(100%);will-change:height,transform}
   .explore-sheet.open{transform:translateY(0)}
-  .explore-sheet.l1{height:140px}
-  .explore-sheet.l2{height:45dvh}
-  .explore-sheet.l3{height:min(92dvh,760px)}
+  .explore-sheet.l1{height:168px}
+  .explore-sheet.l2{height:50dvh}
+  .explore-sheet.l3{height:100dvh;bottom:0;border-radius:0}
   .es-handle{width:40px;height:4px;border-radius:4px;background:rgba(255,255,255,.18);margin:8px auto 4px;flex-shrink:0;cursor:grab}
   .es-peek{padding:6px 14px 10px;display:flex;flex-direction:column;gap:8px;flex-shrink:0}
   .es-search{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:14px;
@@ -1767,5 +1768,35 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
     });
   })();
 </script>
+<style id="sanvicGlassStandard">
+  /* Global glassmorphic drawer standard — semi-opaque dark frosted glass
+     so neon map nodes and contours remain subtly perceived behind panels. */
+  .explore-sheet,
+  .today-sheet,
+  .dest-sheet,
+  .discover-panel,
+  .tala-sheet,
+  .around-sheet,
+  .pulse-sheet,
+  .pulse-compose-sheet,
+  .pulse-loc-sheet,
+  .login-sheet,
+  .admin-sheet,
+  .mysv-panel,
+  #mySanvicPanel,
+  #huntPanel,
+  #pulsePanel,
+  #explorePanel,
+  #todayPanel,
+  #talaSheet,
+  .detail-sheet,
+  .sheet,
+  .drawer,
+  .panel-sheet {
+    background: rgba(10, 16, 26, 0.75) !important;
+    backdrop-filter: blur(16px) saturate(120%);
+    -webkit-backdrop-filter: blur(16px) saturate(120%);
+  }
+</style>
 </body>
 </html>
