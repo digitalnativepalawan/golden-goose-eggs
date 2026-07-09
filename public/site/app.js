@@ -987,17 +987,24 @@ function openTodaySheet(){
 function toggleTodaySheet(){
   const s = document.getElementById('todaySheet');
   if(!s) return;
-  if(s.classList.contains('expanded')){
-    s.classList.remove('expanded'); s.classList.add('peek');
-  } else {
-    s.classList.remove('peek'); s.classList.add('expanded');
-    updateTodayGreeting();
-  }
+  const cur = s.classList.contains('expanded') ? 'expanded'
+    : s.classList.contains('mid') ? 'mid'
+    : s.classList.contains('peek') ? 'peek' : 'hidden';
+  s.classList.remove('peek','mid','expanded','hidden');
+  const next = cur==='peek' ? 'mid' : cur==='mid' ? 'expanded' : 'peek';
+  s.classList.add(next);
+  if(next!=='peek') updateTodayGreeting();
+}
+function setTodaySnap(level){
+  const s = document.getElementById('todaySheet');
+  if(!s) return;
+  s.classList.remove('peek','mid','expanded','hidden');
+  s.classList.add(level===3?'expanded':level===2?'mid':'peek');
 }
 function collapseTodaySheet(){
   const s = document.getElementById('todaySheet');
   if(!s) return;
-  s.classList.remove('expanded');
+  s.classList.remove('expanded','mid');
   s.classList.add('peek');
 }
 function closeTodaySheet(){
