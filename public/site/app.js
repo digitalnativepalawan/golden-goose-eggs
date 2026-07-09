@@ -1146,8 +1146,17 @@ const EXPLORE_NEARBY = [
 ];
 const EXPLORE_SITUATIONAL = ['Open Now','Good for Sunset','Good when Raining','Hard to Reach','Easy to Reach','Social Travelers','Free','Bookable'];
 
+const FOR_YOU_VIBES = [
+  "San Vicente's shades",
+  "Salty hair, slow hours",
+  "Where the map fades",
+  "Off the grid, on the pulse",
+  "Low-tide secrets",
+  "Raw and unwritten",
+];
+const FOR_YOU_VIBE = FOR_YOU_VIBES[Math.floor(Math.random()*FOR_YOU_VIBES.length)];
+
 function renderExploreContent(){
-  const nick = todayNickname();
   const forYou = forYouSeed();
 
   // Peek ribbon
@@ -1160,7 +1169,7 @@ function renderExploreContent(){
   const foryouHTML = `
     <section class="es-section">
       <div class="es-kicker">For You</div>
-      <h3 class="es-title">${nick ? `For ${nick} — Places worth leaving your hammock for` : 'Places worth leaving your hammock for'}</h3>
+      <h3 class="es-title">${FOR_YOU_VIBE}</h3>
       ${forYou.map(placeCardHTML).join('')}
     </section>`;
 
