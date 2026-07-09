@@ -1205,7 +1205,7 @@ function renderExploreContent(){
   const areasHTML = `
     <section class="es-section">
       <div class="es-kicker">Areas / Barangays</div>
-      <h3 class="es-title">How the map actually reads</h3>
+      <h3 class="es-title">San Vicente's shades</h3>
       <div class="es-grid">
         ${EXPLORE_AREAS.map(a=>`<button class="es-tile" onclick="if(window.map){map.flyTo([${a.c[0]},${a.c[1]}],13,{duration:1});} setExploreSnap(1);"><div class="es-tile-t">${a.k}</div><div class="es-tile-s">${a.d}</div></button>`).join('')}
       </div>
