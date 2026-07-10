@@ -1052,35 +1052,53 @@ function cycleExploreSnap(){
   setExploreSnap(cur>=3 ? 1 : cur+1);
 }
 
-// Drag-to-snap on handle (touch + pointer)
+// Drag-to-snap on handle (1:1 pointer tracking, snap to nearest)
 (function(){
-  let startY=0, dragging=false, startLevel=1;
+  let startY=0, dragging=false, startH=0, sheet=null;
+  const snaps = ()=>{
+    const vh = window.innerHeight;
+    return [168, Math.round(vh*0.5), vh]; // l1, l2, l3 heights in px
+  };
   function down(e){
+    sheet = document.getElementById('exploreSheet');
+    if(!sheet) return;
     const t = e.touches ? e.touches[0] : e;
     startY = t.clientY; dragging = true;
-    const s = document.getElementById('exploreSheet');
-    startLevel = parseInt(s?.dataset.snap||'1',10);
+    startH = sheet.getBoundingClientRect().height;
+    sheet.style.transition = 'none';
+    if(e.cancelable) e.preventDefault();
+  }
+  function move(e){
+    if(!dragging||!sheet) return;
+    const t = e.touches ? e.touches[0] : e;
+    const dy = t.clientY - startY;
+    const h = Math.max(120, Math.min(window.innerHeight, startH - dy));
+    sheet.style.height = h + 'px';
   }
   function up(e){
-    if(!dragging) return; dragging=false;
-    const t = (e.changedTouches ? e.changedTouches[0] : e);
-    const dy = t.clientY - startY;
-    let next = startLevel;
-    if(dy < -40) next = Math.min(3, startLevel+1);
-    else if(dy < -120) next = 3;
-    else if(dy > 40) next = Math.max(1, startLevel-1);
-    else if(dy > 120) next = 1;
-    setExploreSnap(next);
+    if(!dragging||!sheet) return; dragging=false;
+    sheet.style.transition = '';
+    const curH = sheet.getBoundingClientRect().height;
+    const s = snaps();
+    let idx = 0, best = Infinity;
+    s.forEach((v,i)=>{ const d=Math.abs(curH-v); if(d<best){best=d;idx=i;} });
+    sheet.style.height = '';
+    setExploreSnap(idx+1);
   }
   document.addEventListener('DOMContentLoaded', ()=>{
     const h = document.getElementById('esHandle');
     if(!h) return;
-    h.addEventListener('touchstart', down, {passive:true});
+    h.style.touchAction = 'none';
+    h.addEventListener('touchstart', down, {passive:false});
+    h.addEventListener('touchmove', move, {passive:false});
     h.addEventListener('touchend', up);
+    h.addEventListener('touchcancel', up);
     h.addEventListener('mousedown', down);
+    window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
   });
 })();
+
 
 // Editorial seed data — permanent places only.
 const EXPLORE_PLACES = {
@@ -1163,27 +1181,86 @@ const FOR_YOU_VIBES = [
 ];
 const FOR_YOU_VIBE = FOR_YOU_VIBES[Math.floor(Math.random()*FOR_YOU_VIBES.length)];
 
-function renderExploreContent(){
-  const forYou = forYouSeed();
+function forYouCards(){
+  const list = Array.isArray(destinations) ? destinations.slice() : [];
+  list.sort((a,b)=> (b.featured?1:0) - (a.featured?1:0));
+  const picks = list.slice(0, 8);
+  if(picks.length) return picks;
+  return forYouSeed().map((p,i)=>({ id:'seed-'+i, name:p.name, image:'', description:p.why, barangay:'', category:'nature', stats:{} }));
+}
 
-  // Peek ribbon
+function nearbyCards(){
+  const flat = [];
+  try {
+    const byB = window.nearbyPlacesByBarangay || {};
+    Object.keys(byB).forEach(b=>{
+      (byB[b]||[]).forEach(n=> flat.push(Object.assign({ barangay:b }, n)));
+    });
+  } catch(e){}
+  return flat.slice(0, 10);
+}
+
+function svCardImage(d){
+  const img = d && d.image ? d.image : '';
+  if(img) return `<img src="${escT(img)}" alt="${escT(d.name||'')}" loading="lazy" onerror="this.style.display='none';this.parentNode.classList.add('sv-noimg')"/>`;
+  const glyph = (d && d.icon) ? d.icon : '📍';
+  return `<div class="sv-noimg-glyph">${escT(glyph)}</div>`;
+}
+
+function forYouCardHTML(d){
+  const cat = d.category ? String(d.category).toUpperCase() : '';
+  const bar = d.barangay || '';
+  const rating = d.stats && d.stats.rating ? d.stats.rating : '';
+  const idAttr = escT(String(d.id));
+  return `<button class="sv-card" data-dest-id="${idAttr}" onclick="(function(el){var x=el.getAttribute('data-dest-id');var f=(window.destinations||[]).find(function(z){return String(z.id)===x});if(f&&typeof openDest==='function'){openDest(f);}})(this)">
+    <div class="sv-card-media${d.image?'':' sv-noimg'}">${svCardImage(d)}</div>
+    <div class="sv-card-overlay"></div>
+    ${cat ? `<span class="sv-card-tag">${escT(cat)}</span>` : ''}
+    <div class="sv-card-body">
+      <div class="sv-card-title">${escT(d.name||'')}</div>
+      <div class="sv-card-meta">${bar?`<span>📍 ${escT(bar)}</span>`:''}${rating?`<span>★ ${escT(rating)}</span>`:''}</div>
+    </div>
+  </button>`;
+}
+
+function nearbyCardHTML(n){
+  const glyph = n.icon || '📍';
+  return `<button class="sv-card sv-card-sm" onclick="filterCategory('${escT(n.category||'')}');setExploreSnap(1);">
+    <div class="sv-card-media sv-noimg"><div class="sv-noimg-glyph">${escT(glyph)}</div></div>
+    <div class="sv-card-overlay"></div>
+    <div class="sv-card-body">
+      <div class="sv-card-title">${escT(n.name||'')}</div>
+      <div class="sv-card-meta">${n.barangay?`<span>📍 ${escT(n.barangay)}</span>`:''}${n.distance_label?`<span>${escT(n.distance_label)}</span>`:''}</div>
+    </div>
+  </button>`;
+}
+
+function renderExploreContent(){
+  const forYou = forYouCards();
+  const nearby = nearbyCards();
+
   const rib = document.getElementById('esRibbon');
   if(rib){
-    rib.innerHTML = ['For You', ...forYou.map(p=>p.name.split('—')[0].trim())]
-      .map((label,i)=>`<button class="es-chip${i===0?' accent':''}" onclick="setExploreSnap(2)">${label}</button>`).join('');
+    rib.innerHTML = ['For You', ...forYou.slice(0,4).map(p=>String(p.name||'').split('—')[0].trim())]
+      .map((label,i)=>`<button class="es-chip${i===0?' accent':''}" onclick="setExploreSnap(2)">${escT(label)}</button>`).join('');
   }
 
   const foryouHTML = `
     <section class="es-section">
       <div class="es-kicker">For You</div>
-      <h3 class="es-title">${FOR_YOU_VIBE}</h3>
-      ${forYou.map(placeCardHTML).join('')}
+      <h3 class="es-title">${escT(FOR_YOU_VIBE)}</h3>
+      <div class="sv-carousel">${forYou.map(forYouCardHTML).join('')}</div>
     </section>`;
 
-  const nearbyHTML = `
+  const nearbyHTML = nearby.length ? `
     <section class="es-section">
-      <div class="es-kicker">Nearby</div>
-      <h3 class="es-title">What's close, right now on the map</h3>
+      <div class="es-kicker">Nearby From You</div>
+      <h3 class="es-title">Close to where you are</h3>
+      <div class="sv-carousel">${nearby.map(nearbyCardHTML).join('')}</div>
+    </section>` : `
+    <section class="es-section">
+      <div class="es-kicker">Nearby From You</div>
+      <h3 class="es-title">Close to where you are</h3>
       <div class="es-grid">
         ${EXPLORE_NEARBY.map(n=>`<button class="es-tile" onclick="filterCategory('${n.cat}');setExploreSnap(1);"><div class="es-tile-t">${n.l}</div></button>`).join('')}
       </div>
@@ -1231,7 +1308,7 @@ function renderExploreContent(){
   const allPlacesHTML = `
     <section class="es-section">
       <div class="es-kicker">All Places</div>
-      <h3 class="es-title">The obvious places and the ones people forget to tell you</h3>
+      <h3 class="es-title">All places & experiences</h3>
       <div class="es-filters">
         ${EXPLORE_SITUATIONAL.map(f=>`<button class="es-fchip" onclick="this.classList.toggle('on')">${f}</button>`).join('')}
       </div>
