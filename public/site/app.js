@@ -1052,35 +1052,53 @@ function cycleExploreSnap(){
   setExploreSnap(cur>=3 ? 1 : cur+1);
 }
 
-// Drag-to-snap on handle (touch + pointer)
+// Drag-to-snap on handle (1:1 pointer tracking, snap to nearest)
 (function(){
-  let startY=0, dragging=false, startLevel=1;
+  let startY=0, dragging=false, startH=0, sheet=null;
+  const snaps = ()=>{
+    const vh = window.innerHeight;
+    return [168, Math.round(vh*0.5), vh]; // l1, l2, l3 heights in px
+  };
   function down(e){
+    sheet = document.getElementById('exploreSheet');
+    if(!sheet) return;
     const t = e.touches ? e.touches[0] : e;
     startY = t.clientY; dragging = true;
-    const s = document.getElementById('exploreSheet');
-    startLevel = parseInt(s?.dataset.snap||'1',10);
+    startH = sheet.getBoundingClientRect().height;
+    sheet.style.transition = 'none';
+    if(e.cancelable) e.preventDefault();
+  }
+  function move(e){
+    if(!dragging||!sheet) return;
+    const t = e.touches ? e.touches[0] : e;
+    const dy = t.clientY - startY;
+    const h = Math.max(120, Math.min(window.innerHeight, startH - dy));
+    sheet.style.height = h + 'px';
   }
   function up(e){
-    if(!dragging) return; dragging=false;
-    const t = (e.changedTouches ? e.changedTouches[0] : e);
-    const dy = t.clientY - startY;
-    let next = startLevel;
-    if(dy < -40) next = Math.min(3, startLevel+1);
-    else if(dy < -120) next = 3;
-    else if(dy > 40) next = Math.max(1, startLevel-1);
-    else if(dy > 120) next = 1;
-    setExploreSnap(next);
+    if(!dragging||!sheet) return; dragging=false;
+    sheet.style.transition = '';
+    const curH = sheet.getBoundingClientRect().height;
+    const s = snaps();
+    let idx = 0, best = Infinity;
+    s.forEach((v,i)=>{ const d=Math.abs(curH-v); if(d<best){best=d;idx=i;} });
+    sheet.style.height = '';
+    setExploreSnap(idx+1);
   }
   document.addEventListener('DOMContentLoaded', ()=>{
     const h = document.getElementById('esHandle');
     if(!h) return;
-    h.addEventListener('touchstart', down, {passive:true});
+    h.style.touchAction = 'none';
+    h.addEventListener('touchstart', down, {passive:false});
+    h.addEventListener('touchmove', move, {passive:false});
     h.addEventListener('touchend', up);
+    h.addEventListener('touchcancel', up);
     h.addEventListener('mousedown', down);
+    window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
   });
 })();
+
 
 // Editorial seed data — permanent places only.
 const EXPLORE_PLACES = {
