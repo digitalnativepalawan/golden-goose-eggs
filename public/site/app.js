@@ -1211,8 +1211,8 @@ function forYouCardHTML(d){
   const cat = d.category ? String(d.category).toUpperCase() : '';
   const bar = d.barangay || '';
   const rating = d.stats && d.stats.rating ? d.stats.rating : '';
-  const idStr = JSON.stringify(String(d.id));
-  return `<button class="sv-card" onclick="(function(){var x=${idStr};var f=(window.destinations||[]).find(function(z){return String(z.id)===x});if(f&&typeof openDest==='function'){openDest(f);}})()">
+  const idAttr = escT(String(d.id));
+  return `<button class="sv-card" data-dest-id="${idAttr}" onclick="(function(el){var x=el.getAttribute('data-dest-id');var f=(window.destinations||[]).find(function(z){return String(z.id)===x});if(f&&typeof openDest==='function'){openDest(f);}})(this)">
     <div class="sv-card-media${d.image?'':' sv-noimg'}">${svCardImage(d)}</div>
     <div class="sv-card-overlay"></div>
     ${cat ? `<span class="sv-card-tag">${escT(cat)}</span>` : ''}
