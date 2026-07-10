@@ -1163,27 +1163,86 @@ const FOR_YOU_VIBES = [
 ];
 const FOR_YOU_VIBE = FOR_YOU_VIBES[Math.floor(Math.random()*FOR_YOU_VIBES.length)];
 
-function renderExploreContent(){
-  const forYou = forYouSeed();
+function forYouCards(){
+  const list = Array.isArray(destinations) ? destinations.slice() : [];
+  list.sort((a,b)=> (b.featured?1:0) - (a.featured?1:0));
+  const picks = list.slice(0, 8);
+  if(picks.length) return picks;
+  return forYouSeed().map((p,i)=>({ id:'seed-'+i, name:p.name, image:'', description:p.why, barangay:'', category:'nature', stats:{} }));
+}
 
-  // Peek ribbon
+function nearbyCards(){
+  const flat = [];
+  try {
+    const byB = window.nearbyPlacesByBarangay || {};
+    Object.keys(byB).forEach(b=>{
+      (byB[b]||[]).forEach(n=> flat.push(Object.assign({ barangay:b }, n)));
+    });
+  } catch(e){}
+  return flat.slice(0, 10);
+}
+
+function svCardImage(d){
+  const img = d && d.image ? d.image : '';
+  if(img) return `<img src="${escT(img)}" alt="${escT(d.name||'')}" loading="lazy" onerror="this.style.display='none';this.parentNode.classList.add('sv-noimg')"/>`;
+  const glyph = (d && d.icon) ? d.icon : '📍';
+  return `<div class="sv-noimg-glyph">${escT(glyph)}</div>`;
+}
+
+function forYouCardHTML(d){
+  const cat = d.category ? String(d.category).toUpperCase() : '';
+  const bar = d.barangay || '';
+  const rating = d.stats && d.stats.rating ? d.stats.rating : '';
+  const idStr = JSON.stringify(String(d.id));
+  return `<button class="sv-card" onclick="(function(){var x=${idStr};var f=(window.destinations||[]).find(function(z){return String(z.id)===x});if(f&&typeof openDest==='function'){openDest(f);}})()">
+    <div class="sv-card-media${d.image?'':' sv-noimg'}">${svCardImage(d)}</div>
+    <div class="sv-card-overlay"></div>
+    ${cat ? `<span class="sv-card-tag">${escT(cat)}</span>` : ''}
+    <div class="sv-card-body">
+      <div class="sv-card-title">${escT(d.name||'')}</div>
+      <div class="sv-card-meta">${bar?`<span>📍 ${escT(bar)}</span>`:''}${rating?`<span>★ ${escT(rating)}</span>`:''}</div>
+    </div>
+  </button>`;
+}
+
+function nearbyCardHTML(n){
+  const glyph = n.icon || '📍';
+  return `<button class="sv-card sv-card-sm" onclick="filterCategory('${escT(n.category||'')}');setExploreSnap(1);">
+    <div class="sv-card-media sv-noimg"><div class="sv-noimg-glyph">${escT(glyph)}</div></div>
+    <div class="sv-card-overlay"></div>
+    <div class="sv-card-body">
+      <div class="sv-card-title">${escT(n.name||'')}</div>
+      <div class="sv-card-meta">${n.barangay?`<span>📍 ${escT(n.barangay)}</span>`:''}${n.distance_label?`<span>${escT(n.distance_label)}</span>`:''}</div>
+    </div>
+  </button>`;
+}
+
+function renderExploreContent(){
+  const forYou = forYouCards();
+  const nearby = nearbyCards();
+
   const rib = document.getElementById('esRibbon');
   if(rib){
-    rib.innerHTML = ['For You', ...forYou.map(p=>p.name.split('—')[0].trim())]
-      .map((label,i)=>`<button class="es-chip${i===0?' accent':''}" onclick="setExploreSnap(2)">${label}</button>`).join('');
+    rib.innerHTML = ['For You', ...forYou.slice(0,4).map(p=>String(p.name||'').split('—')[0].trim())]
+      .map((label,i)=>`<button class="es-chip${i===0?' accent':''}" onclick="setExploreSnap(2)">${escT(label)}</button>`).join('');
   }
 
   const foryouHTML = `
     <section class="es-section">
       <div class="es-kicker">For You</div>
-      <h3 class="es-title">${FOR_YOU_VIBE}</h3>
-      ${forYou.map(placeCardHTML).join('')}
+      <h3 class="es-title">${escT(FOR_YOU_VIBE)}</h3>
+      <div class="sv-carousel">${forYou.map(forYouCardHTML).join('')}</div>
     </section>`;
 
-  const nearbyHTML = `
+  const nearbyHTML = nearby.length ? `
     <section class="es-section">
-      <div class="es-kicker">Nearby</div>
-      <h3 class="es-title">What's close, right now on the map</h3>
+      <div class="es-kicker">Nearby From You</div>
+      <h3 class="es-title">Close to where you are</h3>
+      <div class="sv-carousel">${nearby.map(nearbyCardHTML).join('')}</div>
+    </section>` : `
+    <section class="es-section">
+      <div class="es-kicker">Nearby From You</div>
+      <h3 class="es-title">Close to where you are</h3>
       <div class="es-grid">
         ${EXPLORE_NEARBY.map(n=>`<button class="es-tile" onclick="filterCategory('${n.cat}');setExploreSnap(1);"><div class="es-tile-t">${n.l}</div></button>`).join('')}
       </div>
@@ -1231,7 +1290,7 @@ function renderExploreContent(){
   const allPlacesHTML = `
     <section class="es-section">
       <div class="es-kicker">All Places</div>
-      <h3 class="es-title">The obvious places and the ones people forget to tell you</h3>
+      <h3 class="es-title">All places & experiences</h3>
       <div class="es-filters">
         ${EXPLORE_SITUATIONAL.map(f=>`<button class="es-fchip" onclick="this.classList.toggle('on')">${f}</button>`).join('')}
       </div>
