@@ -516,7 +516,7 @@ async function loadDataFromSupabase(){
     if (talaRes.error) throw talaRes.error;
 
     destinations = (destRes.data && destRes.data.length) ? destRes.data.map(destRowToObj) : DEFAULT_DESTINATIONS;
-    aiData = (talaRes.data && talaRes.data.length) ? talaRes.data.map(r=>({ id:r.id, kw:r.keywords, r:r.response, cat:r.category||'knowledge' })) : DEFAULT_TALA_DATA;
+    aiData = (talaRes.data && talaRes.data.length) ? talaRes.data.map(r=>({ id:r.id, kw:r.keywords, r:r.response, cat:r.category||'knowledge', topic:r.topic||'', label:r.label||'', enabled:r.enabled!==false, sort_order:r.sort_order })) : DEFAULT_TALA_DATA;
     defaultR = (settingsRes.data && settingsRes.data.value) ? settingsRes.data.value : DEFAULT_FALLBACK_RESPONSE;
     talaSuggestions = (sugRes && sugRes.data && sugRes.data.length) ? sugRes.data : DEFAULT_SUGGESTIONS;
     applyCategoriesFromRows(catRes && catRes.data);
@@ -622,8 +622,11 @@ function getAI(input) {
       return `<strong>${d.name}</strong><br><br>${d.description}<br><br>${d.tip}`;
   }
   let best=null, bestS=0;
-  for (const item of aiData) for (const k of item.kw)
-    if (l.includes(k) && k.length>bestS) { bestS=k.length; best=item.r; }
+  for (const item of aiData){
+    if(item.enabled===false) continue; // disabled knowledge entries never match
+    for (const k of item.kw)
+      if (l.includes(k) && k.length>bestS) { bestS=k.length; best=item.r; }
+  }
   return best||defaultR;
 }
 
@@ -3805,10 +3808,19 @@ function renderAdminTala(){
       <label>Fallback response (used when nothing matches)</label>
       <textarea id="adfDefaultR" rows="3" onblur="adminSaveDefaultResponse()">${escapeHtml(defaultR)}</textarea>
     </div>
-    <div class="admin-grid-2" style="margin-bottom:14px;">
-      <button class="admin-add-btn" style="margin-bottom:0;" onclick="adminNewTala()">+ Add response</button>
-      <button class="admin-add-btn" style="margin-bottom:0;" onclick="document.getElementById('adfBulkFile').click()">⇧ Upload .txt files</button>
+
+    <div class="admin-section-title">Knowledge base</div>
+    <div class="admin-kb-desc">Everything Tala knows, in one CSV. Add, edit, or delete entries below — updates go live immediately. Bulk-download to back up, or bulk-upload a filled-in template.</div>
+    <div class="admin-kb-toolbar">
+      <button onclick="downloadTalaTemplateCSV()">📄 Template</button>
+      <button onclick="downloadTalaAllCSV()" ${!aiData.length?'disabled':''}>⇩ Download all</button>
+      <button onclick="document.getElementById('adfCsvFile').click()">⇧ Bulk upload</button>
+      <button class="primary" onclick="adminNewTala()">+ Add entry</button>
     </div>
+    <input type="file" id="adfCsvFile" accept=".csv,text/csv" style="display:none" onchange="adminHandleCsvFile(event)">
+    <div id="adfCsvQueue"></div>
+
+    <button class="admin-add-btn" style="margin-top:4px;" onclick="document.getElementById('adfBulkFile').click()">⇧ Upload .txt files (one file = one long-form entry)</button>
     <input type="file" id="adfBulkFile" accept=".txt,text/plain" multiple style="display:none" onchange="adminHandleBulkFiles(event)">
     <div id="adfBulkQueue"></div>`;
 
@@ -3843,17 +3855,23 @@ function renderAdminTala(){
     html += items.map(item=>{
       const cat = item.cat || 'knowledge';
       const len = talaContentLength(item.r);
+      const disabled = item.enabled === false;
+      const title = item.label || item.kw.join(', ');
       return `
-      <div class="admin-list-item">
+      <div class="admin-list-item${disabled?' is-disabled':''}">
         <div class="admin-list-item-head">
           <div onclick="adminEditTala(${item.id})" style="flex:1;cursor:pointer;">
             <div class="admin-tala-badges">
               <span class="admin-cat-pill ${cat}">${cat==='personality'?'Personality':'Knowledge'}</span>
               <span class="admin-len-pill ${len.cls}">${len.label}</span>
+              ${item.topic ? `<span class="admin-len-pill">${escapeHtml(item.topic)}</span>` : ''}
+              ${disabled ? '<span class="admin-len-pill">Disabled</span>' : ''}
             </div>
-            <strong>${escapeHtml(item.kw.join(', '))}</strong>
+            <strong>${escapeHtml(title)}</strong>
+            ${item.label ? `<div style="font-size:.68rem;color:var(--white-dim);margin-top:2px;">${escapeHtml(item.kw.join(', '))}</div>` : ''}
           </div>
           <div class="admin-row-actions">
+            <button class="admin-mini-btn" onclick="adminToggleTalaEnabled(${item.id})">${disabled?'Enable':'Disable'}</button>
             <button class="admin-mini-btn" onclick="adminEditTala(${item.id})">Edit</button>
             <button class="admin-mini-btn danger" onclick="adminDeleteTala(${item.id})">Delete</button>
           </div>
@@ -3884,7 +3902,7 @@ function adminSetTalaSearch(val){
 
 function adminTalaFormHtml(){
   const isNew = adminEditingTalaId === 'new';
-  const item = isNew ? {kw:[],r:'',cat:'knowledge'} : aiData.find(x=>x.id===adminEditingTalaId);
+  const item = isNew ? {kw:[],r:'',cat:'knowledge',topic:'',label:'',enabled:true} : aiData.find(x=>x.id===adminEditingTalaId);
   if(!item) return '';
   const cat = item.cat || 'knowledge';
   return `
@@ -3896,8 +3914,14 @@ function adminTalaFormHtml(){
           <option value="personality" ${cat==='personality'?'selected':''}>Personality (how Tala talks/acts)</option>
         </select>
       </div>
-      <div class="admin-field"><label>Keywords (comma-separated)</label><input id="atfKw" value="${escapeHtml(item.kw.join(', '))}"></div>
+      <div class="admin-field"><label>Label (admin-facing name, optional)</label><input id="atfLabel" value="${escapeHtml(item.label||'')}" placeholder="e.g. Breakfast hours"></div>
+      <div class="admin-field"><label>Topic (optional grouping tag)</label><input id="atfTopic" value="${escapeHtml(item.topic||'')}" placeholder="e.g. breakfast"></div>
+      <div class="admin-field"><label>Keywords (comma-separated — what triggers this)</label><input id="atfKw" value="${escapeHtml(item.kw.join(', '))}"></div>
       <div class="admin-field"><label>Response (HTML allowed, e.g. &lt;strong&gt;, &lt;br&gt;)</label><textarea id="atfResp" rows="5">${escapeHtml(item.r)}</textarea></div>
+      <div class="admin-toggle-row">
+        <label for="atfEnabled">Enabled (used when matching visitor questions)</label>
+        <input type="checkbox" id="atfEnabled" ${item.enabled===false?'':'checked'}>
+      </div>
       <div class="admin-edit-actions">
         <button class="admin-save-btn" onclick="adminSaveTala()">${isNew?'Create':'Save changes'}</button>
         <button class="admin-cancel-btn" onclick="adminEditingTalaId=null;renderAdminTala();">Cancel</button>
@@ -4018,22 +4042,213 @@ async function adminSaveBulkQueue(){
     saveBtn.textContent = `Save all ${bulkQueue.length} to Tala`;
   }
 }
+
+// ───────────── KNOWLEDGE BASE CSV IMPORT/EXPORT ─────────────
+// Column order matches the downloadable template exactly. `tags` uses ";"
+// as the separator (not ",") since "," is the CSV delimiter itself.
+const TALA_CSV_COLUMNS = ['topic','label','body','tags','enabled','sort_order'];
+
+function csvEscapeField(value){
+  const s = value==null ? '' : String(value);
+  if(/[",\r\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+
+function buildCSV(rows){
+  const lines = [TALA_CSV_COLUMNS.join(',')];
+  rows.forEach(r=> lines.push(TALA_CSV_COLUMNS.map(col=>csvEscapeField(r[col])).join(',')));
+  return lines.join('\r\n');
+}
+
+function triggerCSVDownload(filename, csvText){
+  const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+
+function downloadTalaTemplateCSV(){
+  const sample = [
+    { topic:'breakfast', label:'Breakfast hours', body:'Breakfast is served 08:30–10:30 daily.', tags:'breakfast;dining;hours', enabled:'true', sort_order:10 },
+    { topic:'airport-van', label:'Airport transfer', body:'Private van transfer to/from Puerto Princesa. Book at least 48 hours ahead.', tags:'transfer;airport;van;pickup', enabled:'true', sort_order:20 }
+  ];
+  triggerCSVDownload('tala-knowledge-template.csv', buildCSV(sample));
+}
+
+function downloadTalaAllCSV(){
+  if(!aiData.length){ alert('No knowledge entries yet.'); return; }
+  const rows = aiData.map((item,i)=>({
+    topic: item.topic || '',
+    label: item.label || '',
+    body: item.r || '',
+    tags: (item.kw||[]).join(';'),
+    enabled: item.enabled===false ? 'false' : 'true',
+    sort_order: item.sort_order!=null ? item.sort_order : i
+  }));
+  triggerCSVDownload('tala-knowledge-all.csv', buildCSV(rows));
+}
+
+// Minimal RFC4180-ish CSV parser — quoted fields, embedded commas/newlines
+// inside quotes, doubled "" escaped quotes. Enough for the plain template
+// round-trip this feature is built around (not a general-purpose parser).
+function parseCSV(text){
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  const pushField = ()=>{ row.push(field); field=''; };
+  const pushRow = ()=>{ pushField(); rows.push(row); row=[]; };
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){ if(text[i+1] === '"'){ field+='"'; i++; } else inQuotes=false; }
+      else field += c;
+    } else {
+      if(c === '"') inQuotes = true;
+      else if(c === ',') pushField();
+      else if(c === '\r') { /* no-op, \n closes the row */ }
+      else if(c === '\n') pushRow();
+      else field += c;
+    }
+  }
+  if(field.length || row.length) pushRow();
+  return rows.filter(r=> r.length>1 || r[0]!=='');
+}
+
+function csvRowsToObjects(rows){
+  if(!rows.length) return [];
+  const header = rows[0].map(h=>h.trim().toLowerCase());
+  return rows.slice(1).map(r=>{
+    const obj = {};
+    header.forEach((h,i)=> obj[h] = (r[i]||'').trim());
+    return obj;
+  });
+}
+
+let csvQueue = [];
+let csvIdCounter = 0;
+
+function adminHandleCsvFile(event){
+  const file = event.target.files && event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try {
+      const objs = csvRowsToObjects(parseCSV(String(e.target.result)));
+      const parsed = objs.map(o=>({
+        id: ++csvIdCounter,
+        topic: o.topic || '',
+        label: o.label || '',
+        body: o.body || '',
+        tags: o.tags || '',
+        enabled: !/^false$/i.test((o.enabled||'true').trim()),
+        sort_order: o.sort_order && !isNaN(Number(o.sort_order)) ? Number(o.sort_order) : null
+      })).filter(o=>o.body.trim() && o.tags.trim());
+
+      if(!parsed.length){
+        alert('No usable rows found. Each row needs at least "body" and "tags" filled in — download the template for the exact format.');
+        return;
+      }
+      csvQueue = csvQueue.concat(parsed);
+      renderCsvQueue();
+    } catch(err){
+      alert('Could not read that CSV: ' + (err.message || err));
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function renderCsvQueue(){
+  const container = document.getElementById('adfCsvQueue');
+  if(!container) return;
+  if(!csvQueue.length){ container.innerHTML=''; return; }
+  container.innerHTML = `
+    <div class="admin-edit-box">
+      <div class="admin-field" style="margin-bottom:8px;">
+        <label>${csvQueue.length} row${csvQueue.length>1?'s':''} ready to import — review, then save</label>
+      </div>
+      ${csvQueue.map(item=>`
+        <div class="admin-list-item" style="margin-bottom:8px;">
+          <div class="admin-list-item-head">
+            <div style="flex:1;">
+              <div class="admin-tala-badges">
+                <span class="admin-cat-pill knowledge">${escapeHtml(item.topic||'—')}</span>
+                ${!item.enabled?'<span class="admin-len-pill">Disabled</span>':''}
+              </div>
+              <strong>${escapeHtml(item.label || item.tags)}</strong>
+              <div style="font-size:.7rem;color:var(--white-dim);margin-top:2px;">${escapeHtml(item.body.slice(0,90))}${item.body.length>90?'…':''}</div>
+            </div>
+            <div class="admin-row-actions">
+              <button class="admin-mini-btn danger" onclick="csvQueue=csvQueue.filter(x=>x.id!==${item.id});renderCsvQueue();">Remove</button>
+            </div>
+          </div>
+        </div>`).join('')}
+      <div class="admin-edit-actions">
+        <button class="admin-save-btn" id="adfCsvSaveBtn" onclick="adminSaveCsvQueue()">Save all ${csvQueue.length} to Tala</button>
+        <button class="admin-cancel-btn" onclick="csvQueue=[];renderCsvQueue();">Cancel</button>
+      </div>
+    </div>`;
+}
+
+async function adminSaveCsvQueue(){
+  const saveBtn = document.getElementById('adfCsvSaveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
+  try {
+    const rows = csvQueue.map((item,i)=>({
+      keywords: item.tags.split(';').map(s=>s.trim()).filter(Boolean),
+      response: item.body,
+      category: 'knowledge',
+      topic: item.topic || null,
+      label: item.label || null,
+      enabled: item.enabled,
+      sort_order: item.sort_order!=null ? item.sort_order : (aiData.length + i)
+    }));
+    const { error } = await sb.from('tala_responses').insert(rows);
+    if(error) throw error;
+    csvQueue = [];
+    await loadDataFromSupabase();
+    renderAdminTala();
+  } catch(err){
+    alert('Bulk import failed: ' + (err.message || err));
+    saveBtn.disabled = false;
+    saveBtn.textContent = `Save all ${csvQueue.length} to Tala`;
+  }
+}
+
+async function adminToggleTalaEnabled(id){
+  const item = aiData.find(x=>x.id===id);
+  if(!item) return;
+  try {
+    const { error } = await sb.from('tala_responses').update({ enabled: item.enabled===false }).eq('id', id);
+    if(error) throw error;
+    await loadDataFromSupabase();
+    renderAdminTala();
+  } catch(err){
+    alert('Update failed: ' + (err.message || err));
+  }
+}
+
 function adminEditTala(id){ adminEditingTalaId=id; renderAdminTala(); }
 
 async function adminSaveTala(){
   const kw = document.getElementById('atfKw').value.split(',').map(s=>s.trim()).filter(Boolean);
   const r = document.getElementById('atfResp').value.trim();
   const cat = document.getElementById('atfCat').value;
+  const topic = document.getElementById('atfTopic').value.trim();
+  const label = document.getElementById('atfLabel').value.trim();
+  const enabled = document.getElementById('atfEnabled').checked;
   if(!kw.length || !r){
     alert('At least one keyword and a response are required.');
     return;
   }
   try {
     if(adminEditingTalaId === 'new'){
-      const { error } = await sb.from('tala_responses').insert({ keywords: kw, response: r, category: cat, sort_order: aiData.length });
+      const { error } = await sb.from('tala_responses').insert({ keywords: kw, response: r, category: cat, topic: topic||null, label: label||null, enabled, sort_order: aiData.length });
       if(error) throw error;
     } else {
-      const { error } = await sb.from('tala_responses').update({ keywords: kw, response: r, category: cat }).eq('id', adminEditingTalaId);
+      const { error } = await sb.from('tala_responses').update({ keywords: kw, response: r, category: cat, topic: topic||null, label: label||null, enabled }).eq('id', adminEditingTalaId);
       if(error) throw error;
     }
     await loadDataFromSupabase();
