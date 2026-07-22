@@ -380,28 +380,37 @@ export type Database = {
         Row: {
           category: string | null
           created_at: string | null
+          enabled: boolean
           id: number
           keywords: string[]
+          label: string | null
           response: string
           sort_order: number | null
+          topic: string | null
           updated_at: string | null
         }
         Insert: {
           category?: string | null
           created_at?: string | null
+          enabled?: boolean
           id?: never
           keywords: string[]
+          label?: string | null
           response: string
           sort_order?: number | null
+          topic?: string | null
           updated_at?: string | null
         }
         Update: {
           category?: string | null
           created_at?: string | null
+          enabled?: boolean
           id?: never
           keywords?: string[]
+          label?: string | null
           response?: string
           sort_order?: number | null
+          topic?: string | null
           updated_at?: string | null
         }
         Relationships: []
