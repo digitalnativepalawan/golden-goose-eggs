@@ -3262,6 +3262,8 @@ function switchAdminTab(tab){
   document.getElementById('adminTabToday').classList.toggle('active', tab==='today');
   document.getElementById('adminTabTribes').classList.toggle('active', tab==='tribes');
   document.getElementById('adminTabEvents').classList.toggle('active', tab==='events');
+  document.getElementById('adminTabMySanvic').classList.toggle('active', tab==='mysanvic');
+  document.getElementById('adminTabHunt').classList.toggle('active', tab==='hunt');
   adminEditingDestId = null;
   adminEditingTalaId = null;
   if(tab==='dest') renderAdminDest();
@@ -3271,6 +3273,8 @@ function switchAdminTab(tab){
   else if(tab==='today') renderAdminToday();
   else if(tab==='tribes') renderAdminTribes();
   else if(tab==='events') renderAdminEvents();
+  else if(tab==='mysanvic') renderAdminMySanvic();
+  else if(tab==='hunt') renderAdminHunt();
   else renderAdminPulse();
 }
 
@@ -5133,6 +5137,253 @@ async function adminSaveEvent(id){
 async function adminDeleteEvent(id){
   if(!confirm('Delete this event?')) return;
   try { await sb.from('events').delete().eq('id', id); renderAdminEvents(); }
+  catch(e){ alert('Delete failed: '+e.message); }
+}
+
+// ───────────── MYSANVIC ADMIN ─────────────
+
+async function renderAdminMySanvic(){
+  const body = document.getElementById('adminBody');
+  body.innerHTML = '<div class="admin-empty">Loading…</div>';
+  let upcoming = [];
+  try {
+    const { data, error } = await sb.from('my_sanvic_upcoming').select('*').order('sort_order');
+    if(error) throw error;
+    upcoming = data || [];
+  } catch(e){
+    body.innerHTML = `<div class="admin-empty">Load failed: ${escapeHtml(e.message)}</div>`;
+    return;
+  }
+
+  let html = `
+    <div class="admin-field" style="font-size:.72rem;color:var(--white-dim);margin-bottom:12px;">
+      Curate the "Upcoming" cards shown in My Sanvic. These are featured activities, events, or promotions you want visitors to see first.
+    </div>
+    <button class="admin-add-btn" onclick="adminEditUpcoming('new')">+ Add upcoming item</button>`;
+
+  if(!upcoming.length){
+    html += '<div class="admin-empty">No upcoming items yet. Add one above.</div>';
+  } else {
+    upcoming.forEach(u => {
+      html += `
+      <div class="admin-list-item">
+        <div class="admin-list-item-head">
+          <div style="flex:1;">
+            <strong>${escapeHtml(u.title)}</strong><br>
+            <span style="color:var(--white-dim);font-size:.7rem;">${escapeHtml(u.badge||'')} · ${escapeHtml(u.meta||'')}</span>
+          </div>
+          <div class="admin-row-actions">
+            <button class="admin-mini-btn" onclick="adminEditUpcoming('${u.id}')">Edit</button>
+            <button class="admin-mini-btn danger" onclick="adminDeleteUpcoming('${u.id}')">Delete</button>
+          </div>
+        </div>
+      </div>`;
+    });
+  }
+  body.innerHTML = html;
+}
+
+async function adminEditUpcoming(id){
+  const body = document.getElementById('adminBody');
+  const isNew = id === 'new';
+  let u = { badge:'', badge_style:'solid', title:'', meta:'', cta:'View', action:'', action_id:'', sort_order:0 };
+  if(!isNew){
+    try {
+      const { data } = await sb.from('my_sanvic_upcoming').select('*').eq('id', id).single();
+      if(data) u = data;
+    } catch(e){ alert('Load failed: '+e.message); return; }
+  }
+  body.innerHTML = `
+    <div class="admin-edit-box">
+      <div class="admin-field"><label>Title</label><input id="amuTitle" value="${escapeHtml(u.title)}"></div>
+      <div class="admin-grid-2">
+        <div class="admin-field"><label>Badge text</label><input id="amuBadge" value="${escapeHtml(u.badge||'')}" placeholder="e.g. NEW, HOT, FREE"></div>
+        <div class="admin-field"><label>Badge style</label>
+          <select id="amuBadgeStyle">
+            <option value="solid" ${u.badge_style==='solid'?'selected':''}>Solid</option>
+            <option value="soft" ${u.badge_style==='soft'?'selected':''}>Soft</option>
+          </select>
+        </div>
+      </div>
+      <div class="admin-field"><label>Meta text</label><input id="amuMeta" value="${escapeHtml(u.meta||'')}" placeholder="e.g. Island Hopping · Tomorrow"></div>
+      <div class="admin-grid-2">
+        <div class="admin-field"><label>Button text</label><input id="amuCta" value="${escapeHtml(u.cta||'View')}"></div>
+        <div class="admin-field"><label>Action type</label>
+          <select id="amuAction">
+            <option value="" ${!u.action?'selected':''}>None</option>
+            <option value="dest" ${u.action==='dest'?'selected':''}>Open destination</option>
+            <option value="tribe" ${u.action==='tribe'?'selected':''}>Open tribe</option>
+            <option value="event" ${u.action==='event'?'selected':''}>Open event</option>
+            <option value="url" ${u.action==='url'?'selected':''}>Open URL</option>
+          </select>
+        </div>
+      </div>
+      <div class="admin-field"><label>Action ID / URL</label><input id="amuActionId" value="${escapeHtml(u.action_id||'')}" placeholder="Destination ID, tribe ID, or full URL"></div>
+      <div class="admin-field"><label>Sort order</label><input type="number" id="amuSort" value="${u.sort_order||0}"></div>
+      <div class="admin-edit-actions">
+        <button class="admin-save-btn" onclick="adminSaveUpcoming('${isNew?'':id}')">${isNew?'Create':'Save'}</button>
+        <button class="admin-cancel-btn" onclick="renderAdminMySanvic()">Cancel</button>
+      </div>
+    </div>`;
+}
+
+async function adminSaveUpcoming(id){
+  const isNew = id === 'new';
+  try {
+    const payload = {
+      badge: document.getElementById('amuBadge').value.trim(),
+      badge_style: document.getElementById('amuBadgeStyle').value,
+      title: document.getElementById('amuTitle').value.trim(),
+      meta: document.getElementById('amuMeta').value.trim(),
+      cta: document.getElementById('amuCta').value.trim() || 'View',
+      action: document.getElementById('amuAction').value,
+      action_id: document.getElementById('amuActionId').value.trim(),
+      sort_order: parseInt(document.getElementById('amuSort').value)||0,
+    };
+    if(!payload.title){ alert('Title is required.'); return; }
+    if(isNew){
+      const { error } = await sb.from('my_sanvic_upcoming').insert(payload);
+      if(error) throw error;
+    } else {
+      const { error } = await sb.from('my_sanvic_upcoming').update(payload).eq('id', id);
+      if(error) throw error;
+    }
+    renderAdminMySanvic();
+  } catch(err){ alert('Save failed: '+err.message); }
+}
+
+async function adminDeleteUpcoming(id){
+  if(!confirm('Delete this upcoming item?')) return;
+  try { await sb.from('my_sanvic_upcoming').delete().eq('id', id); renderAdminMySanvic(); }
+  catch(e){ alert('Delete failed: '+e.message); }
+}
+
+// ───────────── HUNT ADMIN ─────────────
+
+async function renderAdminHunt(){
+  const body = document.getElementById('adminBody');
+  body.innerHTML = '<div class="admin-empty">Loading…</div>';
+  let rewards = [];
+  let settings = {};
+  try {
+    const [rewardsRes, settingsRes] = await Promise.all([
+      sb.from('hunt_rewards').select('*').order('sort_order'),
+      sb.from('hunt_settings').select('*')
+    ]);
+    if(rewardsRes.error) throw rewardsRes.error;
+    rewards = rewardsRes.data || [];
+    (settingsRes.data || []).forEach(r => { settings[r.key] = r.value; });
+  } catch(e){
+    body.innerHTML = `<div class="admin-empty">Load failed: ${escapeHtml(e.message)}</div>`;
+    return;
+  }
+
+  const featuredDestId = settings.featured_dest_id || '';
+  const pointsPerUnlock = settings.points_per_unlock || 100;
+  const welcomeMsg = settings.welcome_msg || '';
+
+  let html = `
+    <div class="admin-field" style="font-size:.72rem;color:var(--white-dim);margin-bottom:12px;">
+      Configure The Hunt experience. Set which destination is featured daily, reward items visitors can earn, and hunt settings.
+    </div>
+    <div class="admin-edit-box" style="margin-bottom:16px;">
+      <div style="font-weight:600;margin-bottom:8px;font-size:.82rem;color:var(--white-soft);">Hunt Settings</div>
+      <div class="admin-field"><label>Featured destination ID (today's hunt target)</label><input id="ahSettingsFeat" value="${escapeHtml(featuredDestId)}" placeholder="Destination ID from Destinations tab"></div>
+      <div class="admin-field"><label>Points per unlock</label><input type="number" id="ahSettingsPoints" value="${pointsPerUnlock}"></div>
+      <div class="admin-field"><label>Welcome message</label><textarea id="ahSettingsWelcome" rows="2">${escapeHtml(welcomeMsg)}</textarea></div>
+      <button class="admin-save-btn" onclick="adminSaveHuntSettings()">Save settings</button>
+    </div>
+
+    <button class="admin-add-btn" onclick="adminEditReward('new')">+ Add reward</button>`;
+
+  if(!rewards.length){
+    html += '<div class="admin-empty">No rewards yet. Add one above.</div>';
+  } else {
+    rewards.forEach(r => {
+      html += `
+      <div class="admin-list-item">
+        <div class="admin-list-item-head">
+          <div style="flex:1;">
+            <strong>${escapeHtml(r.title)}</strong><br>
+            <span style="color:var(--white-dim);font-size:.7rem;">${escapeHtml(r.badge||'')} · ${r.points_required} pts · ${escapeHtml(r.subtitle||'')}</span>
+          </div>
+          <div class="admin-row-actions">
+            <button class="admin-mini-btn" onclick="adminEditReward('${r.id}')">Edit</button>
+            <button class="admin-mini-btn danger" onclick="adminDeleteReward('${r.id}')">Delete</button>
+          </div>
+        </div>
+      </div>`;
+    });
+  }
+  body.innerHTML = html;
+}
+
+async function adminSaveHuntSettings(){
+  try {
+    const rows = [
+      { key:'featured_dest_id', value: document.getElementById('ahSettingsFeat').value.trim() },
+      { key:'points_per_unlock', value: parseInt(document.getElementById('ahSettingsPoints').value)||100 },
+      { key:'welcome_msg', value: document.getElementById('ahSettingsWelcome').value.trim() },
+    ];
+    const { error } = await sb.from('hunt_settings').upsert(rows, { onConflict:'key' });
+    if(error) throw error;
+    alert('Settings saved!');
+  } catch(err){ alert('Save failed: '+err.message); }
+}
+
+async function adminEditReward(id){
+  const body = document.getElementById('adminBody');
+  const isNew = id === 'new';
+  let r = { title:'', subtitle:'', badge:'', dest_id:'', points_required:100, sort_order:0 };
+  if(!isNew){
+    try {
+      const { data } = await sb.from('hunt_rewards').select('*').eq('id', id).single();
+      if(data) r = data;
+    } catch(e){ alert('Load failed: '+e.message); return; }
+  }
+  body.innerHTML = `
+    <div class="admin-edit-box">
+      <div class="admin-field"><label>Title</label><input id="ahrTitle" value="${escapeHtml(r.title)}"></div>
+      <div class="admin-field"><label>Subtitle</label><input id="ahrSub" value="${escapeHtml(r.subtitle||'')}"></div>
+      <div class="admin-grid-2">
+        <div class="admin-field"><label>Badge text</label><input id="ahrBadge" value="${escapeHtml(r.badge||'')}" placeholder="e.g. NEW, SOON"></div>
+        <div class="admin-field"><label>Points required</label><input type="number" id="ahrPoints" value="${r.points_required||100}"></div>
+      </div>
+      <div class="admin-field"><label>Destination ID (optional — link to a destination)</label><input id="ahrDest" value="${escapeHtml(r.dest_id||'')}"></div>
+      <div class="admin-field"><label>Sort order</label><input type="number" id="ahrSort" value="${r.sort_order||0}"></div>
+      <div class="admin-edit-actions">
+        <button class="admin-save-btn" onclick="adminSaveReward('${isNew?'':id}')">${isNew?'Create':'Save'}</button>
+        <button class="admin-cancel-btn" onclick="renderAdminHunt()">Cancel</button>
+      </div>
+    </div>`;
+}
+
+async function adminSaveReward(id){
+  const isNew = id === 'new';
+  try {
+    const payload = {
+      title: document.getElementById('ahrTitle').value.trim(),
+      subtitle: document.getElementById('ahrSub').value.trim(),
+      badge: document.getElementById('ahrBadge').value.trim(),
+      dest_id: document.getElementById('ahrDest').value.trim(),
+      points_required: parseInt(document.getElementById('ahrPoints').value)||100,
+      sort_order: parseInt(document.getElementById('ahrSort').value)||0,
+    };
+    if(!payload.title){ alert('Title is required.'); return; }
+    if(isNew){
+      const { error } = await sb.from('hunt_rewards').insert(payload);
+      if(error) throw error;
+    } else {
+      const { error } = await sb.from('hunt_rewards').update(payload).eq('id', id);
+      if(error) throw error;
+    }
+    renderAdminHunt();
+  } catch(err){ alert('Save failed: '+err.message); }
+}
+
+async function adminDeleteReward(id){
+  if(!confirm('Delete this reward?')) return;
+  try { await sb.from('hunt_rewards').delete().eq('id', id); renderAdminHunt(); }
   catch(e){ alert('Delete failed: '+e.message); }
 }
 
