@@ -395,8 +395,8 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
 /* ═══════════════════════════════════
    PULSE — community layer
    ═══════════════════════════════════ */
-.pulse-panel{position:fixed;inset:0;z-index:80;background:var(--charcoal-deep);transform:translateY(100%);transition:transform .5s var(--ease-out-expo);display:flex;flex-direction:column;overflow:hidden}
-.pulse-panel.open{transform:translateY(0)}
+.pulse-panel{position:fixed;inset:0;z-index:80;background:var(--charcoal-deep);transform:translateY(100%);transition:transform .5s var(--ease-out-expo);display:flex;flex-direction:column;overflow:hidden;pointer-events:none}
+.pulse-panel.open{transform:translateY(0);pointer-events:auto}
 .pulse-head{flex-shrink:0;padding:calc(var(--safe-top) + 14px) 18px 0}
 .pulse-head-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:2px}
 .pulse-title-block{display:flex;flex-direction:column}
@@ -563,8 +563,8 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
 .login-fine-print{text-align:center;font-size:.66rem;color:var(--white-dim);margin-top:18px;line-height:1.5}
 
 /* ─── Dashboard ─── */
-.dashboard-panel{position:fixed;inset:0;z-index:85;background:var(--charcoal-deep);transform:translateY(100%);transition:transform .5s var(--ease-out-expo);overflow-y:auto}
-.dashboard-panel.open{transform:translateY(0)}
+.dashboard-panel{position:fixed;inset:0;z-index:85;background:var(--charcoal-deep);transform:translateY(100%);transition:transform .5s var(--ease-out-expo);overflow-y:auto;pointer-events:none}
+.dashboard-panel.open{transform:translateY(0);pointer-events:auto}
 .dash-head{padding:calc(var(--safe-top) + 14px) 18px 6px;position:sticky;top:0;background:var(--charcoal-deep);z-index:1}
 .dash-head-row{display:flex;align-items:center;justify-content:space-between}
 .dash-logo{height:20px;width:auto;opacity:.92}
@@ -1608,8 +1608,8 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
 
 <style>
   /* ═══ MY SANVIC PANEL ═══ */
-  #mySanvicPanel{position:fixed;inset:0;z-index:80;background:var(--charcoal-deep);transform:translateY(100%);transition:transform .5s var(--ease-out-expo);display:flex;flex-direction:column;overflow:hidden}
-  #mySanvicPanel.open{transform:translateY(0)}
+  #mySanvicPanel{position:fixed;inset:0;z-index:80;background:var(--charcoal-deep);transform:translateY(100%);transition:transform .5s var(--ease-out-expo);display:flex;flex-direction:column;overflow:hidden;pointer-events:none}
+  #mySanvicPanel.open{transform:translateY(0);pointer-events:auto}
   .mysv-body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:18px 16px 110px;scrollbar-width:none}
   .mysv-body::-webkit-scrollbar{display:none}
   .mysv-close{position:absolute;top:14px;right:14px;z-index:5;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
@@ -1722,8 +1722,8 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
 
 <style>
   /* ═══ THE HUNT PANEL ═══ */
-  #huntPanel{position:fixed;inset:0;z-index:80;background:var(--charcoal-deep);transform:translateY(100%);transition:transform .5s var(--ease-out-expo);display:flex;flex-direction:column;overflow:hidden}
-  #huntPanel.open{transform:translateY(0)}
+  #huntPanel{position:fixed;inset:0;z-index:80;background:var(--charcoal-deep);transform:translateY(100%);transition:transform .5s var(--ease-out-expo);display:flex;flex-direction:column;overflow:hidden;pointer-events:none}
+  #huntPanel.open{transform:translateY(0);pointer-events:auto}
   .hunt-body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:18px 16px 110px;scrollbar-width:none !important;-ms-overflow-style:none !important;scroll-behavior:smooth}
   .hunt-body::-webkit-scrollbar{display:none !important;width:0 !important;height:0 !important}
   .hunt-close{position:absolute;top:14px;right:14px;z-index:5;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
