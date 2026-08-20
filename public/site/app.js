@@ -2199,7 +2199,7 @@ async function renderPulseFeed(){
   body.innerHTML = `<div class="pulse-empty">Loading…</div>`;
 
   let query = sb.from('pulse_posts')
-    .select('id, user_id, category, text_content, image_url, location_text, tag, display_name, is_anonymous, admin_post, created_at, pulse_likes(count), pulse_comments(count)')
+    .select('id, user_id, category, text_content, image_url, location_text, tag, display_name, is_anonymous, admin_post, created_at')
     .order('created_at', { ascending: false })
     .limit(100);
   if(pulseCategory !== 'all') query = query.eq('category', pulseCategory);
@@ -2220,10 +2220,20 @@ async function renderPulseFeed(){
 
   // Load this device's likes so the heart state is correct
   pulseLikedSet = new Set();
-  if(rows && rows.length){
-    const ids = rows.map(r=>r.id);
-    const { data: likes } = await sb.from('pulse_likes').select('post_id').eq('device_id', pulseDeviceId()).in('post_id', ids);
+  // Fetch likes and comment counts separately (avoids RLS-hanging count aggregates)
+  const postIds = (rows||[]).map(r=>r.id);
+  const likeCountByPost = {};
+  if(postIds.length){
+    const { data: likes } = await sb.from('pulse_likes').select('post_id').eq('device_id', pulseDeviceId()).in('post_id', postIds);
     if(likes) likes.forEach(l => pulseLikedSet.add(l.post_id));
+    // All likes for count
+    const { data: allLikes } = await sb.from('pulse_likes').select('post_id').in('post_id', postIds);
+    (allLikes||[]).forEach(l=>{ likeCountByPost[l.post_id] = (likeCountByPost[l.post_id]||0) + 1; });
+  }
+  const commentCountByPost = {};
+  if(postIds.length){
+    const { data: allComments } = await sb.from('pulse_comments').select('post_id').in('post_id', postIds);
+    (allComments||[]).forEach(c=>{ commentCountByPost[c.post_id] = (commentCountByPost[c.post_id]||0) + 1; });
   }
 
   pulseFeedById = new Map();
@@ -2242,8 +2252,8 @@ async function renderPulseFeed(){
       image: r.image_url || null,
       location: r.location_text || null,
       tag: r.tag || null,
-      likes: (r.pulse_likes && r.pulse_likes[0] && r.pulse_likes[0].count) || 0,
-      comments: (r.pulse_comments && r.pulse_comments[0] && r.pulse_comments[0].count) || 0,
+      likes: likeCountByPost[r.id] || 0,
+      comments: commentCountByPost[r.id] || 0,
     };
     pulseFeedById.set(r.id, mapped);
     return mapped;
@@ -4701,7 +4711,7 @@ async function renderAdminPulsePosts(){
   const body = document.getElementById('adminPulseBody');
   try {
     const { data: posts, error } = await sb.from('pulse_posts')
-      .select('id, user_id, category, text_content, image_url, location_text, display_name, is_anonymous, admin_post, created_at, pulse_comments(count)')
+      .select('id, user_id, category, text_content, image_url, location_text, display_name, is_anonymous, admin_post, created_at')
       .order('created_at', { ascending: false })
       .limit(100);
     if(error) throw error;
@@ -4711,9 +4721,15 @@ async function renderAdminPulsePosts(){
       return;
     }
 
+    // Fetch comment counts separately (avoids RLS-hanging count aggregates)
+    const postIds = posts.map(p=>p.id);
+    const { data: commentCounts } = await sb.from('pulse_comments').select('post_id').in('post_id', postIds);
+    const countByPost = {};
+    (commentCounts||[]).forEach(r=>{ countByPost[r.post_id] = (countByPost[r.post_id]||0) + 1; });
+
     body.innerHTML = posts.map(p=>{
       const isEditing = pulseAdminEditingPostId === p.id;
-      const commentCount = (p.pulse_comments && p.pulse_comments[0] && p.pulse_comments[0].count) || 0;
+      const commentCount = countByPost[p.id] || 0;
       const authorLabel = p.is_anonymous ? 'Anonymous' : (p.display_name || 'Traveler');
       return `
       <div class="admin-list-item">
@@ -4941,7 +4957,7 @@ const MYSV_UPCOMING = [
   { id:'u3', title:'Island Hopping Tribe 🚣', meta:'8:00 AM • Port Barton', badge:'Tomorrow', badgeStyle:'solid', avatars:4, more:2, cta:'Open Tribe Chat', action:'openChat', grad:'linear-gradient(135deg,#0ea5e9,#0c4a6e)' },
   { id:'u4', title:'Acoustic Night 🎸', meta:'7:30 PM • Poblacion', badge:'May 18', badgeStyle:'soft', cta:"I'm Interested", action:'interested', grad:'linear-gradient(135deg,#7c3aed,#1e1b4b)' }
 ];
-const MYSV_SAVED = [
+let MYSV_SAVED = [
   { id:'s1', title:'Long Beach', cat:'Beach • San Vicente', km:12, grad:'linear-gradient(135deg,#38bdf8,#0c4a6e)' },
   { id:'s2', title:'Boayan Island', cat:'Island • Port Barton', km:18, grad:'linear-gradient(135deg,#22d3ee,#164e63)' },
   { id:'s3', title:'Pamuayan Falls', cat:'Waterfall • Alimanguan', km:18, grad:'linear-gradient(135deg,#34d399,#064e3b)' },
@@ -4980,12 +4996,47 @@ function mysvSignIn(){
   alert('Sign-in coming soon.');
 }
 
+// Load saved places from Supabase (requires signed-in user).
+// Falls back to demo data if not signed in or query fails.
+async function loadMySanvicSaved(){
+  if(!currentUser) return;
+  try {
+    const { data: saved, error } = await sb.from('saved_places')
+      .select('id, destination_id')
+      .eq('user_id', currentUser.id);
+    if(error) throw error;
+    if(!saved || !saved.length) return;
+    // Fetch destination details for each saved place
+    const destIds = saved.map(s=>s.destination_id).filter(Boolean);
+    if(!destIds.length) return;
+    const { data: dests } = await sb.from('destinations')
+      .select('id, name, category, barangay')
+      .in('id', destIds);
+    if(!dests || !dests.length) return;
+    const destMap = new Map(dests.map(d=>[d.id, d]));
+    // Replace demo data with real saved places
+    MYSV_SAVED = saved.map(s=>{
+      const d = destMap.get(s.destination_id);
+      const catLabel = (catStyle[d.category] && catStyle[d.category].label) || d.category || '';
+      return {
+        id: 'sp_' + s.id,
+        title: d.name || 'Saved place',
+        cat: catLabel + (d.barangay ? ' • ' + d.barangay : ''),
+        km: '',
+        grad: 'linear-gradient(135deg,#38bdf8,#0c4a6e)'
+      };
+    });
+  } catch(e){
+    console.warn('[MYSV] Could not load saved places:', e);
+  }
+}
+
 function openMySanvicPanel(){
   const p = document.getElementById('mySanvicPanel');
   if(!p) return;
   p.classList.add('open');
   p.setAttribute('aria-hidden','false');
-  renderMySanvic();
+  loadMySanvicSaved().then(()=> renderMySanvic());
 }
 function closeMySanvicPanel(){
   const p = document.getElementById('mySanvicPanel');
@@ -5188,9 +5239,16 @@ function renderMySanvic(){
   body.innerHTML = header + sync + upcoming + saved + tribes + split + recent;
 }
 
-function mysvToggleSaved(id){
+async function mysvToggleSaved(id){
   const i = MYSV_SAVED.findIndex(s=>s.id===id);
-  if(i>=0){ MYSV_SAVED.splice(i,1); renderMySanvic(); }
+  if(i<0) return;
+  // If it's a real Supabase-saved place (id starts with 'sp_'), delete from DB
+  if(id.startsWith('sp_') && currentUser){
+    const realId = id.replace('sp_','');
+    try { await sb.from('saved_places').delete().eq('id', realId); } catch(e){ console.warn('[MYSV] delete failed:', e); }
+  }
+  MYSV_SAVED.splice(i,1);
+  renderMySanvic();
 }
 function mysvAction(kind, id){
   if(!mysvIsSignedIn() && (kind==='openChat' || kind==='interested')){
