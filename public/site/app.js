@@ -6190,14 +6190,10 @@ function renderMySanvic(){
           const allImgs = [];
           if(u.images && Array.isArray(u.images)) allImgs.push(...u.images);
           const hasImages = allImgs.length > 0;
+          const bgStyle = hasImages ? `background-image:url('${escapeHtml(allImgs[0])}');background-size:cover;background-position:center;` : '';
           const imgClick = hasImages ? `onclick="openCarousel(${JSON.stringify(allImgs).replace(/"/g, '&quot;')},0)"` : '';
-          const imgStyle = hasImages ? 'cursor:pointer' : '';
-          const imgHtml = hasImages ? `<img src="${escapeHtml(allImgs[0])}" style="width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:8px;${imgStyle}" ${imgClick} onerror="this.style.display='none'">` : '';
-          const videoHtml = u.videoUrl && u.videoType === 'youtube' ? (()=>{ const yid = getYoutubeId(u.videoUrl); return yid ? `<iframe src="https://www.youtube.com/embed/${yid}?mute=1&playsinline=1" style="width:100%;height:120px;border:none;border-radius:10px;margin-bottom:8px;" allowfullscreen></iframe>` : ''; })()
-            : u.videoUrl && u.videoType === 'upload' ? `<video src="${escapeHtml(u.videoUrl)}" style="width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:8px;" muted loop playsinline preload="metadata"></video>` : '';
           return `
-          <div class="mysv-up-card" style="background:${u.grad}">
-            ${imgHtml || videoHtml}
+          <div class="mysv-up-card" style="${bgStyle}${bgStyle?'':''}${u.grad}">
             <span class="mysv-badge ${u.badgeStyle==='soft'?'soft':''}">${escapeHtml(u.badge)}</span>
             <div class="mysv-up-info">
               <div class="mysv-up-title">${escapeHtml(u.title)}</div>
