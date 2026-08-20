@@ -6038,11 +6038,11 @@ let MYSV_UPCOMING = [
   { id:'u4', title:'Acoustic Night 🎸', meta:'7:30 PM • Poblacion', badge:'May 18', badgeStyle:'soft', cta:"I'm Interested", action:'interested', grad:'linear-gradient(135deg,#7c3aed,#1e1b4b)' }
 ];
 let MYSV_SAVED = [
-  { id:'s1', title:'Long Beach', cat:'Beach • San Vicente', km:12, grad:'linear-gradient(135deg,#38bdf8,#0c4a6e)' },
-  { id:'s2', title:'Boayan Island', cat:'Island • Port Barton', km:18, grad:'linear-gradient(135deg,#22d3ee,#164e63)' },
-  { id:'s3', title:'Pamuayan Falls', cat:'Waterfall • Alimanguan', km:18, grad:'linear-gradient(135deg,#34d399,#064e3b)' },
-  { id:'s4', title:'Poblacion Market', cat:'Local Life • Poblacion', km:2, grad:'linear-gradient(135deg,#f59e0b,#78350f)' },
-  { id:'s5', title:'Alimanguan Beach', cat:'Beach • Alimanguan', km:25, grad:'linear-gradient(135deg,#60a5fa,#1e3a8a)' }
+  { id:'s1', title:'Long Beach', cat:'Beach · San Vicente', km:12, image:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=75', grad:'linear-gradient(135deg,#38bdf8,#0c4a6e)' },
+  { id:'s2', title:'Boayan Island', cat:'Island · Port Barton', km:18, image:'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400&q=75', grad:'linear-gradient(135deg,#22d3ee,#164e63)' },
+  { id:'s3', title:'Pamuayan Falls', cat:'Waterfall · Alimanguan', km:18, image:'https://images.unsplash.com/photo-1432405972618-c6b0cfba8b0f?w=400&q=75', grad:'linear-gradient(135deg,#34d399,#064e3b)' },
+  { id:'s4', title:'Poblacion Market', cat:'Local Life · Poblacion', km:2, image:'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=75', grad:'linear-gradient(135deg,#f59e0b,#78350f)' },
+  { id:'s5', title:'Alimanguan Beach', cat:'Beach · Alimanguan', km:25, image:'https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?w=400&q=75', grad:'linear-gradient(135deg,#60a5fa,#1e3a8a)' }
 ];
 const MYSV_TRIBES = [
   { id:'t1', title:'Sunset Chasers 🌅', meta:'Long Beach • Today, 5:30 PM', more:3, grad:'linear-gradient(135deg,#f97316,#7c2d12)' },
@@ -6090,7 +6090,7 @@ async function loadMySanvicSaved(){
     const destIds = saved.map(s=>s.destination_id).filter(Boolean);
     if(!destIds.length) return;
     const { data: dests } = await sb.from('destinations')
-      .select('id, name, category, barangay')
+      .select('id, name, category, barangay, image')
       .in('id', destIds);
     if(!dests || !dests.length) return;
     const destMap = new Map(dests.map(d=>[d.id, d]));
@@ -6103,6 +6103,7 @@ async function loadMySanvicSaved(){
         title: d.name || 'Saved place',
         cat: catLabel + (d.barangay ? ' • ' + d.barangay : ''),
         km: '',
+        image: d.image || '',
         grad: 'linear-gradient(135deg,#38bdf8,#0c4a6e)'
       };
     });
@@ -6190,10 +6191,11 @@ function renderMySanvic(){
           const allImgs = [];
           if(u.images && Array.isArray(u.images)) allImgs.push(...u.images);
           const hasImages = allImgs.length > 0;
-          const bgStyle = hasImages ? `background-image:url('${escapeHtml(allImgs[0])}');background-size:cover;background-position:center;` : '';
-          const imgClick = hasImages ? `onclick="openCarousel(${JSON.stringify(allImgs).replace(/"/g, '&quot;')},0)"` : '';
+          const cardBg = hasImages
+            ? `background-image:url('${escapeHtml(allImgs[0])}');background-size:cover;background-position:center;`
+            : `background:${u.grad};`;
           return `
-          <div class="mysv-up-card" style="${bgStyle}${bgStyle?'':''}${u.grad}">
+          <div class="mysv-up-card" style="${cardBg}">
             <span class="mysv-badge ${u.badgeStyle==='soft'?'soft':''}">${escapeHtml(u.badge)}</span>
             <div class="mysv-up-info">
               <div class="mysv-up-title">${escapeHtml(u.title)}</div>
@@ -6215,8 +6217,12 @@ function renderMySanvic(){
         <button class="mysv-viewall">View all ›</button>
       </div>
       <div class="mysv-hscroll">
-        ${MYSV_SAVED.map(s=>`
-          <div class="mysv-sv-card" style="background:${s.grad}">
+        ${MYSV_SAVED.map(s=>{
+          const cardBg = s.image
+            ? `background-image:url('${escapeHtml(s.image)}');background-size:cover;background-position:center;`
+            : `background:${s.grad};`;
+          return `
+          <div class="mysv-sv-card" style="${cardBg}">
             <button class="mysv-sv-heart" onclick="mysvToggleSaved('${s.id}')" aria-label="Saved">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
             </button>
@@ -6228,7 +6234,8 @@ function renderMySanvic(){
                 <button class="mysv-dot" onclick="mysvAction('menu','${s.id}')">⋯</button>
               </div>
             </div>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>
     </div>`;
 
@@ -6239,16 +6246,21 @@ function renderMySanvic(){
         <button class="mysv-viewall">View all ›</button>
       </div>
       <div>
-        ${MYSV_TRIBES.map(t=>`
+        ${MYSV_TRIBES.map(t=>{
+          const thumbBg = t.thumb
+            ? `background-image:url('${escapeHtml(t.thumb)}');background-size:cover;background-position:center;`
+            : `background:${t.grad};`;
+          return `
           <div class="mysv-tribe-row">
-            <div class="mysv-tribe-thumb" style="background:${t.grad}"></div>
+            <div class="mysv-tribe-thumb" style="${thumbBg}"></div>
             <div class="mysv-tribe-body">
               <div class="mysv-tribe-title">${escapeHtml(t.title)}</div>
               <div class="mysv-tribe-meta">${escapeHtml(t.meta)}</div>
             </div>
             ${mysvAvatars(3, t.more)}
             <button class="mysv-cap-btn" onclick="mysvAction('openChat','${t.id}')">Open Chat</button>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>
     </div>`;
 
@@ -6260,9 +6272,14 @@ function renderMySanvic(){
             <div><div class="mysv-sec-title">📅 Events I'm Interested In</div><div class="mysv-sec-sub">You showed interest in these.</div></div>
             <button class="mysv-viewall">View all ›</button>
           </div>
-          ${MYSV_EVENTS.map(e=>`
+          ${MYSV_EVENTS.map(e=>{
+            const evImg = (e.images && e.images.length) ? e.images[0] : '';
+            const evBg = evImg
+              ? `background-image:url('${escapeHtml(evImg)}');background-size:cover;background-position:center;`
+              : `background:${e.grad};`;
+            return `
             <div class="mysv-ev-card">
-              <div class="mysv-ev-thumb" style="background:${e.grad}"></div>
+              <div class="mysv-ev-thumb" style="${evBg}"></div>
               <div class="mysv-ev-body">
                 <div class="mysv-ev-title">${escapeHtml(e.title)}</div>
                 <div class="mysv-ev-meta">${escapeHtml(e.meta)}</div>
@@ -6271,7 +6288,8 @@ function renderMySanvic(){
                   <button class="mysv-cap-btn" onclick="mysvAction('details','${e.id}')">View Details</button>
                 </div>
               </div>
-            </div>`).join('')}
+            </div>`;
+          }).join('')}
         </div>
         <div class="mysv-col">
           <div class="mysv-sec-head" style="margin-bottom:6px">
