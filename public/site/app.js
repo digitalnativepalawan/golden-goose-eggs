@@ -90,6 +90,10 @@ const DEFAULT_HERO_SUBTITLE = ``;
 const DEFAULT_SPLASH_SUBTEXT = `The San Vicente Travel Hub<br>Curated by the people who live here`;
 const DEFAULT_SPLASH_FOOTER = `PALAWAN`;
 
+// ─── TALA AI (OpenRouter) state ───
+let talaAiEnabled = false;
+let talaAiModel = '';
+
 // ─── LIVE DATA (populated from Supabase, falls back to defaults) ───
 let destinations = [];
 let aiData = [];
@@ -468,6 +472,7 @@ function destRowToObj(row){
     id: row.id, name: row.name, lat: row.lat, lng: row.lng, category: row.category,
     image: row.image, description: row.description, tip: row.tip, color: row.color || '#0ea5e9',
     videoUrl: row.video_url || '', videoType: row.video_type || '', featured: !!row.featured,
+    googleBusinessUrl: row.google_business_url || '',
     barangay: row.barangay || '',
     stats: { rating: row.rating, travel: row.travel, temp: row.temp, season: row.season }
   };
@@ -502,7 +507,7 @@ function isSuggestionActiveToday(s){
 
 async function loadDataFromSupabase(){
   try {
-    const [destRes, talaRes, settingsRes, sugRes, siteRes, catRes, nearbyRes] = await Promise.all([
+    const [destRes, talaRes, settingsRes, sugRes, siteRes, catRes, nearbyRes, aiSettingsRes] = await Promise.all([
       sb.from('destinations').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_responses').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_settings').select('*').eq('key', 'default_response').maybeSingle(),
@@ -510,10 +515,18 @@ async function loadDataFromSupabase(){
       sb.from('site_settings').select('*').in('key', ['hero_title', 'hero_subtitle', 'splash_subtext', 'splash_footer']),
       sb.from('destination_categories').select('*').order('sort_order', { ascending: true }),
       sb.from('nearby_places').select('*').order('sort_order', { ascending: true }),
+      sb.from('tala_settings').select('key,value').in('key', ['ai_enabled', 'ai_model']),
     ]);
 
     if (destRes.error) throw destRes.error;
     if (talaRes.error) throw talaRes.error;
+
+    if(aiSettingsRes && aiSettingsRes.data){
+      aiSettingsRes.data.forEach(r=>{
+        if(r.key==='ai_enabled') talaAiEnabled = (r.value === 'true');
+        if(r.key==='ai_model' && r.value) talaAiModel = r.value;
+      });
+    }
 
     destinations = (destRes.data && destRes.data.length) ? destRes.data.map(destRowToObj) : DEFAULT_DESTINATIONS;
     aiData = (talaRes.data && talaRes.data.length) ? talaRes.data.map(r=>({ id:r.id, kw:r.keywords, r:r.response, cat:r.category||'knowledge' })) : DEFAULT_TALA_DATA;
@@ -538,6 +551,8 @@ async function loadDataFromSupabase(){
     aiData = DEFAULT_TALA_DATA;
     defaultR = DEFAULT_FALLBACK_RESPONSE;
     talaSuggestions = DEFAULT_SUGGESTIONS;
+    talaAiEnabled = false;
+    talaAiModel = '';
     heroTitle = DEFAULT_HERO_TITLE;
     heroSubtitle = DEFAULT_HERO_SUBTITLE;
     splashSubtext = DEFAULT_SPLASH_SUBTEXT;
@@ -576,10 +591,27 @@ const DEFAULT_CAT_STYLE = {
 // Inlined Lucide SVG inner-content for the curated icon set admins can
 // pick from. Keep this in sync with the picker list below. Rendered into
 // a <svg viewBox="0 0 24 24" stroke="currentColor"...> wrapper.
+const EXTRA_ICONS = {
+  "tag": "<path d=\"M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z\"/><circle cx=\"7.5\" cy=\"7.5\" r=\".5\"/>",
+  "film": "<rect x=\"2\" y=\"2\" width=\"20\" height=\"20\" rx=\"2.18\" ry=\"2.18\"/><path d=\"M7 2v20\"/><path d=\"M17 2v20\"/><path d=\"M2 12h20\"/><path d=\"M2 7h5\"/><path d=\"M2 17h5\"/><path d=\"M17 7h5\"/><path d=\"M17 17h5\"/>",
+  "zap": "<path d=\"M13 2 3 14h9l-1 8 10-12h-9l1-8z\"/>",
+  "file-text": "<path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z\"/><path d=\"M14 2v6h6\"/><path d=\"M16 13H8\"/><path d=\"M16 17H8\"/>",
+  "save": "<path d=\"M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z\"/><path d=\"M17 21v-7a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v7\"/><path d=\"M7 3v4a2 2 0 0 0 2 2h6\"/>",
+  "refresh-cw": "<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\"/><path d=\"M21 3v5h-5\"/><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\"/><path d=\"M8 16H3v5\"/>",
+  "search": "<circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/>",
+  "check": "<path d=\"M20 6 9 17l-5-5\"/>",
+  "x": "<path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/>",
+  "chevron-right": "<path d=\"m9 18 6-6-6-6\"/>",
+  "sparkles-ai": "<path d=\"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z\"/><path d=\"M20 3v4\"/><path d=\"M22 5h-4\"/><path d=\"M4 17v2\"/><path d=\"M5 18H3\"/>",
+  "cpu": "<rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" rx=\"2\"/><rect x=\"9\" y=\"9\" width=\"6\" height=\"6\"/><path d=\"M15 2v2M15 20v2M2 15h2M20 15h2M2 9h2M20 9h2M9 2v2M9 20v2\"/>",
+  "key": "<path d=\"m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4\"/>",
+  "shield": "<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/>",
+  "globe": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20\"/><path d=\"M2 12h20\"/>"
+};
 const LUCIDE_ICONS = JSON.parse('{"anchor": "<path d=\\"M12 6v16\\" /> <path d=\\"m19 13 2-1a9 9 0 0 1-18 0l2 1\\" /> <path d=\\"M9 11h6\\" /> <circle cx=\\"12\\" cy=\\"4\\" r=\\"2\\" />", "bed-double": "<path d=\\"M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8\\" /> <path d=\\"M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4\\" /> <path d=\\"M12 4v6\\" /> <path d=\\"M2 18h20\\" />", "bike": "<circle cx=\\"18.5\\" cy=\\"17.5\\" r=\\"3.5\\" /> <circle cx=\\"5.5\\" cy=\\"17.5\\" r=\\"3.5\\" /> <circle cx=\\"15\\" cy=\\"5\\" r=\\"1\\" /> <path d=\\"M12 17.5V14l-3-3 4-3 2 3h2\\" />", "camera": "<path d=\\"M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z\\" /> <circle cx=\\"12\\" cy=\\"13\\" r=\\"3\\" />", "car": "<path d=\\"M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2\\" /> <circle cx=\\"7\\" cy=\\"17\\" r=\\"2\\" /> <path d=\\"M9 17h6\\" /> <circle cx=\\"17\\" cy=\\"17\\" r=\\"2\\" />", "coffee": "<path d=\\"M10 2v2\\" /> <path d=\\"M14 2v2\\" /> <path d=\\"M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1\\" /> <path d=\\"M6 2v2\\" />", "compass": "<circle cx=\\"12\\" cy=\\"12\\" r=\\"10\\" /> <path d=\\"m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z\\" />", "droplets": "<path d=\\"M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z\\" /> <path d=\\"M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97\\" />", "fish": "<path d=\\"M6.5 12c.94-3.46 4.94-6 8.5-6 3.56 0 6.06 2.54 7 6-.94 3.47-3.44 6-7 6s-7.56-2.53-8.5-6Z\\" /> <path d=\\"M18 12v.5\\" /> <path d=\\"M16 17.93a9.77 9.77 0 0 1 0-11.86\\" /> <path d=\\"M7 10.67C7 8 5.58 5.97 2.73 5.5c-1 1.5-1 5 .23 6.5-1.24 1.5-1.24 5-.23 6.5C5.58 18.03 7 16 7 13.33\\" /> <path d=\\"M10.46 7.26C10.2 5.88 9.17 4.24 8 3h5.8a2 2 0 0 1 1.98 1.67l.23 1.4\\" /> <path d=\\"m16.01 17.93-.23 1.4A2 2 0 0 1 13.8 21H9.5a5.96 5.96 0 0 0 1.49-3.98\\" />", "flower-2": "<path d=\\"M12 5a3 3 0 1 1 3 3m-3-3a3 3 0 1 0-3 3m3-3v1M9 8a3 3 0 1 0 3 3M9 8h1m5 0a3 3 0 1 1-3 3m3-3h-1m-2 3v-1\\" /> <circle cx=\\"12\\" cy=\\"8\\" r=\\"2\\" /> <path d=\\"M12 10v12\\" /> <path d=\\"M12 22c4.2 0 7-1.667 7-5-4.2 0-7 1.667-7 5Z\\" /> <path d=\\"M12 22c-4.2 0-7-1.667-7-5 4.2 0 7 1.667 7 5Z\\" />", "footprints": "<path d=\\"M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z\\" /> <path d=\\"M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z\\" /> <path d=\\"M16 17h4\\" /> <path d=\\"M4 13h4\\" />", "gem": "<path d=\\"M10.5 3 8 9l4 13 4-13-2.5-6\\" /> <path d=\\"M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z\\" /> <path d=\\"M2 9h20\\" />", "heart": "<path d=\\"M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5\\" />", "landmark": "<path d=\\"M10 18v-7\\" /> <path d=\\"M11.119 2.205a2 2 0 0 1 1.762 0l7.84 3.846A.5.5 0 0 1 20.5 7h-17a.5.5 0 0 1-.22-.949z\\" /> <path d=\\"M14 18v-7\\" /> <path d=\\"M18 18v-7\\" /> <path d=\\"M3 22h18\\" /> <path d=\\"M6 18v-7\\" />", "map-pin": "<path d=\\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\\" /> <circle cx=\\"12\\" cy=\\"10\\" r=\\"3\\" />", "mountain": "<path d=\\"m8 3 4 8 5-5 5 15H2L8 3z\\" />", "music": "<path d=\\"M9 18V5l12-2v13\\" /> <circle cx=\\"6\\" cy=\\"18\\" r=\\"3\\" /> <circle cx=\\"18\\" cy=\\"16\\" r=\\"3\\" />", "palmtree": "<path d=\\"M13 8c0-2.76-2.46-5-5.5-5S2 5.24 2 8h2l1-1 1 1h4\\" /> <path d=\\"M13 7.14A5.82 5.82 0 0 1 16.5 6c3.04 0 5.5 2.24 5.5 5h-3l-1-1-1 1h-3\\" /> <path d=\\"M5.89 9.71c-2.15 2.15-2.3 5.47-.35 7.43l4.24-4.25.7-.7.71-.71 2.12-2.12c-1.95-1.96-5.27-1.8-7.42.35\\" /> <path d=\\"M11 15.5c.5 2.5-.17 4.5-1 6.5h4c2-5.5-.5-12-1-14\\" />", "plane": "<path d=\\"M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z\\" />", "ship": "<path d=\\"M12 10.189V14\\" /> <path d=\\"M12 2v3\\" /> <path d=\\"M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6\\" /> <path d=\\"M19.38 20A11.6 11.6 0 0 0 21 14l-8.188-3.639a2 2 0 0 0-1.624 0L3 14a11.6 11.6 0 0 0 2.81 7.76\\" /> <path d=\\"M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1s1.2 1 2.5 1c2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1\\" />", "shopping-bag": "<path d=\\"M16 10a4 4 0 0 1-8 0\\" /> <path d=\\"M3.103 6.034h17.794\\" /> <path d=\\"M3.4 5.467a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.667a2 2 0 0 0-.4-1.2l-2-2.667A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z\\" />", "sparkles": "<path d=\\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\\" /> <path d=\\"M20 2v4\\" /> <path d=\\"M22 4h-4\\" /> <circle cx=\\"4\\" cy=\\"20\\" r=\\"2\\" />", "star": "<path d=\\"M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z\\" />", "sun": "<circle cx=\\"12\\" cy=\\"12\\" r=\\"4\\" /> <path d=\\"M12 2v2\\" /> <path d=\\"M12 20v2\\" /> <path d=\\"m4.93 4.93 1.41 1.41\\" /> <path d=\\"m17.66 17.66 1.41 1.41\\" /> <path d=\\"M2 12h2\\" /> <path d=\\"M20 12h2\\" /> <path d=\\"m6.34 17.66-1.41 1.41\\" /> <path d=\\"m19.07 4.93-1.41 1.41\\" />", "tent": "<path d=\\"M3.5 21 14 3\\" /> <path d=\\"M20.5 21 10 3\\" /> <path d=\\"M15.5 21 12 15l-3.5 6\\" /> <path d=\\"M2 21h20\\" />", "trees": "<path d=\\"M10 10v.2A3 3 0 0 1 8.9 16H5a3 3 0 0 1-1-5.8V10a3 3 0 0 1 6 0Z\\" /> <path d=\\"M7 16v6\\" /> <path d=\\"M13 19v3\\" /> <path d=\\"M12 19h8.3a1 1 0 0 0 .7-1.7L18 14h.3a1 1 0 0 0 .7-1.7L16 9h.2a1 1 0 0 0 .8-1.7L13 3l-1.4 1.5\\" />", "umbrella": "<path d=\\"M12 13v7a2 2 0 0 0 4 0\\" /> <path d=\\"M12 2v2\\" /> <path d=\\"M20.992 13a1 1 0 0 0 .97-1.274 10.284 10.284 0 0 0-19.923 0A1 1 0 0 0 3 13z\\" />", "utensils": "<path d=\\"M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2\\" /> <path d=\\"M7 2v20\\" /> <path d=\\"M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7\\" />", "waves": "<path d=\\"M2 12q2.5 2 5 0t5 0 5 0 5 0\\" /> <path d=\\"M2 19q2.5 2 5 0t5 0 5 0 5 0\\" /> <path d=\\"M2 5q2.5 2 5 0t5 0 5 0 5 0\\" />", "wine": "<path d=\\"M8 22h8\\" /> <path d=\\"M7 10h10\\" /> <path d=\\"M12 15v7\\" /> <path d=\\"M12 15a5 5 0 0 0 5-5c0-2-.5-4-2-8H9c-1.5 4-2 6-2 8a5 5 0 0 0 5 5Z\\" />"}');
 const LUCIDE_ICON_KEYS = Object.keys(LUCIDE_ICONS);
 function lucideSvg(name, size){
-  const inner = LUCIDE_ICONS[name] || LUCIDE_ICONS['map-pin'];
+  const inner = EXTRA_ICONS[name] || LUCIDE_ICONS[name] || LUCIDE_ICONS['map-pin'];
   const s = size || 16;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
 }
@@ -625,6 +657,41 @@ function getAI(input) {
   for (const item of aiData) for (const k of item.kw)
     if (l.includes(k) && k.length>bestS) { bestS=k.length; best=item.r; }
   return best||defaultR;
+}
+
+// Live AI answer via the server-side OpenRouter proxy. Falls back to curated
+// keyword answers on any failure (key not set, model error, offline).
+// Live AI answer via the server-side OpenRouter proxy. Falls back to curated
+// keyword answers on any failure (key not set, model error, offline).
+async function getAILive(input){
+  const res = await fetch('/api/tala-chat', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      model: talaAiModel || undefined,
+      messages: [{ role:'user', content: input }]
+    })
+  });
+  const j = await res.json().catch(()=>({}));
+  if(!res.ok || j.configured === false || j.error) throw new Error(j.error || ('HTTP ' + res.status));
+  const reply = (j.reply || '').trim();
+  return reply || getAI(input);
+}
+
+function answerTala(t){
+  if(talaAiEnabled){
+    document.getElementById('tshStatus').textContent = 'tala is thinking…';
+    getAILive(t)
+      .then(reply=>{ markTalaIdle(); addMsg('bot', reply); speak(reply); })
+      .catch(err=>{ console.warn('[TALA] live AI unavailable, using curated answers:', err); markTalaIdle(); const fallback = getAI(t); addMsg('bot', fallback); speak(fallback); });
+  } else {
+    const r = getAI(t);
+    setTimeout(()=>{ addMsg('bot', r); speak(r); }, 140);
+  }
+}
+function markTalaIdle(){
+  const st = document.getElementById('tshStatus');
+  if(st && st.textContent === 'tala is thinking…') st.textContent = 'Your Palawan concierge';
 }
 
 // ─── MAP ───
@@ -2569,13 +2636,24 @@ function openDest(d) {
     window.open(url,'_blank','noopener');
   };
 
+  const gbpBtn = document.getElementById('deGbp');
+  if(gbpBtn){
+    if(d.googleBusinessUrl){
+      gbpBtn.style.display = '';
+      gbpBtn.onclick = ()=>{ window.open(d.googleBusinessUrl,'_blank','noopener'); };
+    } else {
+      gbpBtn.style.display = 'none';
+    }
+  }
+
   document.getElementById('deAskTala').onclick = ()=>{
     closeDestSheet(true);
+    const name = d.name;
     setTimeout(()=>{
       openTalaSheet();
-      addMsg('user',`Tell me about ${d.name}`);
-      setTimeout(()=>{addMsg('bot',getAI(d.name));speak(getAI(d.name));},400);
-    },350);
+      addMsg('user',`Tell me about ${name}`);
+      answerTala(name);
+    }, 300);
   };
 
   // Close everything else
@@ -2788,8 +2866,7 @@ function sendTala(){
 
 function processTala(t){
   addMsg('user',t);
-  const r=getAI(t);
-  setTimeout(()=>{addMsg('bot',r);speak(r);},400+Math.random()*200);
+  answerTala(t);
 }
 
 function askTala(btn){processTala(btn.textContent);}
@@ -2803,7 +2880,9 @@ function addMsg(type,text){
 function speak(text){
   if(!synth||!voiceOn) return;
   synth.cancel();
+  if(!voices.length) voices = synth.getVoices();
   const c=text.replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
+  if(!c) return;
   const u=new SpeechSynthesisUtterance(c);
   u.rate=1;u.pitch=1;u.volume=.85;
   const v=voices.find(v=>v.lang.startsWith('en')&&v.name.toLowerCase().includes('female'))||voices.find(v=>v.lang.startsWith('en-US'))||voices.find(v=>v.lang.startsWith('en'));
@@ -2816,8 +2895,9 @@ function speak(text){
 function toggleMute(){
   voiceOn=!voiceOn;
   const b=document.getElementById('tshMute');
-  if(voiceOn){b.textContent='🔊';b.classList.remove('muted');document.getElementById('tshStatus').textContent='Your Palawan concierge';}
-  else{b.textContent='🔇';b.classList.add('muted');document.getElementById('tshStatus').textContent='Voice muted';synth.cancel();document.getElementById('tshAvatar').classList.remove('speaking');}
+  b.classList.toggle('muted', !voiceOn);
+  if(voiceOn){b.title='Mute voice';document.getElementById('tshStatus').textContent='Your Palawan concierge';}
+  else{b.title='Unmute voice';document.getElementById('tshStatus').textContent='Voice muted';synth.cancel();document.getElementById('tshAvatar').classList.remove('speaking');}
 }
 
 // ─── SEARCH ───
@@ -2837,7 +2917,7 @@ function heroAsk(){
   closeDestSheet(false);
   openTalaSheet();
   addMsg('user',t);
-  setTimeout(()=>{addMsg('bot',getAI(t));speak(getAI(t));},400);
+  answerTala(t);
 }
 
 function heroMic(){
@@ -2984,7 +3064,16 @@ function checkAdminPin(){
 async function openAdminPanel(){
   if(!dataReady) await loadDataFromSupabase();
   document.getElementById('adminPanelOverlay').classList.add('active');
+  refreshAdminAiBadge();
   switchAdminTab(adminTab);
+}
+
+function refreshAdminAiBadge(){
+  const b = document.getElementById('adminAiBadge');
+  if(!b) return;
+  b.classList.toggle('is-on', !!talaAiEnabled);
+  b.innerHTML = `${lucideSvg('cpu',12)} ${talaAiEnabled ? 'AI on · ' : 'AI off · '}${escapeHtml(talaAiModel || '—')}`;
+  b.title = talaAiEnabled ? 'TALA answers use OpenRouter (live AI)' : 'TALA uses curated keyword answers';
 }
 
 function closeAdminPanel(){
@@ -2997,12 +3086,14 @@ function switchAdminTab(tab){
   adminTab = tab;
   document.getElementById('adminTabDest').classList.toggle('active', tab==='dest');
   document.getElementById('adminTabTala').classList.toggle('active', tab==='tala');
+  document.getElementById('adminTabTalaAi').classList.toggle('active', tab==='ai');
   document.getElementById('adminTabPulse').classList.toggle('active', tab==='pulse');
   document.getElementById('adminTabSite').classList.toggle('active', tab==='site');
   adminEditingDestId = null;
   adminEditingTalaId = null;
   if(tab==='dest') renderAdminDest();
   else if(tab==='tala') renderAdminTala();
+  else if(tab==='ai') renderAdminTalaAi();
   else if(tab==='site') renderAdminSite();
   else renderAdminPulse();
 }
@@ -3285,14 +3376,14 @@ function renderAdminDest(){
   const body = document.getElementById('adminBody');
   let html = `
     <div class="admin-section-toggle" onclick="adminToggleDestCatPanel()">
-      <span>🏷️ Manage categories ${destCatPanelOpen?'▾':'▸'}</span>
+      <span>${lucideSvg('tag',13)} Manage categories ${destCatPanelOpen?'▾':'▸'}</span>
       <span class="admin-section-count">${Object.keys(catStyle).length}</span>
     </div>
     <div id="adfCatPanel" style="display:${destCatPanelOpen?'':'none'}">
       ${adminDestCatPanelHtml()}
     </div>
     <div class="admin-section-toggle" onclick="adminToggleNearbyPanel()" style="margin-top:8px;">
-      <span>📍 Manage "What's around me" ${nearbyPanelOpen?'▾':'▸'}</span>
+      <span>${lucideSvg('map-pin',13)} Manage "What's around me" ${nearbyPanelOpen?'▾':'▸'}</span>
       <span class="admin-section-count">${Object.values(nearbyPlacesByBarangay).reduce((n,arr)=>n+arr.length,0)}</span>
     </div>
     <div id="adfNearbyPanel" style="display:${nearbyPanelOpen?'':'none'}">
@@ -3311,7 +3402,7 @@ function renderAdminDest(){
       <div class="admin-list-item">
         <div class="admin-list-item-head">
           <div onclick="adminEditDest(${d.id})" style="flex:1;cursor:pointer;">
-            <strong>${escapeHtml(d.name)}</strong>${d.featured ? ' ⭐' : ''}${d.videoUrl ? ' 🎬' : ''}<br>
+            <strong>${escapeHtml(d.name)}</strong>${d.featured ? ` <span class="admin-feat-icon" title="Featured">${lucideSvg('star',12)}</span>` : ''}${d.videoUrl ? ` <span class="admin-feat-icon" title="Has video">${lucideSvg('film',12)}</span>` : ''}<br>
             <span>${escapeHtml(catStyle[d.category]?.label||d.category)} · ${escapeHtml(d.stats.travel||'')}</span>
           </div>
           <div class="admin-row-actions">
@@ -3326,7 +3417,7 @@ function renderAdminDest(){
 
 function adminDestFormHtml(){
   const isNew = adminEditingDestId === 'new';
-  const d = isNew ? {name:'',lat:'',lng:'',category:'beaches',image:'',description:'',tip:'',color:'#0ea5e9',videoUrl:'',videoType:'',featured:false,barangay:'',stats:{rating:'',travel:'',temp:'',season:''}} : destinations.find(x=>x.id===adminEditingDestId);
+  const d = isNew ? {name:'',lat:'',lng:'',category:'beaches',image:'',description:'',tip:'',color:'#0ea5e9',videoUrl:'',videoType:'',featured:false,barangay:'',googleBusinessUrl:'',stats:{rating:'',travel:'',temp:'',season:''}} : destinations.find(x=>x.id===adminEditingDestId);
   if(!d) return '';
   const vType = d.videoType || 'none';
   return `
@@ -3355,6 +3446,18 @@ function adminDestFormHtml(){
         <input id="adfBarangay" list="adfBarangayList" value="${escapeHtml(d.barangay||'')}" placeholder="e.g. Poblacion, Port Barton, Alimanguan...">
         <datalist id="adfBarangayList">${Object.keys(nearbyPlacesByBarangay).map(b=>`<option value="${escapeHtml(b)}">`).join('')}</datalist>
       </div>
+      <div class="admin-field">
+        <label>Google Business Profile URL (sightseeing, accommodation, cafe, tour office...)</label>
+        <input id="adfGbp" value="${escapeHtml(d.googleBusinessUrl)}" placeholder="https://www.google.com/maps/place/... or https://maps.app.goo.gl/..." oninput="adminParseGbpLink()">
+        <div id="adfGbpStatus" style="font-size:.68rem;color:var(--white-dim);margin-top:6px;">
+          Paste the "Share" link from the business's Google profile. If coordinates can be read from it, they're filled in below.
+        </div>
+      </div>
+      <div class="admin-field" style="margin-top:10px">
+        <button type="button" class="admin-save-btn" id="adfAutoFillBtn" onclick="adminAutoFill()" style="min-height:44px">Auto-fill from OpenStreetMap &amp; Wikimedia (no API keys)</button>
+        <div id="adfAutoStatus" style="font-size:.68rem;color:var(--white-dim);margin-top:8px;line-height:1.5"></div>
+        <div id="adfAutoResults"></div>
+      </div>
       <div class="admin-grid-2">
         <div class="admin-field"><label>Category</label>
           <select id="adfCat">
@@ -3370,6 +3473,7 @@ function adminDestFormHtml(){
         <input type="file" id="adfImageFile" accept="image/jpeg,image/png,image/webp,image/gif" style="margin-top:8px;" onchange="adminUploadImageNow()">
         <div id="adfImageUploadStatus" style="font-size:.68rem;color:var(--white-dim);margin-top:6px;"></div>
         <img id="adfImagePreview" class="admin-img-preview" src="${escapeHtml(d.image)}" style="display:${d.image?'':'none'}" onerror="this.style.display='none'">
+        <div id="adfImageAttribution" style="font-size:.62rem;color:var(--white-dim);margin-top:4px;line-height:1.5"></div>
       </div>
 
       <div class="admin-field"><label>Description</label><textarea id="adfDesc" rows="3">${escapeHtml(d.description)}</textarea></div>
@@ -3482,6 +3586,242 @@ function adminParseMapsLink(){
 function adminNewDest(){ adminEditingDestId='new'; renderAdminDest(); }
 function adminEditDest(id){ adminEditingDestId=id; renderAdminDest(); }
 
+// Optional helper: a Google Business Profile URL is usually just a Google
+// Maps place link — when it is, quietly fill in name/lat/lng as a convenience.
+// The URL itself is always stored verbatim in the google_business_url column.
+function adminParseGbpLink(){
+  const status = document.getElementById('adfGbpStatus');
+  const url = (document.getElementById('adfGbp').value || '').trim();
+  if(!url){
+    status.textContent = 'Paste the "Share" link from the business\'s Google profile. If coordinates can be read from it, they\'re filled in below.';
+    status.style.color = 'var(--white-dim)';
+    return;
+  }
+  const result = parseGoogleMapsUrl(url);
+  if(result){
+    const latEl = document.getElementById('adfLat');
+    const lngEl = document.getElementById('adfLng');
+    const nameEl = document.getElementById('adfName');
+    if(latEl && lngEl){
+      if(!latEl.value) latEl.value = result.lat;
+      if(!lngEl.value) lngEl.value = result.lng;
+    }
+    if(result.name && nameEl && !nameEl.value.trim()) nameEl.value = result.name;
+    status.textContent = 'Coordinates found and filled in. This URL will also be saved as the Google Business Profile link.';
+    status.style.color = '#22c55e';
+  } else {
+    status.textContent = 'Saved as-is. (Some profile share links are short URLs that can\'t be read client-side — that\'s fine.)';
+    status.style.color = '#f59e0b';
+  }
+}
+
+// ─── OPEN-SOURCE AUTO-FILL (no API keys) ───
+// Pasted flow: admin pastes a Google Business link (or types a name),
+// we resolve the place through OpenStreetMap (Nominatim + Overpass) for real
+// data and recommend photos from Wikimedia Commons. All endpoints are open,
+// keyless, CORS-enabled. Attribution required for OSM (ODbL) + Commons (CC).
+
+function gbpNameFromUrl(url){
+  if(!url) return '';
+  const m = url.match(/\/maps\/place\/([^/@]+)/);
+  if(m) return decodeURIComponent(m[1].replace(/\+/g,' '));
+  const q = url.match(/[?&]q=([^&]+)/);
+  if(q && q[1] && !/^[\d.,]+$/.test(q[1].trim())) return decodeURIComponent(q[1].replace(/\+/g,' '));
+  return '';
+}
+
+async function adminNominatim(q){
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=1&q=' +
+    encodeURIComponent(q + ' San Vicente Palawan Philippines');
+  const res = await fetch(url);
+  if(!res.ok) throw new Error('Nominatim HTTP ' + res.status);
+  const rows = await res.json();
+  if(!rows || !rows.length) return null;
+  // Rank by distance to San Vicente + prefer results that actually mention it.
+  const center = { lat: 10.50, lon: 119.22 };
+  const score = r => Math.hypot(parseFloat(r.lat)-center.lat, parseFloat(r.lon)-center.lon)
+    + (/san vicente/i.test(r.display_name) ? 0 : 2)
+    + (/palawan/i.test(r.display_name) ? 0 : 1);
+  rows.sort((a,b)=>score(a)-score(b));
+  const r = rows[0];
+  return { lat:r.lat, lon:r.lon, displayName:r.display_name, shortName:r.display_name.split(',')[0].trim(), osmType:r.osm_type, osmId:r.osm_id };
+}
+
+async function adminOsmTags(osmType, osmId){
+  const type = osmType === 'relation' ? 'relation' : (osmType === 'way' ? 'way' : 'node');
+  const q = '[out:json];(' + type + '(' + osmId + '););out tags;';
+  const res = await fetch('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(q));
+  if(!res.ok) throw new Error('Overpass HTTP ' + res.status);
+  const j = await res.json();
+  return (j.elements && j.elements[0] && j.elements[0].tags) || {};
+}
+
+// Ordered guesses: [osmtag, [values], [preferred destination category keys...]]
+const OSM_CATEGORY_HINTS = [
+  ['amenity', ['restaurant','cafe','bar','fast_food','pub','food_court'], ['food']],
+  ['shop', ['travel_agency'], ['activity','tours','adventure']],
+  ['office', ['travel_agent','travel_agency'], ['activity','tours','adventure']],
+  ['tourism', ['hotel','guest_house','hostel','resort','chalet','motel','apartment'], ['stays','lodging','hotel']],
+  ['tourism', ['attraction','viewpoint'], ['adventure','nature','culture']],
+  ['tourism', ['museum','gallery','artwork'], ['culture']],
+  ['leisure', ['beach_resort','water_park'], ['stays','adventure']],
+  ['natural', ['beach','bay'], ['beaches','nature']],
+  ['natural', ['island'], ['islands','nature']],
+  ['amenity', ['atm','bank','pharmacy','clinic'], ['service','services']],
+  ['highway', ['bus_stop','ferry_terminal'], ['transport']],
+];
+function adminPickCategoryFromTags(tags){
+  const t = tags || {};
+  const sel = document.getElementById('adfCat');
+  if(!sel) return null;
+  const pick = bases => {
+    for(const b of bases) if(Array.from(sel.options).some(o=>o.value === b)){ sel.value = b; return b; }
+    return null;
+  };
+  for(const [k, vals, bases] of OSM_CATEGORY_HINTS){
+    const v = String(t[k] || '').toLowerCase();
+    if(vals.includes(v)) return pick(bases) || null;
+  }
+  return null;
+}
+
+function adminApplyOsmTags(tags, results){
+  const t = tags || {};
+  const info = [];
+  const website = t.website || t['contact:website'] || t['url:wikipedia'] || '';
+  const phone = t.phone || t['contact:phone'] || t['phone:mobile'] || '';
+  const hours = t.opening_hours || '';
+  if(website) info.push('Website: <a href="' + escapeHtml(website) + '" target="_blank" rel="noreferrer" style="color:var(--ocean-teal-light)">' + escapeHtml(website) + '</a>');
+  if(phone) info.push('Phone: ' + escapeHtml(phone));
+  if(hours) info.push('Hours: ' + escapeHtml(hours));
+  if(t['addr:housenumber'] || t['addr:street']) info.push('Address: ' + escapeHtml((t['addr:housenumber']||'') + ' ' + (t['addr:street']||'')) + ', San Vicente');
+
+  adminPickCategoryFromTags(t);
+
+  const descEl = document.getElementById('adfDesc');
+  if(descEl && !descEl.value.trim()){
+    const parts = [(t.name || 'This spot') + ' — located in San Vicente, Palawan.'];
+    const hoursStr = hours ? ' Open ' + hours + '.' : '';
+    const addrStr = (t['addr:housenumber']||t['addr:street']) ? ' Found at ' + ((t['addr:housenumber']||'') + ' ' + (t['addr:street']||'')).trim() + ', San Vicente.' : '';
+    if(hoursStr) parts.push(hoursStr);
+    if(addrStr) parts.push(addrStr);
+    descEl.value = parts.join('');
+  }
+
+  if(info.length){
+    results.insertAdjacentHTML('beforeend',
+      '<div style="border:1px solid var(--glass-border);border-radius:12px;background:rgba(255,255,255,.04);padding:10px 12px;margin-top:10px">' +
+      '<div style="font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white-dim);margin-bottom:6px">OpenStreetMap details (open-source)</div>' +
+      info.map(s => '<div style="font-size:.75rem;color:var(--sand);margin:2px 0">' + s + '</div>').join('') +
+      '<div style="font-size:.6rem;color:var(--white-dim);margin-top:6px">Data &copy; OpenStreetMap contributors (ODbL)</div>' +
+      '</div>');
+  }
+}
+
+async function adminWikimediaSuggest(q, results){
+  const box = document.createElement('div');
+  box.innerHTML =
+    '<div style="font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white-dim);margin:10px 0 6px">Wikimedia Commons photos — tap one to use it</div>' +
+    '<div style="font-size:.6rem;color:var(--white-dim);margin-bottom:4px">Photos are CC-licensed by their authors — show attribution on the live site too.</div>' +
+    '<div id="wikimediaThumbs" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:6px">Loading…</div>';
+  results.appendChild(box);
+  try{
+    const url = 'https://commons.wikimedia.org/w/api.php?action=query&generator=search' +
+      '&gsrsearch=' + encodeURIComponent(q + ' San Vicente Palawan') +
+      '&gsrnamespace=6&gsrlimit=12&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=600&format=json&origin=*';
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json();
+    const pages = (j.query && j.query.pages) || {};
+    const photos = [];
+    Object.keys(pages).forEach(k => {
+      const p = pages[k];
+      const ii = p.imageinfo && p.imageinfo[0];
+      if(ii && ii.thumburl) photos.push({
+        thumb: ii.thumburl,
+        url: ii.descriptionurl || ii.url || '',
+        artist: (ii.extmetadata && ii.extmetadata.Artist && ii.extmetadata.Artist.value) || '',
+        license: (ii.extmetadata && ii.extmetadata.LicenseShortName && ii.extmetadata.LicenseShortName.value) || ''
+      });
+    });
+    const grid = document.getElementById('wikimediaThumbs');
+    if(!grid) return;
+    if(!photos.length){
+      grid.innerHTML = '<div style="color:var(--white-dim);font-size:.7rem;grid-column:1/-1">No Commons photos found — upload your own instead.</div>';
+      return;
+    }
+    window.__wmPhotos = photos;
+    grid.innerHTML = photos.map((ph, i) =>
+      '<button type="button" onclick="adminPickWikimedia(' + i + ')" title="' + escapeHtml((ph.artist||'Photo').replace(/<[^>]+>/g,'').trim() + ' · ' + ph.license) + '" style="border:1px solid var(--glass-border);border-radius:8px;overflow:hidden;padding:0;background:rgba(255,255,255,.04);cursor:pointer">' +
+      '<img src="' + ph.thumb + '" alt="" loading="lazy" style="width:100%;height:62px;object-fit:cover;display:block"></button>'
+    ).join('');
+  }catch(e){
+    const grid = document.getElementById('wikimediaThumbs');
+    if(grid) grid.innerHTML = '<div style="color:var(--white-dim);font-size:.7rem;grid-column:1/-1">Wikimedia lookup failed (' + escapeHtml(e.message || e) + ')</div>';
+  }
+}
+
+function adminPickWikimedia(i){
+  const phs = window.__wmPhotos || [];
+  const ph = phs[i];
+  if(!ph) return;
+  const img = document.getElementById('adfImage');
+  if(img) img.value = ph.thumb;
+  adminPreviewImage();
+  const attrEl = document.getElementById('adfImageAttribution');
+  const artist = (ph.artist || '').replace(/<[^>]+>/g,'').trim() || 'unknown author';
+  if(attrEl){
+    attrEl.innerHTML = 'Photo from ' +
+      (ph.url ? '<a href="' + ph.url + '" target="_blank" rel="noreferrer" style="color:var(--ocean-teal-light)">Wikimedia Commons</a>' : 'Wikimedia Commons') +
+      ' — ' + escapeHtml(artist) + (ph.license ? ' (' + escapeHtml(ph.license) + ')' : '') + '. Show this attribution on the live map too.';
+  }
+}
+
+async function adminAutoFill(){
+  const status = document.getElementById('adfAutoStatus');
+  const results = document.getElementById('adfAutoResults');
+  status.style.color = 'var(--white-dim)';
+  results.innerHTML = '';
+  const gbp = (document.getElementById('adfGbp').value || '').trim();
+  let name = gbpNameFromUrl(gbp);
+  const nameField = document.getElementById('adfName');
+  if(!name && nameField && nameField.value.trim()) name = nameField.value.trim();
+  name = (name || '').trim();
+  if(!name){
+    status.textContent = 'Type a location name first — or paste a Google Maps link with a /place/ name — so we can search OpenStreetMap.';
+    status.style.color = '#ef4444';
+    return;
+  }
+  status.textContent = 'Searching OpenStreetMap for "' + name + '"…';
+  let r;
+  try {
+    r = await adminNominatim(name);
+  } catch(e){
+    status.textContent = 'OpenStreetMap lookup failed (' + escapeHtml(e.message || e) + '). You can still fill the fields manually.';
+    status.style.color = '#ef4444';
+    return;
+  }
+  if(!r){
+    status.textContent = 'No matching place on OpenStreetMap for "' + name + '". Fill the fields manually.';
+    status.style.color = '#f59e0b';
+    return;
+  }
+  const latEl = document.getElementById('adfLat');
+  const lngEl = document.getElementById('adfLng');
+  if(latEl && !latEl.value) latEl.value = r.lat;
+  if(lngEl && !lngEl.value) lngEl.value = r.lon;
+  if(nameField && !nameField.value.trim() && r.shortName) nameField.value = r.shortName;
+  status.innerHTML = 'Matched: <strong>' + escapeHtml(r.displayName) + '</strong> (via OpenStreetMap / Nominatim).';
+  status.style.color = '#22c55e';
+  let tags = {};
+  if(r.osmId){
+    try { tags = await adminOsmTags(r.osmType, r.osmId); }
+    catch(e){ /* details are a bonus — coords already filled */ }
+  }
+  adminApplyOsmTags(tags, results);
+  adminWikimediaSuggest(name, results);
+}
+
 async function adminUploadVideoIfNeeded(){
   const type = document.getElementById('adfVideoType').value;
   if(type !== 'upload') return null;
@@ -3538,6 +3878,7 @@ async function adminSaveDest(){
       video_type: videoType === 'none' ? null : videoType,
       featured: document.getElementById('adfFeatured').checked,
       barangay: document.getElementById('adfBarangay').value.trim(),
+      google_business_url: document.getElementById('adfGbp').value.trim() || null,
     };
     if(!payload.name || isNaN(payload.lat) || isNaN(payload.lng)){
       alert('Name, latitude, and longitude are required.');
@@ -3709,6 +4050,152 @@ async function adminDeleteSuggestion(id){
   }
 }
 
+// ───────────── TALA AI ADMIN (OpenRouter) ─────────────
+
+const TALA_AI_DEFAULT_MODEL = 'google/gemini-2.5-flash';
+const TALA_AI_FALLBACK_MODELS = {
+  free: [
+    'google/gemini-2.5-flash',
+    'qwen/qwen3-30b-a3b-instruct:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'deepseek/deepseek-chat-v3-0324:free',
+    'mistralai/mistral-small-3.1-24b-instruct:free'
+  ],
+  paid: [
+    'openai/gpt-4o-mini',
+    'openai/gpt-4.1-mini',
+    'anthropic/claude-3-5-haiku',
+    'google/gemini-2.5-pro',
+    'deepseek/deepseek-chat'
+  ]
+};
+let talaAiModelsCache = null;
+
+async function fetchOpenRouterModels(){
+  if(talaAiModelsCache) return talaAiModelsCache;
+  const free = [], paid = [];
+  try {
+    const r = await fetch('https://openrouter.ai/api/v1/models');
+    if(r.ok){
+      const j = await r.json();
+      (j.data || []).forEach(m=>{
+        const cost = parseFloat(m.pricing && m.pricing.prompt);
+        (cost === 0 ? free : paid).push(m.id);
+      });
+      free.sort(); paid.sort();
+    }
+  } catch(e){ /* offline — use curated fallback below */ }
+  talaAiModelsCache = {
+    free: free.length ? free : TALA_AI_FALLBACK_MODELS.free.slice(),
+    paid: paid.length ? paid : TALA_AI_FALLBACK_MODELS.paid.slice()
+  };
+  return talaAiModelsCache;
+}
+
+async function renderAdminTalaAi(){
+  const body = document.getElementById('adminBody');
+  body.innerHTML = `
+    <div class="admin-field" style="font-size:.72rem;color:var(--white-dim);margin-bottom:12px;line-height:1.6;">
+      Route Tala's answers to a live AI model through OpenRouter. Turn it on below and pick a model — free or paid. Your curated knowledge (destinations + Tala answers) is sent as context, and if the server key isn't configured, Tala silently falls back to the keyword answers you manage in the <strong style="color:var(--white-soft)">Tala Answers</strong> tab.
+    </div>
+    <div class="admin-edit-box">
+      <div class="admin-toggle-row">
+        <label>Live AI answers enabled</label>
+        <input type="checkbox" id="aiEnabledCb">
+      </div>
+      <div class="admin-field" style="margin-top:12px">
+        <label>Model</label>
+        <select id="aiModelSel"><option>Loading models…</option></select>
+      </div>
+      <div class="admin-field">
+        <label>Custom model ID <span style="text-transform:none;letter-spacing:0;color:var(--white-dim)">(overrides dropdown, e.g. google/gemini-2.5-flash)</span></label>
+        <input type="text" id="aiModelCustom" placeholder="OpenRouter model id">
+      </div>
+      <div class="admin-edit-actions">
+        <button class="admin-save-btn" onclick="adminSaveAiConfig()">${lucideSvg('save',14)} Save AI config</button>
+        <button class="admin-cancel-btn" onclick="adminTestAi()">${lucideSvg('zap',12)} Test</button>
+      </div>
+      <div id="aiTestOut" style="font-size:.72rem;margin-top:8px;color:var(--white-dim);min-height:14px;"></div>
+    </div>
+    <div class="admin-empty" style="padding:14px 0">Free &amp; paid models load here from openrouter.ai…</div>`;
+
+  document.getElementById('aiEnabledCb').checked = !!talaAiEnabled;
+  document.getElementById('aiModelCustom').value = talaAiModel || '';
+
+  const models = await fetchOpenRouterModels();
+  const sel = document.getElementById('aiModelSel');
+  const cur = talaAiModel;
+  let html = '';
+  if(models.free.length){
+    html += `<optgroup label="Free models">`;
+    models.free.forEach(id=>{ html += `<option value="${escapeHtml(id)}" ${cur===id?'selected':''}>${escapeHtml(id)}</option>`; });
+    html += `</optgroup>`;
+  }
+  if(models.paid.length){
+    html += `<optgroup label="Paid models">`;
+    models.paid.forEach(id=>{ html += `<option value="${escapeHtml(id)}" ${cur===id?'selected':''}>${escapeHtml(id)}</option>`; });
+    html += `</optgroup>`;
+  }
+  sel.innerHTML = html || '<option value="' + escapeHtml(TALA_AI_DEFAULT_MODEL) + '">' + escapeHtml(TALA_AI_DEFAULT_MODEL) + '</option>';
+
+  refreshAiServerStatus();
+}
+
+async function refreshAiServerStatus(){
+  try {
+    const r = await fetch('/api/tala-chat', { method:'GET' });
+    const j = await r.json().catch(()=>({}));
+    const pillTxt = j.configured ? 'server: key configured' : 'server: key missing — offline answers';
+    const out = document.getElementById('aiTestOut');
+    if(out) out.innerHTML = `<span style="color:${j.configured ? '#5eead4' : '#fbbf24'}">${lucideSvg(j.configured ? 'check' : 'x', 12)} ${pillTxt}</span>`;
+  } catch(e){ /* server not reachable — ignore, badge reflects state */ }
+}
+
+async function adminSaveAiConfig(){
+  const sel = document.getElementById('aiModelSel');
+  const custom = document.getElementById('aiModelCustom').value.trim();
+  const model = custom || (sel && sel.value) || TALA_AI_DEFAULT_MODEL;
+  const enabled = document.getElementById('aiEnabledCb').checked;
+  const out = document.getElementById('aiTestOut');
+  out.textContent = 'Saving…';
+  try {
+    const { error } = await sb.from('tala_settings').upsert([
+      { key:'ai_enabled', value: enabled ? 'true' : 'false' },
+      { key:'ai_model', value: model }
+    ]);
+    if(error) throw error;
+    talaAiEnabled = enabled;
+    talaAiModel = model;
+    refreshAdminAiBadge();
+    out.innerHTML = `<span style="color:#5eead4">${lucideSvg('check',12)} Saved.</span> Live AI ${enabled?'on':'off'} · ${escapeHtml(model)}`;
+  } catch(err){
+    out.textContent = 'Save failed: ' + (err.message || err);
+    out.style.color = '#f87171';
+  }
+}
+
+async function adminTestAi(){
+  const sel = document.getElementById('aiModelSel');
+  const custom = document.getElementById('aiModelCustom').value.trim();
+  const model = custom || (sel && sel.value) || TALA_AI_DEFAULT_MODEL;
+  const out = document.getElementById('aiTestOut');
+  out.textContent = 'Asking ' + model + '…';
+  out.style.color = 'var(--white-dim)';
+  try {
+    const r = await fetch('/api/tala-chat', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ model, messages:[{ role:'user', content:'Say hello as tala, the warm San Vicente travel concierge. Under 10 words.' }] })
+    });
+    const j = await r.json().catch(()=>({}));
+    if(r.ok && j.reply) out.innerHTML = `<span style="color:#5eead4">${lucideSvg('check',12)} Reply:</span> ${escapeHtml(String(j.reply).slice(0,300))}`;
+    else out.innerHTML = `<span style="color:#f87171">${lucideSvg('x',12)} ${escapeHtml(j.error || ('HTTP ' + r.status) || 'No key configured')}</span>`;
+  } catch(err){
+    out.textContent = 'Request failed: ' + (err.message || err);
+    out.style.color = '#f87171';
+  }
+}
+
 // ───────────── SITE SETTINGS ADMIN (hero title/subtitle) ─────────────
 
 function renderAdminSite(){
@@ -3794,7 +4281,7 @@ function renderAdminTala(){
   const body = document.getElementById('adminBody');
   let html = `
     <div class="admin-section-toggle" onclick="adminToggleSuggestionsPanel()">
-      <span>⚡ Quick suggestion chips ${talaSuggestionsOpen?'▾':'▸'}</span>
+      <span>${lucideSvg('zap',13)} Quick suggestion chips ${talaSuggestionsOpen?'▾':'▸'}</span>
       <span class="admin-section-count">${talaSuggestions.length}</span>
     </div>
     <div id="adfSuggestionsPanel" style="display:${talaSuggestionsOpen?'':'none'}">
@@ -3967,7 +4454,7 @@ function renderBulkQueue(){
       ${bulkQueue.map(item=>`
         <div class="admin-list-item" style="margin-bottom:10px;">
           <div style="font-size:.8rem;color:var(--white-soft);font-weight:500;margin-bottom:6px;">
-            📄 ${escapeHtml(item.filename)} <span style="color:var(--white-dim);font-size:.68rem;">(${item.content.length.toLocaleString()} chars)</span>
+            ${lucideSvg('file-text',13)} ${escapeHtml(item.filename)} <span style="color:var(--white-dim);font-size:.68rem;">(${item.content.length.toLocaleString()} chars)</span>
           </div>
           <div class="admin-field" style="margin-bottom:6px;">
             <label>Category</label>

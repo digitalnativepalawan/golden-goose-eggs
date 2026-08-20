@@ -52,6 +52,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           featured: boolean | null
+          google_business_url: string | null
           id: number
           image: string | null
           lat: number
@@ -74,6 +75,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           featured?: boolean | null
+          google_business_url?: string | null
           id?: never
           image?: string | null
           lat: number
@@ -96,6 +98,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           featured?: boolean | null
+          google_business_url?: string | null
           id?: never
           image?: string | null
           lat?: number

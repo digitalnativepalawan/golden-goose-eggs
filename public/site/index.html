@@ -335,9 +335,13 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
 .tsh-avatar .tsh-dot{position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;border-radius:50%;background:#22c55e;border:2px solid var(--charcoal-surface)}
 .tsh-info h4{font-family:var(--font-display);font-size:.95rem;font-weight:400;color:var(--white-soft);margin:0}
 .tsh-info p{font-size:.62rem;font-weight:300;color:var(--white-muted);margin:1px 0 0}
-.tsh-mute{margin-left:auto;width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,255,255,.05);color:var(--white-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.72rem;transition:all .2s}
+.tsh-mute{margin-left:auto;width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.05);color:var(--white-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
 .tsh-mute:hover{background:rgba(255,255,255,.1)}
 .tsh-mute.muted{color:#ef4444}
+.tsh-mute svg{width:16px;height:16px;display:block}
+.tsh-mute .vol-x{display:none}
+.tsh-mute.muted .vol-x{display:block}
+.tsh-mute.muted .vol-on{display:none}
 
 .tala-chat{flex:1;overflow-y:auto;padding:14px 20px;display:flex;flex-direction:column;gap:12px}
 .tala-chat::-webkit-scrollbar{width:2px}
@@ -615,7 +619,7 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
 /* ═══════════════════════════════════
    ADMIN (hidden, PIN-gated)
    ═══════════════════════════════════ */
-.admin-overlay{position:fixed;inset:0;z-index:200;background:rgba(2,14,38,.7);backdrop-filter:blur(4px);opacity:0;visibility:hidden;transition:all .25s;display:flex;align-items:center;justify-content:center;padding:20px}
+.admin-overlay{position:fixed;inset:0;z-index:200;background:rgba(2,14,38,.7);backdrop-filter:blur(4px);opacity:0;visibility:hidden;transition:all .25s;display:flex;align-items:center;justify-content:center;padding:0}
 .admin-overlay.active{opacity:1;visibility:visible}
 
 .admin-pin-card{width:100%;max-width:300px;background:var(--charcoal-surface);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:28px 22px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)}
@@ -626,16 +630,45 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
 .admin-pin-btn{width:100%;padding:11px;border-radius:var(--radius-pill);border:none;background:linear-gradient(135deg,var(--ocean-teal),var(--ocean-teal-light));color:#fff;font-family:var(--font-body);font-size:.85rem;font-weight:500;cursor:pointer}
 .admin-pin-cancel{margin-top:10px;font-size:.72rem;color:var(--white-dim);background:none;border:none;cursor:pointer}
 
-.admin-panel{width:100%;max-width:560px;height:88vh;max-height:720px;background:var(--charcoal-surface);border:1px solid var(--glass-border);border-radius:var(--radius-lg);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}
-.admin-head{padding:16px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--glass-border);flex-shrink:0}
-.admin-head h3{font-family:var(--font-display);font-size:1.1rem;color:var(--white-soft);font-weight:400}
-.admin-close{width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.06);color:var(--white-muted);cursor:pointer;font-size:1.1rem}
-.admin-tabs{display:flex;gap:6px;padding:10px 18px;border-bottom:1px solid var(--glass-border);flex-shrink:0;overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none}
+.admin-panel{width:100%;height:100%;max-height:100%;background:var(--charcoal-surface);border:none;display:flex;flex-direction:column;overflow:hidden}
+
+.admin-head{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--glass-border);flex-shrink:0}
+.admin-head-left{display:flex;align-items:center;gap:10px;min-width:0}
+.admin-head-left h3{font-family:var(--font-display);font-size:1.02rem;color:var(--white-soft);font-weight:400;white-space:nowrap}
+.admin-head-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.admin-ai-badge{display:inline-flex;align-items:center;gap:6px;font-size:.62rem;letter-spacing:.04em;color:var(--white-dim);padding:5px 10px;border-radius:var(--radius-pill);border:1px solid var(--glass-border);background:rgba(255,255,255,.04);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-ai-badge svg{width:12px;height:12px;flex-shrink:0;color:var(--ocean-teal-light)}
+.admin-ai-badge.is-on{color:#5eead4;border-color:rgba(94,234,212,.3);background:rgba(20,184,166,.1)}
+.admin-close{width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.06);color:var(--white-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.admin-close:hover{background:rgba(255,255,255,.12);color:var(--white-soft)}
+.admin-close svg{width:15px;height:15px}
+
+.admin-shell{flex:1;min-height:0;display:flex;flex-direction:column}
+.admin-tabs{display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--glass-border);flex-shrink:0;overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none}
 .admin-tabs::-webkit-scrollbar{display:none}
-.admin-tab{flex-shrink:0;padding:8px 14px;border-radius:var(--radius-pill);border:1px solid var(--glass-border);background:transparent;color:var(--white-muted);font-size:.74rem;cursor:pointer}
+.admin-tab{flex-shrink:0;display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:var(--radius-pill);border:1px solid var(--glass-border);background:transparent;color:var(--white-muted);font-size:.74rem;cursor:pointer;transition:all .18s}
+.admin-tab svg{width:14px;height:14px;flex-shrink:0}
+.admin-tab:hover{color:var(--white-soft);border-color:rgba(255,255,255,.18)}
 .admin-tab.active{background:rgba(20,184,166,.14);border-color:rgba(20,184,166,.3);color:var(--white-soft)}
-.admin-body{flex:1;overflow-y:auto;padding:16px 18px}
-.admin-body::-webkit-scrollbar{width:4px}
+.admin-tab.active svg{color:var(--ocean-teal-light)}
+.admin-feat-icon{display:inline-flex;vertical-align:middle;color:var(--ocean-teal-light);margin-left:2px}
+.admin-feat-icon[title="Featured"]{color:#fbbf24}
+.admin-section-toggle svg,.admin-tab svg{pointer-events:none}
+
+.admin-main{flex:1;min-height:0;display:flex;flex-direction:column}
+.admin-body{flex:1;min-height:0;overflow-y:auto;padding:16px}
+.admin-body::-webkit-scrollbar{width:5px}
+.admin-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px}
+
+/* ── Desktop: centered dashboard with left sidebar nav ── */
+@media (min-width: 860px){
+  .admin-overlay{padding:28px}
+  .admin-panel{width:100%;max-width:1180px;height:min(880px,92vh);border:1px solid var(--glass-border);border-radius:20px}
+  .admin-shell{flex-direction:row}
+  .admin-tabs{flex-direction:column;justify-content:flex-start;width:220px;flex-shrink:0;padding:16px 14px;gap:4px;border-bottom:none;border-right:1px solid var(--glass-border);overflow-y:auto}
+  .admin-tab{width:100%;border-radius:10px;padding:10px 13px;font-size:.78rem}
+  .admin-body{padding:20px 24px 24px}
+}
 
 .admin-list-item{background:rgba(255,255,255,.04);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:10px}
 .admin-list-item-head{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer}
@@ -1065,6 +1098,10 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
         Ask tala
       </button>
+      <button class="dest-exp-btn wide" id="deGbp" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
+        Google Profile
+      </button>
       <button class="dest-exp-btn wide" id="deAroundMe" onclick="openAroundMePanel()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
         What's around me
@@ -1087,7 +1124,10 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
       <h4>TALA’s Whisper</h4>
       <p id="tshStatus">What kind of day are we making?</p>
     </div>
-    <button class="tsh-mute" id="tshMute" onclick="toggleMute()">🔊</button>
+    <button class="tsh-mute" id="tshMute" onclick="toggleMute()" title="Toggle voice">
+      <svg class="vol-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+      <svg class="vol-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>
+    </button>
   </div>
   <div class="tala-chat" id="talaChat">
     <div class="tala-msg bot">Welcome. I'm <strong>tala</strong> — your San Vicente concierge. Ask me about destinations, timing, routes, or hidden gems.</div>
@@ -1493,21 +1533,50 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
 <div class="admin-overlay" id="adminPanelOverlay">
   <div class="admin-panel">
     <div class="admin-head">
-      <h3>SANVIC Admin</h3>
-      <button class="admin-close" onclick="closeAdminPanel()">×</button>
+      <div class="admin-head-left">
+        <h3>SANVIC Admin</h3>
+      </div>
+      <div class="admin-head-right">
+        <span class="admin-ai-badge" id="adminAiBadge" title="TALA brain status">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M20 15h2M2 9h2M20 9h2M9 2v2M9 20v2"/></svg>
+          loading…
+        </span>
+        <button class="admin-close" onclick="closeAdminPanel()" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
     </div>
-    <div class="admin-tabs">
-      <button class="admin-tab active" id="adminTabDest" onclick="switchAdminTab('dest')">Destinations</button>
-      <button class="admin-tab" id="adminTabTala" onclick="switchAdminTab('tala')">Tala</button>
-      <button class="admin-tab" id="adminTabPulse" onclick="switchAdminTab('pulse')">Pulse</button>
-      <button class="admin-tab" id="adminTabSite" onclick="switchAdminTab('site')">Site</button>
+    <div class="admin-shell">
+      <div class="admin-tabs">
+        <button class="admin-tab active" id="adminTabDest" onclick="switchAdminTab('dest')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
+          Destinations
+        </button>
+        <button class="admin-tab" id="adminTabTala" onclick="switchAdminTab('tala')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+          Tala Answers
+        </button>
+        <button class="admin-tab" id="adminTabTalaAi" onclick="switchAdminTab('ai')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
+          TALA AI
+        </button>
+        <button class="admin-tab" id="adminTabPulse" onclick="switchAdminTab('pulse')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+          Pulse
+        </button>
+        <button class="admin-tab" id="adminTabSite" onclick="switchAdminTab('site')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          Site
+        </button>
+      </div>
+      <div class="admin-main">
+        <div class="admin-body" id="adminBody"></div>
+        <div class="admin-foot">
+          <button onclick="adminResetDefaults()" class="reset">Reset to defaults</button>
+          <button onclick="closeAdminPanel()">Done</button>
+        </div>
+      </div>
     </div>
-    <div class="admin-body" id="adminBody"></div>
-    <div class="admin-foot">
-      <button onclick="adminResetDefaults()" class="reset">Reset to defaults</button>
-      <button onclick="closeAdminPanel()">Done</button>
-    </div>
-  </div>
   </div>
 </div>
 
