@@ -471,7 +471,7 @@ async function refreshDestSaveButton(destinationId){
 function destRowToObj(row){
   return {
     id: row.id, name: row.name, lat: row.lat, lng: row.lng, category: row.category,
-    image: row.image, description: row.description, tip: row.tip, color: row.color || '#0ea5e9',
+    image: row.image, images: row.images || [], description: row.description, tip: row.tip, color: row.color || '#0ea5e9',
     videoUrl: row.video_url || '', videoType: row.video_type || '', featured: !!row.featured,
     googleBusinessUrl: row.google_business_url || '',
     barangay: row.barangay || '',
@@ -569,9 +569,9 @@ async function loadDataFromSupabase(){
       tribesRes.data.forEach(t=>{
         PULSE_TRIBES.push({
           id: t.id, title: t.title, where: t.where_text, when: t.when_text,
-          sub: t.sub, thumb: t.thumb_url, joined: t.joined, extra: t.extra,
+          sub: t.sub, thumb: t.thumb_url, images: t.images||[], joined: t.joined, extra: t.extra,
           cap: t.cap, tags: t.tags||[], spots: t.spots, seatsOpen: t.seats_open,
-          warn: t.spots>0
+          warn: t.spots>0, videoUrl: t.video_url||'', videoType: t.video_type||''
         });
       });
       MYSV_TRIBES.length = 0;
@@ -579,7 +579,8 @@ async function loadDataFromSupabase(){
         MYSV_TRIBES.push({
           id: t.id, title: t.title,
           meta: t.where_text + ' • ' + t.when_text,
-          more: t.extra, grad: 'linear-gradient(135deg,#f97316,#7c2d12)'
+          more: t.extra, grad: 'linear-gradient(135deg,#f97316,#7c2d12)',
+          thumb: t.thumb_url, images: t.images||[]
         });
       });
     }
@@ -590,7 +591,8 @@ async function loadDataFromSupabase(){
       eventsRes.data.forEach(ev=>{
         PULSE_EVENTS.push({
           id: ev.id, title: ev.title, org: ev.org, where: ev.where_text,
-          when: ev.when_text, price: ev.price, tags: ev.tags||[]
+          when: ev.when_text, price: ev.price, tags: ev.tags||[],
+          images: ev.images||[], videoUrl: ev.video_url||'', videoType: ev.video_type||''
         });
       });
       MYSV_EVENTS.length = 0;
@@ -598,7 +600,8 @@ async function loadDataFromSupabase(){
         MYSV_EVENTS.push({
           id: ev.id, title: ev.title,
           meta: ev.where_text + ' • ' + ev.when_text,
-          more: 0, grad: 'linear-gradient(135deg,#a78bfa,#1e1b4b)'
+          more: 0, grad: 'linear-gradient(135deg,#a78bfa,#1e1b4b)',
+          images: ev.images||[]
         });
       });
     }
@@ -3522,9 +3525,12 @@ function renderAdminDest(){
 
 function adminDestFormHtml(){
   const isNew = adminEditingDestId === 'new';
-  const d = isNew ? {name:'',lat:'',lng:'',category:'beaches',image:'',description:'',tip:'',color:'#0ea5e9',videoUrl:'',videoType:'',featured:false,barangay:'',googleBusinessUrl:'',stats:{rating:'',travel:'',temp:'',season:''}} : destinations.find(x=>x.id===adminEditingDestId);
+  const d = isNew ? {name:'',lat:'',lng:'',category:'beaches',image:'',images:[],description:'',tip:'',color:'#0ea5e9',videoUrl:'',videoType:'',featured:false,barangay:'',googleBusinessUrl:'',stats:{rating:'',travel:'',temp:'',season:''}} : destinations.find(x=>x.id===adminEditingDestId);
   if(!d) return '';
-  const vType = d.videoType || 'none';
+  // Initialize media gallery with existing images
+  __mediaGallery = [];
+  if(d.image) __mediaGallery.push(d.image);
+  if(d.images && Array.isArray(d.images)) __mediaGallery.push(...d.images);
   return `
     <div class="admin-edit-box">
       <div class="admin-toggle-row">
@@ -3572,14 +3578,8 @@ function adminDestFormHtml(){
         <div class="admin-field"><label>Marker color</label><input id="adfColor" value="${escapeHtml(d.color)}"></div>
       </div>
 
-      <div class="admin-field">
-        <label>Photo</label>
-        <input id="adfImage" value="${escapeHtml(d.image)}" placeholder="Image URL, or upload below" oninput="adminPreviewImage()">
-        <input type="file" id="adfImageFile" accept="image/jpeg,image/png,image/webp,image/gif" style="margin-top:8px;" onchange="adminUploadImageNow()">
-        <div id="adfImageUploadStatus" style="font-size:.68rem;color:var(--white-dim);margin-top:6px;"></div>
-        <img id="adfImagePreview" class="admin-img-preview" src="${escapeHtml(d.image)}" style="display:${d.image?'':'none'}" onerror="this.style.display='none'">
-        <div id="adfImageAttribution" style="font-size:.62rem;color:var(--white-dim);margin-top:4px;line-height:1.5"></div>
-      </div>
+      ${mediaGalleryHtml('adf','dest')}
+      ${mediaVideoHtml('adf', d.videoUrl, d.videoType)}
 
       <div class="admin-field"><label>Description</label><textarea id="adfDesc" rows="3">${escapeHtml(d.description)}</textarea></div>
       <div class="admin-field"><label>Tip</label><textarea id="adfTip" rows="2">${escapeHtml(d.tip)}</textarea></div>
@@ -3590,27 +3590,6 @@ function adminDestFormHtml(){
       <div class="admin-grid-2">
         <div class="admin-field"><label>Temp</label><input id="adfTemp" value="${escapeHtml(d.stats.temp)}"></div>
         <div class="admin-field"><label>Season</label><input id="adfSeason" value="${escapeHtml(d.stats.season)}"></div>
-      </div>
-
-      <div class="admin-field">
-        <label>Video (shown instead of the photo when set)</label>
-        <select id="adfVideoType" onchange="adminToggleVideoFields()">
-          <option value="none" ${vType==='none'?'selected':''}>No video</option>
-          <option value="youtube" ${vType==='youtube'?'selected':''}>YouTube URL</option>
-          <option value="upload" ${vType==='upload'?'selected':''}>Upload from device</option>
-        </select>
-      </div>
-      <div class="admin-field" id="adfVideoYoutubeWrap" style="display:${vType==='youtube'?'':'none'}">
-        <label>YouTube URL</label>
-        <input id="adfVideoYoutube" value="${vType==='youtube'?escapeHtml(d.videoUrl):''}" placeholder="https://youtube.com/watch?v=...">
-      </div>
-      <div class="admin-field" id="adfVideoUploadWrap" style="display:${vType==='upload'?'':'none'}">
-        <label>Video file (mp4/webm/mov, up to 100MB)</label>
-        <input type="file" id="adfVideoFile" accept="video/mp4,video/webm,video/quicktime,video/x-m4v">
-        <div id="adfVideoUploadStatus" style="font-size:.7rem;color:var(--white-dim);margin-top:6px;">
-          ${vType==='upload' && d.videoUrl ? 'Current: <a href="'+d.videoUrl+'" target="_blank" style="color:var(--ocean-teal-light)">existing video</a>' : ''}
-        </div>
-        <input type="hidden" id="adfVideoUploadedUrl" value="${vType==='upload'?escapeHtml(d.videoUrl):''}">
       </div>
 
       <div class="admin-edit-actions">
@@ -3958,13 +3937,9 @@ async function adminSaveDest(){
   saveBtn.textContent = 'Saving...';
 
   try {
-    const videoType = document.getElementById('adfVideoType').value;
-    let videoUrl = '';
-    if(videoType === 'youtube'){
-      videoUrl = document.getElementById('adfVideoYoutube').value.trim();
-    } else if(videoType === 'upload'){
-      videoUrl = await adminUploadVideoIfNeeded() || '';
-    }
+    const video = await mediaUploadVideoIfNeeded('adf');
+    const images = __mediaGallery.slice();
+    const coverImage = images.shift() || '';
 
     const payload = {
       name: document.getElementById('adfName').value.trim(),
@@ -3972,15 +3947,16 @@ async function adminSaveDest(){
       lng: parseFloat(document.getElementById('adfLng').value),
       category: document.getElementById('adfCat').value,
       color: document.getElementById('adfColor').value.trim() || '#0ea5e9',
-      image: document.getElementById('adfImage').value.trim(),
+      image: coverImage,
+      images: images,
       description: document.getElementById('adfDesc').value.trim(),
       tip: document.getElementById('adfTip').value.trim(),
       rating: document.getElementById('adfRating').value.trim(),
       travel: document.getElementById('adfTravel').value.trim(),
       temp: document.getElementById('adfTemp').value.trim(),
       season: document.getElementById('adfSeason').value.trim(),
-      video_url: videoType === 'none' ? null : (videoUrl || null),
-      video_type: videoType === 'none' ? null : videoType,
+      video_url: video.url || null,
+      video_type: video.type || null,
       featured: document.getElementById('adfFeatured').checked,
       barangay: document.getElementById('adfBarangay').value.trim(),
       google_business_url: document.getElementById('adfGbp').value.trim() || null,
@@ -4424,6 +4400,125 @@ async function adminSaveSplashFooter(){
   }
 }
 
+// ───────────── REUSABLE MEDIA UPLOAD ─────────────
+// Shared by Destinations, Tribes, Events admin forms.
+// Manages an array of image URLs + optional YouTube/uploaded video.
+// ──────────────────────────────────────────────────
+
+let __mediaGallery = [];    // current image URLs being edited
+let __mediaPrefix = 'item'; // storage path prefix (dest_, tribe_, event_)
+
+function mediaGalleryHtml(containerId, prefix){
+  __mediaPrefix = prefix || 'item';
+  const imgs = (__mediaGallery || []).map((url, i) => `
+    <div class="admin-media-thumb">
+      <img src="${escapeHtml(url)}" onerror="this.parentElement.style.display='none'">
+      <button class="admin-media-del" onclick="mediaRemoveImage(${i},'${containerId}')">&times;</button>
+    </div>`).join('');
+  return `
+    <label>Gallery images (tap + to upload from device, or paste a URL)</label>
+    <div class="admin-media-grid" id="${containerId}Gallery">${imgs}
+      <label class="admin-media-add">
+        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="mediaUploadFile(this,'${containerId}')" hidden>
+        <span>+</span>
+      </label>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:6px;">
+      <input id="${containerId}UrlInput" placeholder="Or paste image URL…" style="flex:1;padding:7px 10px;border-radius:6px;border:1px solid var(--glass-border);background:var(--charcoal-input);color:var(--white-soft);font-size:.78rem;">
+      <button class="admin-mini-btn" onclick="mediaAddUrl('${containerId}')">Add URL</button>
+    </div>`;
+}
+
+function mediaAddUrl(containerId){
+  const inp = document.getElementById(containerId + 'UrlInput');
+  const url = (inp.value || '').trim();
+  if(!url) return;
+  __mediaGallery.push(url);
+  inp.value = '';
+  mediaRefreshGrid(containerId);
+}
+
+async function mediaUploadFile(input, containerId){
+  const file = input.files[0];
+  if(!file) return;
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = __mediaPrefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '.' + ext;
+  try {
+    const { error } = await sb.storage.from('destination-images').upload(path, file, { cacheControl:'3600', upsert:false, contentType: file.type || 'image/jpeg' });
+    if(error) throw error;
+    const { data } = sb.storage.from('destination-images').getPublicUrl(path);
+    if(data && data.publicUrl){
+      __mediaGallery.push(data.publicUrl);
+      mediaRefreshGrid(containerId);
+    }
+  } catch(e){ alert('Upload failed: ' + e.message); }
+  input.value = '';
+}
+
+function mediaRemoveImage(idx, containerId){
+  __mediaGallery.splice(idx, 1);
+  mediaRefreshGrid(containerId);
+}
+
+function mediaRefreshGrid(containerId){
+  const grid = document.getElementById(containerId + 'Gallery');
+  if(!grid) return;
+  const addBtn = grid.querySelector('.admin-media-add');
+  const thumbs = (__mediaGallery || []).map((url, i) => `
+    <div class="admin-media-thumb">
+      <img src="${escapeHtml(url)}" onerror="this.parentElement.style.display='none'">
+      <button class="admin-media-del" onclick="mediaRemoveImage(${i},'${containerId}')">&times;</button>
+    </div>`).join('');
+  grid.innerHTML = thumbs + (addBtn ? addBtn.outerHTML : `<label class="admin-media-add"><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="mediaUploadFile(this,'${containerId}')" hidden><span>+</span></label>`);
+}
+
+function mediaVideoHtml(containerId, currentUrl, currentType){
+  const vType = currentType || 'none';
+  return `
+    <div class="admin-field">
+      <label>Video (shown instead of gallery when set)</label>
+      <select id="${containerId}VideoType" onchange="document.getElementById('${containerId}YoutubeWrap').style.display=this.value==='youtube'?'':'none';document.getElementById('${containerId}UploadWrap').style.display=this.value==='upload'?'':'none';">
+        <option value="none" ${vType==='none'?'selected':''}>No video</option>
+        <option value="youtube" ${vType==='youtube'?'selected':''}>YouTube URL</option>
+        <option value="upload" ${vType==='upload'?'selected':''}>Upload from device</option>
+      </select>
+    </div>
+    <div class="admin-field" id="${containerId}YoutubeWrap" style="display:${vType==='youtube'?'':'none'}">
+      <label>YouTube URL</label>
+      <input id="${containerId}YoutubeUrl" value="${vType==='youtube'?escapeHtml(currentUrl||''):''}" placeholder="https://youtube.com/watch?v=…">
+    </div>
+    <div class="admin-field" id="${containerId}UploadWrap" style="display:${vType==='upload'?'':'none'}">
+      <label>Video file (mp4/webm, up to 100MB)</label>
+      <input type="file" id="${containerId}VideoFile" accept="video/mp4,video/webm,video/quicktime">
+      ${vType==='upload' && currentUrl ? '<div style="font-size:.68rem;color:var(--white-dim);margin-top:4px;">Current: <a href="'+currentUrl+'" target="_blank" style="color:var(--ocean-teal-light)">view video</a></div>' : ''}
+      <input type="hidden" id="${containerId}VideoUploadedUrl" value="${vType==='upload'?escapeHtml(currentUrl||''):''}">
+    </div>`;
+}
+
+async function mediaUploadVideoIfNeeded(containerId){
+  const type = document.getElementById(containerId + 'VideoType');
+  if(!type) return { url:null, type:null };
+  const vType = type.value;
+  if(vType === 'youtube'){
+    return { url: (document.getElementById(containerId+'YoutubeUrl')||{}).value||'', type:'youtube' };
+  }
+  if(vType === 'upload'){
+    const fileInput = document.getElementById(containerId+'VideoFile');
+    const hiddenUrl = (document.getElementById(containerId+'VideoUploadedUrl')||{}).value||'';
+    if(fileInput && fileInput.files[0]){
+      const file = fileInput.files[0];
+      const ext = (file.name.split('.').pop() || 'mp4').toLowerCase();
+      const path = __mediaPrefix + '_vid_' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '.' + ext;
+      const { error } = await sb.storage.from('destination-images').upload(path, file, { cacheControl:'3600', upsert:false, contentType: file.type || 'video/mp4' });
+      if(error) throw error;
+      const { data } = sb.storage.from('destination-images').getPublicUrl(path);
+      return { url: data.publicUrl, type:'upload' };
+    }
+    return { url: hiddenUrl || null, type: hiddenUrl ? 'upload' : null };
+  }
+  return { url:null, type:null };
+}
+
 // ───────────── TODAY ADMIN ─────────────
 let adminTodayData = null;
 
@@ -4570,13 +4665,17 @@ async function renderAdminTribes(){
 async function adminEditTribe(id){
   const body = document.getElementById('adminBody');
   const isNew = id === 'new';
-  let t = { title:'', where_text:'', when_text:'', sub:'', thumb_url:'', joined:0, extra:0, cap:0, spots:null, seats_open:null, sort_order:0 };
+  let t = { title:'', where_text:'', when_text:'', sub:'', thumb_url:'', joined:0, extra:0, cap:0, spots:null, seats_open:null, sort_order:0, images:[], video_url:null, video_type:null };
   if(!isNew){
     try {
       const { data } = await sb.from('tribes').select('*').eq('id', id).single();
       if(data) t = data;
     } catch(e){ alert('Load failed: '+e.message); return; }
   }
+  // Initialize media gallery
+  __mediaGallery = [];
+  if(t.thumb_url) __mediaGallery.push(t.thumb_url);
+  if(t.images && Array.isArray(t.images)) __mediaGallery.push(...t.images);
   body.innerHTML = `
     <div class="admin-edit-box">
       <div class="admin-field"><label>Title</label><input id="atbfTitle" value="${escapeHtml(t.title)}"></div>
@@ -4585,7 +4684,6 @@ async function adminEditTribe(id){
         <div class="admin-field"><label>When</label><input id="atbfWhen" value="${escapeHtml(t.when_text||'')}"></div>
       </div>
       <div class="admin-field"><label>Subtitle</label><input id="atbfSub" value="${escapeHtml(t.sub||'')}"></div>
-      <div class="admin-field"><label>Thumbnail URL</label><input id="atbfThumb" value="${escapeHtml(t.thumb_url||'')}" placeholder="https://..."></div>
       <div class="admin-grid-2">
         <div class="admin-field"><label>Joined</label><input type="number" id="atbfJoined" value="${t.joined||0}"></div>
         <div class="admin-field"><label>Extra (+N)</label><input type="number" id="atbfExtra" value="${t.extra||0}"></div>
@@ -4595,6 +4693,8 @@ async function adminEditTribe(id){
         <div class="admin-field"><label>Spots left</label><input type="number" id="atbfSpots" value="${t.spots||''}"></div>
       </div>
       <div class="admin-field"><label>Tags (comma-separated)</label><input id="atbfTags" value="${(t.tags||[]).join(', ')}"></div>
+      ${mediaGalleryHtml('atbf','tribe')}
+      ${mediaVideoHtml('atbf', t.video_url, t.video_type)}
       <div class="admin-field"><label>Sort order</label><input type="number" id="atbfSort" value="${t.sort_order||0}"></div>
       <div class="admin-edit-actions">
         <button class="admin-save-btn" onclick="adminSaveTribe('${isNew?'':id}')">${isNew?'Create':'Save'}</button>
@@ -4605,22 +4705,28 @@ async function adminEditTribe(id){
 
 async function adminSaveTribe(id){
   const isNew = id === 'new';
-  const payload = {
-    title: document.getElementById('atbfTitle').value.trim(),
-    where_text: document.getElementById('atbfWhere').value.trim(),
-    when_text: document.getElementById('atbfWhen').value.trim(),
-    sub: document.getElementById('atbfSub').value.trim(),
-    thumb_url: document.getElementById('atbfThumb').value.trim(),
-    joined: parseInt(document.getElementById('atbfJoined').value)||0,
-    extra: parseInt(document.getElementById('atbfExtra').value)||0,
-    cap: parseInt(document.getElementById('atbfCap').value)||0,
-    spots: document.getElementById('atbfSpots').value ? parseInt(document.getElementById('atbfSpots').value) : null,
-    seats_open: document.getElementById('atbfSpots').value ? parseInt(document.getElementById('atbfSpots').value) : null,
-    tags: document.getElementById('atbfTags').value.split(',').map(s=>s.trim()).filter(Boolean),
-    sort_order: parseInt(document.getElementById('atbfSort').value)||0,
-  };
-  if(!payload.title){ alert('Title is required.'); return; }
   try {
+    const video = await mediaUploadVideoIfNeeded('atbf');
+    const images = __mediaGallery.slice();
+    const thumbUrl = images.shift() || '';
+    const payload = {
+      title: document.getElementById('atbfTitle').value.trim(),
+      where_text: document.getElementById('atbfWhere').value.trim(),
+      when_text: document.getElementById('atbfWhen').value.trim(),
+      sub: document.getElementById('atbfSub').value.trim(),
+      thumb_url: thumbUrl,
+      images: images,
+      video_url: video.url || null,
+      video_type: video.type || null,
+      joined: parseInt(document.getElementById('atbfJoined').value)||0,
+      extra: parseInt(document.getElementById('atbfExtra').value)||0,
+      cap: parseInt(document.getElementById('atbfCap').value)||0,
+      spots: document.getElementById('atbfSpots').value ? parseInt(document.getElementById('atbfSpots').value) : null,
+      seats_open: document.getElementById('atbfSpots').value ? parseInt(document.getElementById('atbfSpots').value) : null,
+      tags: document.getElementById('atbfTags').value.split(',').map(s=>s.trim()).filter(Boolean),
+      sort_order: parseInt(document.getElementById('atbfSort').value)||0,
+    };
+    if(!payload.title){ alert('Title is required.'); return; }
     if(isNew){
       const { error } = await sb.from('tribes').insert(payload);
       if(error) throw error;
@@ -4680,13 +4786,14 @@ async function renderAdminEvents(){
 async function adminEditEvent(id){
   const body = document.getElementById('adminBody');
   const isNew = id === 'new';
-  let ev = { title:'', org:'', where_text:'', when_text:'', price:'', tags:[], sort_order:0 };
+  let ev = { title:'', org:'', where_text:'', when_text:'', price:'', tags:[], sort_order:0, images:[], video_url:null, video_type:null };
   if(!isNew){
     try {
       const { data } = await sb.from('events').select('*').eq('id', id).single();
       if(data) ev = data;
     } catch(e){ alert('Load failed: '+e.message); return; }
   }
+  __mediaGallery = (ev.images && Array.isArray(ev.images)) ? ev.images.slice() : [];
   body.innerHTML = `
     <div class="admin-edit-box">
       <div class="admin-field"><label>Title</label><input id="aevfTitle" value="${escapeHtml(ev.title)}"></div>
@@ -4697,6 +4804,8 @@ async function adminEditEvent(id){
       </div>
       <div class="admin-field"><label>Price</label><input id="aevfPrice" value="${escapeHtml(ev.price||'')}"></div>
       <div class="admin-field"><label>Tags (comma-separated)</label><input id="aevfTags" value="${(ev.tags||[]).join(', ')}"></div>
+      ${mediaGalleryHtml('aevf','event')}
+      ${mediaVideoHtml('aevf', ev.video_url, ev.video_type)}
       <div class="admin-field"><label>Sort order</label><input type="number" id="aevfSort" value="${ev.sort_order||0}"></div>
       <div class="admin-edit-actions">
         <button class="admin-save-btn" onclick="adminSaveEvent('${isNew?'':id}')">${isNew?'Create':'Save'}</button>
@@ -4707,17 +4816,21 @@ async function adminEditEvent(id){
 
 async function adminSaveEvent(id){
   const isNew = id === 'new';
-  const payload = {
-    title: document.getElementById('aevfTitle').value.trim(),
-    org: document.getElementById('aevfOrg').value.trim(),
-    where_text: document.getElementById('aevfWhere').value.trim(),
-    when_text: document.getElementById('aevfWhen').value.trim(),
-    price: document.getElementById('aevfPrice').value.trim(),
-    tags: document.getElementById('aevfTags').value.split(',').map(s=>s.trim()).filter(Boolean),
-    sort_order: parseInt(document.getElementById('aevfSort').value)||0,
-  };
-  if(!payload.title){ alert('Title is required.'); return; }
   try {
+    const video = await mediaUploadVideoIfNeeded('aevf');
+    const payload = {
+      title: document.getElementById('aevfTitle').value.trim(),
+      org: document.getElementById('aevfOrg').value.trim(),
+      where_text: document.getElementById('aevfWhere').value.trim(),
+      when_text: document.getElementById('aevfWhen').value.trim(),
+      price: document.getElementById('aevfPrice').value.trim(),
+      tags: document.getElementById('aevfTags').value.split(',').map(s=>s.trim()).filter(Boolean),
+      images: __mediaGallery.slice(),
+      video_url: video.url || null,
+      video_type: video.type || null,
+      sort_order: parseInt(document.getElementById('aevfSort').value)||0,
+    };
+    if(!payload.title){ alert('Title is required.'); return; }
     if(isNew){
       const { error } = await sb.from('events').insert(payload);
       if(error) throw error;
