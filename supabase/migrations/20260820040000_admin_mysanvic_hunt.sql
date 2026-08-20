@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS public.my_sanvic_upcoming (
   cta text DEFAULT 'View',
   action text DEFAULT '',
   action_id text DEFAULT '',
+  images jsonb DEFAULT '[]'::jsonb,
+  video_url text,
+  video_type text,
   sort_order int DEFAULT 0,
   created_at timestamptz DEFAULT now()
 );
@@ -19,6 +22,9 @@ CREATE TABLE IF NOT EXISTS public.hunt_rewards (
   subtitle text DEFAULT '',
   badge text DEFAULT '',
   dest_id text DEFAULT '',
+  images jsonb DEFAULT '[]'::jsonb,
+  video_url text,
+  video_type text,
   points_required int DEFAULT 100,
   sort_order int DEFAULT 0,
   created_at timestamptz DEFAULT now()

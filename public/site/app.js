@@ -508,7 +508,7 @@ function isSuggestionActiveToday(s){
 
 async function loadDataFromSupabase(){
   try {
-    const [destRes, talaRes, settingsRes, sugRes, siteRes, catRes, nearbyRes, aiSettingsRes, todayRes, tribesRes, eventsRes] = await Promise.all([
+    const [destRes, talaRes, settingsRes, sugRes, siteRes, catRes, nearbyRes, aiSettingsRes, todayRes, tribesRes, eventsRes, upcomingRes, huntRewardsRes, huntSettingsRes] = await Promise.all([
       sb.from('destinations').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_responses').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_settings').select('*').eq('key', 'default_response').maybeSingle(),
@@ -520,6 +520,9 @@ async function loadDataFromSupabase(){
       sb.from('today_content').select('key,data'),
       sb.from('tribes').select('*').order('sort_order', { ascending: true }),
       sb.from('events').select('*').order('sort_order', { ascending: true }),
+      sb.from('my_sanvic_upcoming').select('*').order('sort_order', { ascending: true }),
+      sb.from('hunt_rewards').select('*').order('sort_order', { ascending: true }),
+      sb.from('hunt_settings').select('*'),
     ]);
 
     if (destRes.error) throw destRes.error;
@@ -602,6 +605,35 @@ async function loadDataFromSupabase(){
           meta: ev.where_text + ' • ' + ev.when_text,
           more: 0, grad: 'linear-gradient(135deg,#a78bfa,#1e1b4b)',
           images: ev.images||[]
+        });
+      });
+    }
+
+    // Load upcoming items from DB
+    if(upcomingRes && upcomingRes.data && upcomingRes.data.length){
+      MYSV_UPCOMING.length = 0;
+      upcomingRes.data.forEach(u=>{
+        MYSV_UPCOMING.push({
+          id: u.id, title: u.title, badge: u.badge, badgeStyle: u.badge_style||'solid',
+          meta: u.meta, cta: u.cta||'View', action: u.action||'', actionId: u.action_id||'',
+          images: u.images||[], videoUrl: u.video_url||'', videoType: u.video_type||'',
+          grad: 'linear-gradient(135deg,#0ea5e9,#0c4a6e)'
+        });
+      });
+    }
+
+    // Load hunt settings + rewards
+    if(huntSettingsRes && huntSettingsRes.data){
+      huntSettingsRes.data.forEach(r=>{ HUNT_SETTINGS[r.key] = r.value; });
+    }
+    if(huntRewardsRes && huntRewardsRes.data && huntRewardsRes.data.length){
+      HUNT_REWARDS.length = 0;
+      huntRewardsRes.data.forEach(r=>{
+        HUNT_REWARDS.push({
+          id: r.id, title: r.title, subtitle: r.subtitle||'', badge: r.badge||'',
+          destId: r.dest_id||'', pointsRequired: r.points_required||100,
+          images: r.images||[], videoUrl: r.video_url||'', videoType: r.video_type||'',
+          grad: 'linear-gradient(135deg,#0ea5e9,#0c4a6e)'
         });
       });
     }
@@ -5186,13 +5218,14 @@ async function renderAdminMySanvic(){
 async function adminEditUpcoming(id){
   const body = document.getElementById('adminBody');
   const isNew = id === 'new';
-  let u = { badge:'', badge_style:'solid', title:'', meta:'', cta:'View', action:'', action_id:'', sort_order:0 };
+  let u = { badge:'', badge_style:'solid', title:'', meta:'', cta:'View', action:'', action_id:'', sort_order:0, images:[], video_url:null, video_type:null };
   if(!isNew){
     try {
       const { data } = await sb.from('my_sanvic_upcoming').select('*').eq('id', id).single();
       if(data) u = data;
     } catch(e){ alert('Load failed: '+e.message); return; }
   }
+  __mediaGallery = (u.images && Array.isArray(u.images)) ? u.images.slice() : [];
   body.innerHTML = `
     <div class="admin-edit-box">
       <div class="admin-field"><label>Title</label><input id="amuTitle" value="${escapeHtml(u.title)}"></div>
@@ -5219,6 +5252,8 @@ async function adminEditUpcoming(id){
         </div>
       </div>
       <div class="admin-field"><label>Action ID / URL</label><input id="amuActionId" value="${escapeHtml(u.action_id||'')}" placeholder="Destination ID, tribe ID, or full URL"></div>
+      ${mediaGalleryHtml('amu','upcoming')}
+      ${mediaVideoHtml('amu', u.video_url, u.video_type)}
       <div class="admin-field"><label>Sort order</label><input type="number" id="amuSort" value="${u.sort_order||0}"></div>
       <div class="admin-edit-actions">
         <button class="admin-save-btn" onclick="adminSaveUpcoming('${isNew?'':id}')">${isNew?'Create':'Save'}</button>
@@ -5230,6 +5265,7 @@ async function adminEditUpcoming(id){
 async function adminSaveUpcoming(id){
   const isNew = id === 'new';
   try {
+    const video = await mediaUploadVideoIfNeeded('amu');
     const payload = {
       badge: document.getElementById('amuBadge').value.trim(),
       badge_style: document.getElementById('amuBadgeStyle').value,
@@ -5238,6 +5274,9 @@ async function adminSaveUpcoming(id){
       cta: document.getElementById('amuCta').value.trim() || 'View',
       action: document.getElementById('amuAction').value,
       action_id: document.getElementById('amuActionId').value.trim(),
+      images: __mediaGallery.slice(),
+      video_url: video.url || null,
+      video_type: video.type || null,
       sort_order: parseInt(document.getElementById('amuSort').value)||0,
     };
     if(!payload.title){ alert('Title is required.'); return; }
@@ -5334,13 +5373,14 @@ async function adminSaveHuntSettings(){
 async function adminEditReward(id){
   const body = document.getElementById('adminBody');
   const isNew = id === 'new';
-  let r = { title:'', subtitle:'', badge:'', dest_id:'', points_required:100, sort_order:0 };
+  let r = { title:'', subtitle:'', badge:'', dest_id:'', points_required:100, sort_order:0, images:[], video_url:null, video_type:null };
   if(!isNew){
     try {
       const { data } = await sb.from('hunt_rewards').select('*').eq('id', id).single();
       if(data) r = data;
     } catch(e){ alert('Load failed: '+e.message); return; }
   }
+  __mediaGallery = (r.images && Array.isArray(r.images)) ? r.images.slice() : [];
   body.innerHTML = `
     <div class="admin-edit-box">
       <div class="admin-field"><label>Title</label><input id="ahrTitle" value="${escapeHtml(r.title)}"></div>
@@ -5350,6 +5390,8 @@ async function adminEditReward(id){
         <div class="admin-field"><label>Points required</label><input type="number" id="ahrPoints" value="${r.points_required||100}"></div>
       </div>
       <div class="admin-field"><label>Destination ID (optional — link to a destination)</label><input id="ahrDest" value="${escapeHtml(r.dest_id||'')}"></div>
+      ${mediaGalleryHtml('ahr','reward')}
+      ${mediaVideoHtml('ahr', r.video_url, r.video_type)}
       <div class="admin-field"><label>Sort order</label><input type="number" id="ahrSort" value="${r.sort_order||0}"></div>
       <div class="admin-edit-actions">
         <button class="admin-save-btn" onclick="adminSaveReward('${isNew?'':id}')">${isNew?'Create':'Save'}</button>
@@ -5361,11 +5403,15 @@ async function adminEditReward(id){
 async function adminSaveReward(id){
   const isNew = id === 'new';
   try {
+    const video = await mediaUploadVideoIfNeeded('ahr');
     const payload = {
       title: document.getElementById('ahrTitle').value.trim(),
       subtitle: document.getElementById('ahrSub').value.trim(),
       badge: document.getElementById('ahrBadge').value.trim(),
       dest_id: document.getElementById('ahrDest').value.trim(),
+      images: __mediaGallery.slice(),
+      video_url: video.url || null,
+      video_type: video.type || null,
       points_required: parseInt(document.getElementById('ahrPoints').value)||100,
       sort_order: parseInt(document.getElementById('ahrSort').value)||0,
     };
@@ -5973,9 +6019,19 @@ async function adminPulseToggleBan(userId, banned){
 }
 
 // ═══════════════════════════════════════════════════════
+// THE HUNT — admin-managed data
+// ═══════════════════════════════════════════════════════
+let HUNT_SETTINGS = {};
+let HUNT_REWARDS = [
+  { id:'hr1', title:'Long Beach Explorer', subtitle:'Unlock Long Beach to earn this reward.', badge:'NEW', destId:'', pointsRequired:100, images:[], videoUrl:'', videoType:'', grad:'linear-gradient(135deg,#0ea5e9,#0c4a6e)' },
+  { id:'hr2', title:'Island Hopper', subtitle:'Discover all islands near Port Barton.', badge:'SOON', destId:'', pointsRequired:200, images:[], videoUrl:'', videoType:'', grad:'linear-gradient(135deg,#22d3ee,#164e63)' },
+  { id:'hr3', title:'Waterfall Hunter', subtitle:'Find Pamuayan Falls.', badge:'', destId:'', pointsRequired:150, images:[], videoUrl:'', videoType:'', grad:'linear-gradient(135deg,#34d399,#064e3b)' }
+];
+
+// ═══════════════════════════════════════════════════════
 // MY SANVIC — private pocket panel
 // ═══════════════════════════════════════════════════════
-const MYSV_UPCOMING = [
+let MYSV_UPCOMING = [
   { id:'u1', title:'Sunset Chasers 🌅', meta:'5:30 PM • Long Beach', badge:'Today', badgeStyle:'solid', avatars:4, more:3, cta:'Open Tribe Chat', action:'openChat', grad:'linear-gradient(135deg,#f97316,#7c2d12)' },
   { id:'u2', title:'Lechon by the Beach 🍖', meta:'6:00 PM • Sunset Resort', badge:'Today', badgeStyle:'solid', cta:'View Details', action:'details', grad:'linear-gradient(135deg,#d97706,#78350f)' },
   { id:'u3', title:'Island Hopping Tribe 🚣', meta:'8:00 AM • Port Barton', badge:'Tomorrow', badgeStyle:'solid', avatars:4, more:2, cta:'Open Tribe Chat', action:'openChat', grad:'linear-gradient(135deg,#0ea5e9,#0c4a6e)' },
@@ -6130,8 +6186,18 @@ function renderMySanvic(){
         <button class="mysv-viewall">View all ›</button>
       </div>
       <div class="mysv-hscroll">
-        ${MYSV_UPCOMING.map(u=>`
+        ${MYSV_UPCOMING.map(u=>{
+          const allImgs = [];
+          if(u.images && Array.isArray(u.images)) allImgs.push(...u.images);
+          const hasImages = allImgs.length > 0;
+          const imgClick = hasImages ? `onclick="openCarousel(${JSON.stringify(allImgs).replace(/"/g, '&quot;')},0)"` : '';
+          const imgStyle = hasImages ? 'cursor:pointer' : '';
+          const imgHtml = hasImages ? `<img src="${escapeHtml(allImgs[0])}" style="width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:8px;${imgStyle}" ${imgClick} onerror="this.style.display='none'">` : '';
+          const videoHtml = u.videoUrl && u.videoType === 'youtube' ? (()=>{ const yid = getYoutubeId(u.videoUrl); return yid ? `<iframe src="https://www.youtube.com/embed/${yid}?mute=1&playsinline=1" style="width:100%;height:120px;border:none;border-radius:10px;margin-bottom:8px;" allowfullscreen></iframe>` : ''; })()
+            : u.videoUrl && u.videoType === 'upload' ? `<video src="${escapeHtml(u.videoUrl)}" style="width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:8px;" muted loop playsinline preload="metadata"></video>` : '';
+          return `
           <div class="mysv-up-card" style="background:${u.grad}">
+            ${imgHtml || videoHtml}
             <span class="mysv-badge ${u.badgeStyle==='soft'?'soft':''}">${escapeHtml(u.badge)}</span>
             <div class="mysv-up-info">
               <div class="mysv-up-title">${escapeHtml(u.title)}</div>
@@ -6141,7 +6207,8 @@ function renderMySanvic(){
                 <button class="mysv-cap-btn" onclick="mysvAction('${u.action}','${u.id}')">${escapeHtml(u.cta)}</button>
               </div>
             </div>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>
     </div>`;
 
@@ -6338,6 +6405,7 @@ function huntTrailGroups(){
   });
 }
 function huntRewardItems(){
+  if(HUNT_REWARDS.length) return HUNT_REWARDS;
   const list = (Array.isArray(destinations)?destinations:[]).filter(d=>d.featured).slice(0,3);
   return list.map((d,i)=>({
     id:String(d.id),
@@ -6563,18 +6631,28 @@ function renderHunt(){
           <div class="hunt-sec-head" style="margin-bottom:6px">
             <div><div class="hunt-sec-title">🎁 Rewards</div><div class="hunt-sec-sub">Redeem your unlocked rewards.</div></div>
           </div>
-          ${rewards.length ? rewards.map(r=>`
+          ${rewards.length ? rewards.map(r=>{
+            const allImgs = [];
+            if(r.images && Array.isArray(r.images)) allImgs.push(...r.images);
+            const hasImages = allImgs.length > 0;
+            const imgClick = hasImages ? `onclick="openCarousel(${JSON.stringify(allImgs).replace(/"/g, '&quot;')},0)"` : '';
+            const imgHtml = hasImages ? `<img src="${escapeHtml(allImgs[0])}" style="width:100%;height:100px;object-fit:cover;border-radius:10px;margin-bottom:8px;cursor:pointer" ${imgClick} onerror="this.style.display='none'">` : '';
+            const videoHtml = r.videoUrl && r.videoType === 'youtube' ? (()=>{ const yid = getYoutubeId(r.videoUrl); return yid ? `<iframe src="https://www.youtube.com/embed/${yid}?mute=1&playsinline=1" style="width:100%;height:100px;border:none;border-radius:10px;margin-bottom:8px;" allowfullscreen></iframe>` : ''; })()
+              : r.videoUrl && r.videoType === 'upload' ? `<video src="${escapeHtml(r.videoUrl)}" style="width:100%;height:100px;object-fit:cover;border-radius:10px;margin-bottom:8px;" muted loop playsinline preload="metadata"></video>` : '';
+            return `
             <div class="hunt-reward-card" style="background:${r.grad}">
+              ${imgHtml || videoHtml}
               <span class="hunt-reward-badge">${escapeHtml(r.badge)}</span>
               <div>
                 <div class="hunt-reward-t">${escapeHtml(r.title)}</div>
-                <div class="hunt-reward-s">${escapeHtml(r.sub)}</div>
+                <div class="hunt-reward-s">${escapeHtml(r.subtitle||r.sub||'')}</div>
               </div>
               <div class="hunt-reward-row">
                 <div></div>
                 <button class="hunt-glass-btn" onclick="huntRedeem('${r.id}')">Redeem</button>
               </div>
-            </div>`).join('') : '<div class="hunt-empty">Feature destinations in the SANVIC Admin panel to publish rewards.</div>'}
+            </div>`;
+          }).join('') : '<div class="hunt-empty">Feature destinations in the SANVIC Admin panel to publish rewards.</div>'}
         </div>
         <div class="hunt-col">
           <div class="hunt-sec-head" style="margin-bottom:6px">
