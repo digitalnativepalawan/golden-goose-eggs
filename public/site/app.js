@@ -6040,10 +6040,10 @@ let HUNT_REWARDS = [
 // MY SANVIC — private pocket panel
 // ═══════════════════════════════════════════════════════
 let MYSV_UPCOMING = [
-  { id:'u1', title:'Sunset Chasers 🌅', meta:'5:30 PM • Long Beach', badge:'Today', badgeStyle:'solid', avatars:4, more:3, cta:'Open Tribe Chat', action:'openChat', grad:'linear-gradient(135deg,#f97316,#7c2d12)' },
-  { id:'u2', title:'Lechon by the Beach 🍖', meta:'6:00 PM • Sunset Resort', badge:'Today', badgeStyle:'solid', cta:'View Details', action:'details', grad:'linear-gradient(135deg,#d97706,#78350f)' },
-  { id:'u3', title:'Island Hopping Tribe 🚣', meta:'8:00 AM • Port Barton', badge:'Tomorrow', badgeStyle:'solid', avatars:4, more:2, cta:'Open Tribe Chat', action:'openChat', grad:'linear-gradient(135deg,#0ea5e9,#0c4a6e)' },
-  { id:'u4', title:'Acoustic Night 🎸', meta:'7:30 PM • Poblacion', badge:'May 18', badgeStyle:'soft', cta:"I'm Interested", action:'interested', grad:'linear-gradient(135deg,#7c3aed,#1e1b4b)' }
+  { id:'u1', title:'Sunset Chasers 🌅', meta:'5:30 PM • Long Beach', badge:'Today', badgeStyle:'solid', avatars:4, more:3, cta:'Open Tribe Chat', action:'openChat', images:['https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=75','https://images.unsplash.com/photo-1518509562904-e7ef99cdcc86?w=400&q=75'], grad:'linear-gradient(135deg,#f97316,#7c2d12)' },
+  { id:'u2', title:'Lechon by the Beach 🍖', meta:'6:00 PM • Sunset Resort', badge:'Today', badgeStyle:'solid', cta:'View Details', action:'details', images:['https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=75','https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&q=75'], grad:'linear-gradient(135deg,#d97706,#78350f)' },
+  { id:'u3', title:'Island Hopping Tribe 🚣', meta:'8:00 AM • Port Barton', badge:'Tomorrow', badgeStyle:'solid', avatars:4, more:2, cta:'Open Tribe Chat', action:'openChat', images:['https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400&q=75','https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&q=75'], grad:'linear-gradient(135deg,#0ea5e9,#0c4a6e)' },
+  { id:'u4', title:'Acoustic Night 🎸', meta:'7:30 PM • Poblacion', badge:'May 18', badgeStyle:'soft', cta:"I'm Interested", action:'interested', images:['https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=75'], grad:'linear-gradient(135deg,#7c3aed,#1e1b4b)' }
 ];
 let MYSV_SAVED = [
   { id:'s1', title:'Long Beach', cat:'Beach · San Vicente', km:12, image:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=75', grad:'linear-gradient(135deg,#38bdf8,#0c4a6e)' },
@@ -6052,20 +6052,20 @@ let MYSV_SAVED = [
   { id:'s4', title:'Poblacion Market', cat:'Local Life · Poblacion', km:2, image:'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=75', grad:'linear-gradient(135deg,#f59e0b,#78350f)' },
   { id:'s5', title:'Alimanguan Beach', cat:'Beach · Alimanguan', km:25, image:'https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?w=400&q=75', grad:'linear-gradient(135deg,#60a5fa,#1e3a8a)' }
 ];
-const MYSV_TRIBES = [
-  { id:'t1', title:'Sunset Chasers 🌅', meta:'Long Beach • Today, 5:30 PM', more:3, grad:'linear-gradient(135deg,#f97316,#7c2d12)' },
-  { id:'t2', title:'Island Hopping Tomorrow 🚣', meta:'Port Barton • Tomorrow, 8:00 AM', more:2, grad:'linear-gradient(135deg,#0ea5e9,#0c4a6e)' },
-  { id:'t3', title:'Shared Ride to Port Barton 🚐', meta:'Poblacion • May 18, 10:00 AM', more:1, grad:'linear-gradient(135deg,#10b981,#064e3b)' }
+let MYSV_TRIBES = [
+  { id:'t1', title:'Sunset Chasers 🌅', meta:'Long Beach • Today, 5:30 PM', more:3, thumb:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=75', grad:'linear-gradient(135deg,#f97316,#7c2d12)' },
+  { id:'t2', title:'Island Hopping Tomorrow 🚣', meta:'Port Barton • Tomorrow, 8:00 AM', more:2, thumb:'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400&q=75', grad:'linear-gradient(135deg,#0ea5e9,#0c4a6e)' },
+  { id:'t3', title:'Shared Ride to Port Barton 🚐', meta:'Poblacion • May 18, 10:00 AM', more:1, thumb:'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&q=75', grad:'linear-gradient(135deg,#10b981,#064e3b)' }
 ];
 const MYSV_EVENTS = [
-  { id:'e1', title:'Full Moon Party 🌙', meta:'Baybay • Tonight, 9:00 PM', more:12, grad:'linear-gradient(135deg,#a78bfa,#1e1b4b)' },
-  { id:'e2', title:'Acoustic Night 🎸', meta:'Poblacion • May 18, 7:30 PM', more:8, grad:'linear-gradient(135deg,#f472b6,#831843)' }
+  { id:'e1', title:'Full Moon Party 🌙', meta:'Baybay • Tonight, 9:00 PM', more:12, images:['https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=400&q=75','https://images.unsplash.com/photo-1429962714451-bb934ecdc4ec?w=400&q=75'], grad:'linear-gradient(135deg,#a78bfa,#1e1b4b)' },
+  { id:'e2', title:'Acoustic Night 🎸', meta:'Poblacion • May 18, 7:30 PM', more:8, images:['https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=75'], grad:'linear-gradient(135deg,#f472b6,#831843)' }
 ];
 const MYSV_RECENT = [
-  { id:'r1', label:'Port Barton Village', grad:'linear-gradient(135deg,#38bdf8,#0c4a6e)' },
-  { id:'r2', label:'Private Boat Experience', grad:'linear-gradient(135deg,#22d3ee,#164e63)' },
-  { id:'r3', label:'Wild Beach North', grad:'linear-gradient(135deg,#60a5fa,#1e3a8a)' },
-  { id:'r4', label:'Sunset Drinks Tribe', grad:'linear-gradient(135deg,#f97316,#7c2d12)' }
+  { id:'r1', label:'Port Barton Village', image:'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=200&q=75', grad:'linear-gradient(135deg,#38bdf8,#0c4a6e)' },
+  { id:'r2', label:'Private Boat Experience', image:'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=200&q=75', grad:'linear-gradient(135deg,#22d3ee,#164e63)' },
+  { id:'r3', label:'Wild Beach North', image:'https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?w=200&q=75', grad:'linear-gradient(135deg,#60a5fa,#1e3a8a)' },
+  { id:'r4', label:'Sunset Drinks Tribe', image:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=200&q=75', grad:'linear-gradient(135deg,#f97316,#7c2d12)' }
 ];
 
 function mysvIsSignedIn(){
@@ -6322,7 +6322,7 @@ function renderMySanvic(){
               </div>
             </div>
             <div class="mysv-reward">
-              <div class="mysv-reward-thumb"></div>
+              <div class="mysv-reward-thumb" style="background-image:url('https://images.unsplash.com/photo-1519046904884-53103b34b206?w=200&q=75');background-size:cover;background-position:center;"></div>
               <div class="mysv-reward-body">
                 <div class="mysv-reward-lab">Recent reward</div>
                 <div class="mysv-reward-t">Hidden Beach Access</div>
@@ -6343,7 +6343,7 @@ function renderMySanvic(){
       <div class="mysv-hscroll">
         ${MYSV_RECENT.map(r=>`
           <button class="mysv-pill" onclick="mysvAction('view','${r.id}')">
-            <span class="mysv-pill-thumb" style="background:${r.grad}"></span>
+            <span class="mysv-pill-thumb" style="background-image:url('${r.image||''}');background-size:cover;background-position:center;background-color:#2a3247"></span>
             ${escapeHtml(r.label)}
           </button>`).join('')}
       </div>
