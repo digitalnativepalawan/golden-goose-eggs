@@ -67,6 +67,10 @@ const DEFAULT_TALA_DATA = [
     r:`<strong>San Vicente Budget Guide</strong><br><br>Budget: 1,800–3,500₱/day<br>Mid-range: 4,000–8,000₱/day<br>Boat tours vary by route and group size.<br><br>Bring cash, especially for Port Barton, island stops, and small eateries.`},
   {kw:["food","eat","restaurant","dish","cuisine"],
     r:`<strong>Food Around San Vicente</strong><br><br>Look for grilled fish, kinilaw, simple beachfront carinderias, fresh fruit, and local seafood in Port Barton or Poblacion. Many small places are cash-only.`},
+  {kw:["accommodation","stays","hotel","lodging","resort","where to stay","place to stay","stay","accomodation","homestay"],
+    r:`<strong>Where to Stay in San Vicente</strong><br><br><strong>Long Beach</strong> — boathouses, beachfront cottages, and mid-range resorts along the 14km strip. Best for first-timers who want the beach in front of them.<br><br><strong>Port Barton</strong> — quieter, smaller beachfront lodges, homestays, and a few guesthouses. Better for slow travel and island-hopping bases.<br><br><strong>Poblacion</strong> — the practical base: closest to transport, market, and Long Beach access. Good for arrivals, supplies, and budget stays.<br><br>Book ahead in peak season (Dec–May). Many places are small and fill up on weekends. Cash is king — bring it.`},
+  {kw:["cafe","cafes","coffee","caffe","brunch","breakfast","lunch","dining","resto","restaurants","food spots","where to eat"],
+    r:`<strong>Cafés & Food Spots in San Vicente</strong><br><br><strong>Poblacion</strong> — the town center has simple cafés, carinderias, and a few spots with wifi and morning coffee. Good for a slow start before heading to the beach.<br><br><strong>Long Beach</strong> — beachfront grills, boathouse cafés, and casual seafood stops along the strip. Best at sunrise or late afternoon.<br><br><strong>Port Barton</strong> — a handful of cafés, fusion spots, and beachfront eateries. Smaller than Long Beach but more relaxed.<br><br>Most small places are cash-only and close early. Bring cash, ask locals for today's best spot — it changes.`}
   {kw:["diving","snorkel","dive","coral","wreck"],
     r:`<strong>Snorkeling</strong><br><br>Port Barton island-hopping is the easiest snorkeling base in San Vicente. Ask for reef stops, turtle-friendly viewing, German Island, and Inaladelan Island. Never touch coral or chase wildlife.`},
   {kw:["packing","bring","prepare","gear"],
@@ -818,6 +822,7 @@ function answerTala(t){
       .catch(err=>{ console.warn('[TALA] live AI unavailable, using curated answers:', err); markTalaIdle(); const fallback = getAI(t); addMsg('bot', fallback.reply); speak(fallback.reply); });
   } else {
     const r = getAI(t);
+    if (r.dest && typeof openDest === 'function') openDest(r.dest);
     setTimeout(()=>{ addMsg('bot', r.reply); speak(r.reply); }, 140);
   }
 }
