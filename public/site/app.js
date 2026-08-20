@@ -93,6 +93,7 @@ const DEFAULT_SPLASH_FOOTER = `PALAWAN`;
 // ─── TALA AI (OpenRouter) state ───
 let talaAiEnabled = false;
 let talaAiModel = '';
+let talaAiKey = '';
 
 // ─── LIVE DATA (populated from Supabase, falls back to defaults) ───
 let destinations = [];
@@ -515,7 +516,7 @@ async function loadDataFromSupabase(){
       sb.from('site_settings').select('*').in('key', ['hero_title', 'hero_subtitle', 'splash_subtext', 'splash_footer']),
       sb.from('destination_categories').select('*').order('sort_order', { ascending: true }),
       sb.from('nearby_places').select('*').order('sort_order', { ascending: true }),
-      sb.from('tala_settings').select('key,value').in('key', ['ai_enabled', 'ai_model']),
+      sb.from('tala_settings').select('key,value').in('key', ['ai_enabled', 'ai_model', 'ai_key']),
     ]);
 
     if (destRes.error) throw destRes.error;
@@ -525,6 +526,7 @@ async function loadDataFromSupabase(){
       aiSettingsRes.data.forEach(r=>{
         if(r.key==='ai_enabled') talaAiEnabled = (r.value === 'true');
         if(r.key==='ai_model' && r.value) talaAiModel = r.value;
+        if(r.key==='ai_key' && r.value) talaAiKey = r.value;
       });
     }
 
@@ -553,6 +555,7 @@ async function loadDataFromSupabase(){
     talaSuggestions = DEFAULT_SUGGESTIONS;
     talaAiEnabled = false;
     talaAiModel = '';
+    talaAiKey = '';
     heroTitle = DEFAULT_HERO_TITLE;
     heroSubtitle = DEFAULT_HERO_SUBTITLE;
     splashSubtext = DEFAULT_SPLASH_SUBTEXT;
@@ -659,22 +662,53 @@ function getAI(input) {
   return best||defaultR;
 }
 
-// Live AI answer via the server-side OpenRouter proxy. Falls back to curated
+// Live AI answer calling OpenRouter directly from the browser, using the API
+// key + model stored in tala_settings via the admin. Falls back to curated
 // keyword answers on any failure (key not set, model error, offline).
-// Live AI answer via the server-side OpenRouter proxy. Falls back to curated
-// keyword answers on any failure (key not set, model error, offline).
+const TALA_BASE_PROMPT = 'You are TALA, the warm, local travel concierge of San Vicente, Palawan. You know the town, its beaches, waterfalls, islands, food and transport. Be friendly, concise and personal. If you don\'t know something, say so kindly and suggest asking at the tourism office. Keep answers under 120 words unless asked for details.';
+
+function talaKnowledgeBlock(){
+  const lines = [];
+  destinations.forEach(d=>{
+    lines.push(`[${d.category}] ${d.name}: ${d.description || ''} ${d.tip ? '— Tip: ' + d.tip : ''}`);
+  });
+  aiData.forEach(it=>{
+    it.kw.forEach(k=>{
+      if(!it.r) return;
+      lines.push(`"${k}" -> ${it.r}`);
+    });
+  });
+  const block = lines.slice(0, 140).join('\n');
+  return block ? ('\n\nLOCAL KNOWLEDGE BASE (use this first, it is vetted by the tourism office):\n' + block + '\n') : '';
+}
+
 async function getAILive(input){
-  const res = await fetch('/api/tala-chat', {
+  const key = (talaAiKey || '').trim();
+  const model = (talaAiModel || '').trim();
+  if(!key) throw new Error('OpenRouter API key not set — add it in Backoffice > TALA AI');
+  if(!model) throw new Error('No AI model selected');
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':'Bearer ' + key
+    },
     body: JSON.stringify({
-      model: talaAiModel || undefined,
-      messages: [{ role:'user', content: input }]
+      model,
+      max_tokens: 600,
+      temperature: 0.6,
+      messages: [
+        { role:'system', content: TALA_BASE_PROMPT + talaKnowledgeBlock() },
+        { role:'user', content: input }
+      ]
     })
   });
   const j = await res.json().catch(()=>({}));
-  if(!res.ok || j.configured === false || j.error) throw new Error(j.error || ('HTTP ' + res.status));
-  const reply = (j.reply || '').trim();
+  if(!res.ok){
+    const e = (j && j.error) ? (j.error.message || JSON.stringify(j.error)) : ('HTTP ' + res.status);
+    throw new Error(String(e));
+  }
+  const reply = ((j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '').trim();
   return reply || getAI(input);
 }
 
@@ -4096,9 +4130,13 @@ async function renderAdminTalaAi(){
   const body = document.getElementById('adminBody');
   body.innerHTML = `
     <div class="admin-field" style="font-size:.72rem;color:var(--white-dim);margin-bottom:12px;line-height:1.6;">
-      Route Tala's answers to a live AI model through OpenRouter. Turn it on below and pick a model — free or paid. Your curated knowledge (destinations + Tala answers) is sent as context, and if the server key isn't configured, Tala silently falls back to the keyword answers you manage in the <strong style="color:var(--white-soft)">Tala Answers</strong> tab.
+      Route Tala's answers to a live AI model through OpenRouter — called directly from the browser, no server needed. Paste your OpenRouter API key below, pick a model, then hit <strong style="color:var(--white-soft)">Save</strong> and the light goes green when the model replies. If the key or model fail, Tala silently falls back to the keyword answers you manage in the <strong style="color:var(--white-soft)">Tala Answers</strong> tab.
     </div>
     <div class="admin-edit-box">
+      <div class="admin-field">
+        <label>OpenRouter API key <span style="text-transform:none;letter-spacing:0;color:var(--white-dim)">(sk-or-v1-…, from openrouter.ai/keys)</span></label>
+        <input type="password" id="aiKeyInput" placeholder="sk-or-v1-••••" autocomplete="off">
+      </div>
       <div class="admin-toggle-row">
         <label>Live AI answers enabled</label>
         <input type="checkbox" id="aiEnabledCb">
@@ -4119,6 +4157,7 @@ async function renderAdminTalaAi(){
     </div>
     <div class="admin-empty" style="padding:14px 0">Free &amp; paid models load here from openrouter.ai…</div>`;
 
+  document.getElementById('aiKeyInput').value = talaAiKey || '';
   document.getElementById('aiEnabledCb').checked = !!talaAiEnabled;
   document.getElementById('aiModelCustom').value = talaAiModel || '';
 
@@ -4141,14 +4180,38 @@ async function renderAdminTalaAi(){
   refreshAiServerStatus();
 }
 
+// Green-light checker: actually calls OpenRouter with the currently entered
+// key + model. Colors the status line. No server involved.
 async function refreshAiServerStatus(){
+  const key = (document.getElementById('aiKeyInput') ? document.getElementById('aiKeyInput').value : talaAiKey || '').trim();
+  const sel = document.getElementById('aiModelSel');
+  const custom = document.getElementById('aiModelCustom');
+  const model = (custom && custom.value.trim()) || (sel && sel.value) || talaAiModel || TALA_AI_DEFAULT_MODEL;
+  const out = document.getElementById('aiTestOut');
+  if(!out) return;
+
+  if(!key){
+    out.innerHTML = `<span style="color:#fbbf24">${lucideSvg('x',12)} No OpenRouter API key yet — paste one above and save.</span>`;
+    return;
+  }
+  out.innerHTML = `<span style="color:#fbbf24">${lucideSvg('refresh-cw',12)} Checking <b>${escapeHtml(model)}</b> with your key…</span>`;
   try {
-    const r = await fetch('/api/tala-chat', { method:'GET' });
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer ' + key},
+      body: JSON.stringify({ model, max_tokens: 8, messages:[{ role:'user', content:'Say "ok".' }] })
+    });
     const j = await r.json().catch(()=>({}));
-    const pillTxt = j.configured ? 'server: key configured' : 'server: key missing — offline answers';
-    const out = document.getElementById('aiTestOut');
-    if(out) out.innerHTML = `<span style="color:${j.configured ? '#5eead4' : '#fbbf24'}">${lucideSvg(j.configured ? 'check' : 'x', 12)} ${pillTxt}</span>`;
-  } catch(e){ /* server not reachable — ignore, badge reflects state */ }
+    if(r.ok){
+      const reply = ((j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '').trim();
+      out.innerHTML = `<span style="color:#5eead4">${lucideSvg('check',12)} Connected — ${escapeHtml(model)} replied: “${escapeHtml(reply.slice(0,60))}”</span>`;
+    } else {
+      const e = (j && j.error) ? (j.error.message || j.error.type || '') : ('HTTP ' + r.status);
+      out.innerHTML = `<span style="color:#f87171">${lucideSvg('x',12)} ${escapeHtml(model)} failed — ${escapeHtml(String(e).slice(0,200))}. Try another model.</span>`;
+    }
+  } catch(e){
+    out.innerHTML = `<span style="color:#f87171">${lucideSvg('x',12)} Can't reach OpenRouter — ${escapeHtml(String(e && e.message || e).slice(0,200))}</span>`;
+  }
 }
 
 async function adminSaveAiConfig(){
@@ -4156,18 +4219,23 @@ async function adminSaveAiConfig(){
   const custom = document.getElementById('aiModelCustom').value.trim();
   const model = custom || (sel && sel.value) || TALA_AI_DEFAULT_MODEL;
   const enabled = document.getElementById('aiEnabledCb').checked;
+  const key = (document.getElementById('aiKeyInput').value || '').trim();
   const out = document.getElementById('aiTestOut');
   out.textContent = 'Saving…';
   try {
-    const { error } = await sb.from('tala_settings').upsert([
+    const rows = [
       { key:'ai_enabled', value: enabled ? 'true' : 'false' },
       { key:'ai_model', value: model }
-    ]);
+    ];
+    if(key) rows.push({ key:'ai_key', value: key });
+    const { error } = await sb.from('tala_settings').upsert(rows);
     if(error) throw error;
     talaAiEnabled = enabled;
     talaAiModel = model;
+    if(key) talaAiKey = key;
     refreshAdminAiBadge();
     out.innerHTML = `<span style="color:#5eead4">${lucideSvg('check',12)} Saved.</span> Live AI ${enabled?'on':'off'} · ${escapeHtml(model)}`;
+    refreshAiServerStatus();
   } catch(err){
     out.textContent = 'Save failed: ' + (err.message || err);
     out.style.color = '#f87171';
@@ -4182,14 +4250,24 @@ async function adminTestAi(){
   out.textContent = 'Asking ' + model + '…';
   out.style.color = 'var(--white-dim)';
   try {
-    const r = await fetch('/api/tala-chat', {
+    const key = (document.getElementById('aiKeyInput').value || '').trim();
+    if(!key){ out.textContent = 'Paste your OpenRouter API key first.'; out.style.color = '#fbbf24'; return; }
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ model, messages:[{ role:'user', content:'Say hello as tala, the warm San Vicente travel concierge. Under 10 words.' }] })
+      headers:{'Content-Type':'application/json','Authorization':'Bearer ' + key},
+      body: JSON.stringify({
+        model, max_tokens: 80, temperature: 0.6,
+        messages:[{ role:'system', content: TALA_BASE_PROMPT }, { role:'user', content:'Say hello as tala, the warm San Vicente travel concierge. Under 10 words.' }]
+      })
     });
     const j = await r.json().catch(()=>({}));
-    if(r.ok && j.reply) out.innerHTML = `<span style="color:#5eead4">${lucideSvg('check',12)} Reply:</span> ${escapeHtml(String(j.reply).slice(0,300))}`;
-    else out.innerHTML = `<span style="color:#f87171">${lucideSvg('x',12)} ${escapeHtml(j.error || ('HTTP ' + r.status) || 'No key configured')}</span>`;
+    if(r.ok){
+      const reply = ((j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '').trim();
+      out.innerHTML = `<span style="color:#5eead4">${lucideSvg('check',12)} Reply:</span> ${escapeHtml(reply.slice(0,300))}`;
+    } else {
+      const e = (j && j.error) ? (j.error.message || j.error.type || '') : ('HTTP ' + r.status);
+      out.innerHTML = `<span style="color:#f87171">${lucideSvg('x',12)} ${escapeHtml(String(e).slice(0,200))}</span>`;
+    }
   } catch(err){
     out.textContent = 'Request failed: ' + (err.message || err);
     out.style.color = '#f87171';
