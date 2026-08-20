@@ -508,7 +508,7 @@ function isSuggestionActiveToday(s){
 
 async function loadDataFromSupabase(){
   try {
-    const [destRes, talaRes, settingsRes, sugRes, siteRes, catRes, nearbyRes, aiSettingsRes] = await Promise.all([
+    const [destRes, talaRes, settingsRes, sugRes, siteRes, catRes, nearbyRes, aiSettingsRes, todayRes, tribesRes, eventsRes] = await Promise.all([
       sb.from('destinations').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_responses').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_settings').select('*').eq('key', 'default_response').maybeSingle(),
@@ -517,6 +517,9 @@ async function loadDataFromSupabase(){
       sb.from('destination_categories').select('*').order('sort_order', { ascending: true }),
       sb.from('nearby_places').select('*').order('sort_order', { ascending: true }),
       sb.from('tala_settings').select('key,value').in('key', ['ai_enabled', 'ai_model', 'ai_key']),
+      sb.from('today_content').select('key,data'),
+      sb.from('tribes').select('*').order('sort_order', { ascending: true }),
+      sb.from('events').select('*').order('sort_order', { ascending: true }),
     ]);
 
     if (destRes.error) throw destRes.error;
@@ -547,6 +550,58 @@ async function loadDataFromSupabase(){
     heroSubtitle = (subRow && subRow.value != null) ? subRow.value : DEFAULT_HERO_SUBTITLE;
     splashSubtext = (splashSubRow && splashSubRow.value != null) ? splashSubRow.value : DEFAULT_SPLASH_SUBTEXT;
     splashFooter = (splashFootRow && splashFootRow.value != null) ? splashFootRow.value : DEFAULT_SPLASH_FOOTER;
+
+    // Load Today content from DB (overrides hardcoded TODAY_DATA)
+    if(todayRes && todayRes.data && todayRes.data.length){
+      todayRes.data.forEach(r=>{
+        if(r.key==='tala_pick') TODAY_DATA.talaPick = r.data;
+        else if(r.key==='happening') TODAY_DATA.happening = r.data;
+        else if(r.key==='joinable') TODAY_DATA.joinable = r.data;
+        else if(r.key==='weather') TODAY_DATA.weather = r.data;
+        else if(r.key==='locals') TODAY_DATA.locals = r.data;
+        else if(r.key==='notices') TODAY_DATA.notices = r.data;
+      });
+    }
+
+    // Load tribes from DB (overrides hardcoded PULSE_TRIBES)
+    if(tribesRes && tribesRes.data && tribesRes.data.length){
+      PULSE_TRIBES.length = 0;
+      tribesRes.data.forEach(t=>{
+        PULSE_TRIBES.push({
+          id: t.id, title: t.title, where: t.where_text, when: t.when_text,
+          sub: t.sub, thumb: t.thumb_url, joined: t.joined, extra: t.extra,
+          cap: t.cap, tags: t.tags||[], spots: t.spots, seatsOpen: t.seats_open,
+          warn: t.spots>0
+        });
+      });
+      MYSV_TRIBES.length = 0;
+      tribesRes.data.forEach(t=>{
+        MYSV_TRIBES.push({
+          id: t.id, title: t.title,
+          meta: t.where_text + ' • ' + t.when_text,
+          more: t.extra, grad: 'linear-gradient(135deg,#f97316,#7c2d12)'
+        });
+      });
+    }
+
+    // Load events from DB (overrides hardcoded PULSE_EVENTS / MYSV_EVENTS)
+    if(eventsRes && eventsRes.data && eventsRes.data.length){
+      PULSE_EVENTS.length = 0;
+      eventsRes.data.forEach(ev=>{
+        PULSE_EVENTS.push({
+          id: ev.id, title: ev.title, org: ev.org, where: ev.where_text,
+          when: ev.when_text, price: ev.price, tags: ev.tags||[]
+        });
+      });
+      MYSV_EVENTS.length = 0;
+      eventsRes.data.forEach(ev=>{
+        MYSV_EVENTS.push({
+          id: ev.id, title: ev.title,
+          meta: ev.where_text + ' • ' + ev.when_text,
+          more: 0, grad: 'linear-gradient(135deg,#a78bfa,#1e1b4b)'
+        });
+      });
+    }
   } catch(err) {
     console.warn('[SANVIC] Supabase load failed, using built-in defaults:', err);
     destinations = DEFAULT_DESTINATIONS;
@@ -3133,12 +3188,18 @@ function switchAdminTab(tab){
   document.getElementById('adminTabTalaAi').classList.toggle('active', tab==='ai');
   document.getElementById('adminTabPulse').classList.toggle('active', tab==='pulse');
   document.getElementById('adminTabSite').classList.toggle('active', tab==='site');
+  document.getElementById('adminTabToday').classList.toggle('active', tab==='today');
+  document.getElementById('adminTabTribes').classList.toggle('active', tab==='tribes');
+  document.getElementById('adminTabEvents').classList.toggle('active', tab==='events');
   adminEditingDestId = null;
   adminEditingTalaId = null;
   if(tab==='dest') renderAdminDest();
   else if(tab==='tala') renderAdminTala();
   else if(tab==='ai') renderAdminTalaAi();
   else if(tab==='site') renderAdminSite();
+  else if(tab==='today') renderAdminToday();
+  else if(tab==='tribes') renderAdminTribes();
+  else if(tab==='events') renderAdminEvents();
   else renderAdminPulse();
 }
 
@@ -4361,6 +4422,317 @@ async function adminSaveSplashFooter(){
   } catch(err){
     alert('Save failed: ' + (err.message || err));
   }
+}
+
+// ───────────── TODAY ADMIN ─────────────
+let adminTodayData = null;
+
+async function loadTodayContent(){
+  try {
+    const { data, error } = await sb.from('today_content').select('key,data');
+    if(error) throw error;
+    if(data && data.length){
+      adminTodayData = {};
+      data.forEach(r=>{ adminTodayData[r.key] = r.data; });
+    }
+  } catch(e){ console.warn('[ADMIN] today_content load failed:', e); }
+  if(!adminTodayData) adminTodayData = JSON.parse(JSON.stringify(TODAY_DATA));
+}
+
+async function renderAdminToday(){
+  const body = document.getElementById('adminBody');
+  body.innerHTML = '<div class="admin-empty">Loading…</div>';
+  await loadTodayContent();
+  const d = adminTodayData;
+  const happening = (d.happening||[]);
+  const joinable = (d.joinable||[]);
+  const weather = (d.weather||[]);
+  const locals = (d.locals||[]);
+  const notices = (d.notices||[]);
+  const path = (d.talaPick && d.talaPick.path) || [];
+
+  body.innerHTML = `
+    <div class="admin-field">
+      <label>TALA's pick intro</label>
+      <textarea id="atPickIntro" rows="2">${escapeHtml((d.talaPick||{}).intro||'')}</textarea>
+    </div>
+    <div class="admin-field">
+      <label>TALA's pick path (one per line: Label | Sub)</label>
+      <textarea id="atPickPath" rows="3">${path.map(p=> p.label+' | '+p.sub).join('\n')}</textarea>
+    </div>
+    <div class="admin-field">
+      <label>Happening today (one per line: Title | Place | Time | Distance | Vibe)</label>
+      <textarea id="atHappening" rows="4">${happening.map(e=> [e.title,e.place,e.time,e.dist,e.vibe].join(' | ')).join('\n')}</textarea>
+    </div>
+    <div class="admin-field">
+      <label>Joinable today (one per line: Title | Detail | Crowd)</label>
+      <textarea id="atJoinable" rows="3">${joinable.map(j=> [j.title,j.detail,j.crowd].join(' | ')).join('\n')}</textarea>
+    </div>
+    <div class="admin-field">
+      <label>Weather verdicts (one per line: Icon | Label | Verdict)</label>
+      <textarea id="atWeather" rows="3">${weather.map(w=> [w.icon,w.label,w.verdict].join(' | ')).join('\n')}</textarea>
+    </div>
+    <div class="admin-field">
+      <label>Local tips (one per line: Badge | Business | Text | Meta)</label>
+      <textarea id="atLocals" rows="3">${locals.map(l=> [l.badge,l.biz,l.text,l.meta].join(' | ')).join('\n')}</textarea>
+    </div>
+    <div class="admin-field">
+      <label>Notices (one per line: Text)</label>
+      <textarea id="atNotices" rows="2">${notices.map(n=> n.text).join('\n')}</textarea>
+    </div>
+    <div class="admin-edit-actions">
+      <button class="admin-save-btn" onclick="adminSaveToday()">${lucideSvg('save',14)} Save Today content</button>
+      <span id="atStatus" style="font-size:.72rem;color:var(--white-dim);margin-left:8px;"></span>
+    </div>`;
+}
+
+function parseLines(text, fieldCount){
+  return text.split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
+    const parts = line.split('|').map(s=>s.trim());
+    while(parts.length < fieldCount) parts.push('');
+    return parts;
+  });
+}
+
+async function adminSaveToday(){
+  const status = document.getElementById('atStatus');
+  status.textContent = 'Saving…';
+  try {
+    const pickIntro = document.getElementById('atPickIntro').value.trim();
+    const pickPath = parseLines(document.getElementById('atPickPath').value, 2).map(p=>({ label:p[0], sub:p[1] }));
+    const happening = parseLines(document.getElementById('atHappening').value, 5).map(p=>({ title:p[0], place:p[1], time:p[2], dist:p[3], vibe:p[4] }));
+    const joinable = parseLines(document.getElementById('atJoinable').value, 3).map(p=>({ title:p[0], detail:p[1], crowd:parseInt(p[2])||0 }));
+    const weather = parseLines(document.getElementById('atWeather').value, 3).map(p=>({ icon:p[0], label:p[1], verdict:p[2] }));
+    const locals = parseLines(document.getElementById('atLocals').value, 4).map(p=>({ badge:p[0], biz:p[1], text:p[2], meta:p[3] }));
+    const notices = parseLines(document.getElementById('atNotices').value, 1).map(p=>({ text:p[0] }));
+
+    const rows = [
+      { key:'tala_pick', data:{ intro: pickIntro, path: pickPath } },
+      { key:'happening', data: happening },
+      { key:'joinable', data: joinable },
+      { key:'weather', data: weather },
+      { key:'locals', data: locals },
+      { key:'notices', data: notices },
+    ];
+    const { error } = await sb.from('today_content').upsert(rows, { onConflict:'key' });
+    if(error) throw error;
+    status.innerHTML = '<span style="color:#5eead4">✓ Saved</span>';
+    TODAY_DATA.talaPick = { intro: pickIntro, path: pickPath };
+    TODAY_DATA.happening = happening;
+    TODAY_DATA.joinable = joinable;
+    TODAY_DATA.weather = weather;
+    TODAY_DATA.locals = locals;
+    TODAY_DATA.notices = notices;
+  } catch(err){
+    status.innerHTML = '<span style="color:#f87171">Failed: ' + escapeHtml(err.message) + '</span>';
+  }
+}
+
+// ───────────── TRIBES ADMIN ─────────────
+
+async function renderAdminTribes(){
+  const body = document.getElementById('adminBody');
+  body.innerHTML = '<div class="admin-empty">Loading…</div>';
+  let tribes = [];
+  try {
+    const { data, error } = await sb.from('tribes').select('*').order('sort_order');
+    if(error) throw error;
+    tribes = data || [];
+  } catch(e){
+    body.innerHTML = `<div class="admin-empty">Load failed: ${escapeHtml(e.message)}</div>`;
+    return;
+  }
+
+  let html = `<button class="admin-add-btn" onclick="adminEditTribe('new')">+ Add tribe</button>`;
+
+  if(!tribes.length){
+    html += '<div class="admin-empty">No tribes yet. Add one above.</div>';
+  } else {
+    tribes.forEach(t=>{
+      html += `
+      <div class="admin-list-item">
+        <div class="admin-list-item-head">
+          <div style="flex:1;">
+            <strong>${escapeHtml(t.title)}</strong><br>
+            <span style="color:var(--white-dim);font-size:.7rem;">${escapeHtml(t.where_text||'')} · ${escapeHtml(t.when_text||'')}</span>
+          </div>
+          <div class="admin-row-actions">
+            <button class="admin-mini-btn" onclick="adminEditTribe('${t.id}')">Edit</button>
+            <button class="admin-mini-btn danger" onclick="adminDeleteTribe('${t.id}')">Delete</button>
+          </div>
+        </div>
+      </div>`;
+    });
+  }
+  body.innerHTML = html;
+}
+
+async function adminEditTribe(id){
+  const body = document.getElementById('adminBody');
+  const isNew = id === 'new';
+  let t = { title:'', where_text:'', when_text:'', sub:'', thumb_url:'', joined:0, extra:0, cap:0, spots:null, seats_open:null, sort_order:0 };
+  if(!isNew){
+    try {
+      const { data } = await sb.from('tribes').select('*').eq('id', id).single();
+      if(data) t = data;
+    } catch(e){ alert('Load failed: '+e.message); return; }
+  }
+  body.innerHTML = `
+    <div class="admin-edit-box">
+      <div class="admin-field"><label>Title</label><input id="atbfTitle" value="${escapeHtml(t.title)}"></div>
+      <div class="admin-grid-2">
+        <div class="admin-field"><label>Where</label><input id="atbfWhere" value="${escapeHtml(t.where_text||'')}"></div>
+        <div class="admin-field"><label>When</label><input id="atbfWhen" value="${escapeHtml(t.when_text||'')}"></div>
+      </div>
+      <div class="admin-field"><label>Subtitle</label><input id="atbfSub" value="${escapeHtml(t.sub||'')}"></div>
+      <div class="admin-field"><label>Thumbnail URL</label><input id="atbfThumb" value="${escapeHtml(t.thumb_url||'')}" placeholder="https://..."></div>
+      <div class="admin-grid-2">
+        <div class="admin-field"><label>Joined</label><input type="number" id="atbfJoined" value="${t.joined||0}"></div>
+        <div class="admin-field"><label>Extra (+N)</label><input type="number" id="atbfExtra" value="${t.extra||0}"></div>
+      </div>
+      <div class="admin-grid-2">
+        <div class="admin-field"><label>Capacity</label><input type="number" id="atbfCap" value="${t.cap||0}"></div>
+        <div class="admin-field"><label>Spots left</label><input type="number" id="atbfSpots" value="${t.spots||''}"></div>
+      </div>
+      <div class="admin-field"><label>Tags (comma-separated)</label><input id="atbfTags" value="${(t.tags||[]).join(', ')}"></div>
+      <div class="admin-field"><label>Sort order</label><input type="number" id="atbfSort" value="${t.sort_order||0}"></div>
+      <div class="admin-edit-actions">
+        <button class="admin-save-btn" onclick="adminSaveTribe('${isNew?'':id}')">${isNew?'Create':'Save'}</button>
+        <button class="admin-cancel-btn" onclick="renderAdminTribes()">Cancel</button>
+      </div>
+    </div>`;
+}
+
+async function adminSaveTribe(id){
+  const isNew = id === 'new';
+  const payload = {
+    title: document.getElementById('atbfTitle').value.trim(),
+    where_text: document.getElementById('atbfWhere').value.trim(),
+    when_text: document.getElementById('atbfWhen').value.trim(),
+    sub: document.getElementById('atbfSub').value.trim(),
+    thumb_url: document.getElementById('atbfThumb').value.trim(),
+    joined: parseInt(document.getElementById('atbfJoined').value)||0,
+    extra: parseInt(document.getElementById('atbfExtra').value)||0,
+    cap: parseInt(document.getElementById('atbfCap').value)||0,
+    spots: document.getElementById('atbfSpots').value ? parseInt(document.getElementById('atbfSpots').value) : null,
+    seats_open: document.getElementById('atbfSpots').value ? parseInt(document.getElementById('atbfSpots').value) : null,
+    tags: document.getElementById('atbfTags').value.split(',').map(s=>s.trim()).filter(Boolean),
+    sort_order: parseInt(document.getElementById('atbfSort').value)||0,
+  };
+  if(!payload.title){ alert('Title is required.'); return; }
+  try {
+    if(isNew){
+      const { error } = await sb.from('tribes').insert(payload);
+      if(error) throw error;
+    } else {
+      const { error } = await sb.from('tribes').update(payload).eq('id', id);
+      if(error) throw error;
+    }
+    renderAdminTribes();
+  } catch(err){ alert('Save failed: '+err.message); }
+}
+
+async function adminDeleteTribe(id){
+  if(!confirm('Delete this tribe?')) return;
+  try { await sb.from('tribes').delete().eq('id', id); renderAdminTribes(); }
+  catch(e){ alert('Delete failed: '+e.message); }
+}
+
+// ───────────── EVENTS ADMIN ─────────────
+
+async function renderAdminEvents(){
+  const body = document.getElementById('adminBody');
+  body.innerHTML = '<div class="admin-empty">Loading…</div>';
+  let events = [];
+  try {
+    const { data, error } = await sb.from('events').select('*').order('sort_order');
+    if(error) throw error;
+    events = data || [];
+  } catch(e){
+    body.innerHTML = `<div class="admin-empty">Load failed: ${escapeHtml(e.message)}</div>`;
+    return;
+  }
+
+  let html = `<button class="admin-add-btn" onclick="adminEditEvent('new')">+ Add event</button>`;
+
+  if(!events.length){
+    html += '<div class="admin-empty">No events yet. Add one above.</div>';
+  } else {
+    events.forEach(ev=>{
+      html += `
+      <div class="admin-list-item">
+        <div class="admin-list-item-head">
+          <div style="flex:1;">
+            <strong>${escapeHtml(ev.title)}</strong><br>
+            <span style="color:var(--white-dim);font-size:.7rem;">${escapeHtml(ev.org||'')} · ${escapeHtml(ev.where_text||'')} · ${escapeHtml(ev.when_text||'')}</span>
+          </div>
+          <div class="admin-row-actions">
+            <button class="admin-mini-btn" onclick="adminEditEvent('${ev.id}')">Edit</button>
+            <button class="admin-mini-btn danger" onclick="adminDeleteEvent('${ev.id}')">Delete</button>
+          </div>
+        </div>
+      </div>`;
+    });
+  }
+  body.innerHTML = html;
+}
+
+async function adminEditEvent(id){
+  const body = document.getElementById('adminBody');
+  const isNew = id === 'new';
+  let ev = { title:'', org:'', where_text:'', when_text:'', price:'', tags:[], sort_order:0 };
+  if(!isNew){
+    try {
+      const { data } = await sb.from('events').select('*').eq('id', id).single();
+      if(data) ev = data;
+    } catch(e){ alert('Load failed: '+e.message); return; }
+  }
+  body.innerHTML = `
+    <div class="admin-edit-box">
+      <div class="admin-field"><label>Title</label><input id="aevfTitle" value="${escapeHtml(ev.title)}"></div>
+      <div class="admin-field"><label>Organizer</label><input id="aevfOrg" value="${escapeHtml(ev.org||'')}"></div>
+      <div class="admin-grid-2">
+        <div class="admin-field"><label>Where</label><input id="aevfWhere" value="${escapeHtml(ev.where_text||'')}"></div>
+        <div class="admin-field"><label>When</label><input id="aevfWhen" value="${escapeHtml(ev.when_text||'')}"></div>
+      </div>
+      <div class="admin-field"><label>Price</label><input id="aevfPrice" value="${escapeHtml(ev.price||'')}"></div>
+      <div class="admin-field"><label>Tags (comma-separated)</label><input id="aevfTags" value="${(ev.tags||[]).join(', ')}"></div>
+      <div class="admin-field"><label>Sort order</label><input type="number" id="aevfSort" value="${ev.sort_order||0}"></div>
+      <div class="admin-edit-actions">
+        <button class="admin-save-btn" onclick="adminSaveEvent('${isNew?'':id}')">${isNew?'Create':'Save'}</button>
+        <button class="admin-cancel-btn" onclick="renderAdminEvents()">Cancel</button>
+      </div>
+    </div>`;
+}
+
+async function adminSaveEvent(id){
+  const isNew = id === 'new';
+  const payload = {
+    title: document.getElementById('aevfTitle').value.trim(),
+    org: document.getElementById('aevfOrg').value.trim(),
+    where_text: document.getElementById('aevfWhere').value.trim(),
+    when_text: document.getElementById('aevfWhen').value.trim(),
+    price: document.getElementById('aevfPrice').value.trim(),
+    tags: document.getElementById('aevfTags').value.split(',').map(s=>s.trim()).filter(Boolean),
+    sort_order: parseInt(document.getElementById('aevfSort').value)||0,
+  };
+  if(!payload.title){ alert('Title is required.'); return; }
+  try {
+    if(isNew){
+      const { error } = await sb.from('events').insert(payload);
+      if(error) throw error;
+    } else {
+      const { error } = await sb.from('events').update(payload).eq('id', id);
+      if(error) throw error;
+    }
+    renderAdminEvents();
+  } catch(err){ alert('Save failed: '+err.message); }
+}
+
+async function adminDeleteEvent(id){
+  if(!confirm('Delete this event?')) return;
+  try { await sb.from('events').delete().eq('id', id); renderAdminEvents(); }
+  catch(e){ alert('Delete failed: '+e.message); }
 }
 
 // ───────────── TALA ADMIN ─────────────
