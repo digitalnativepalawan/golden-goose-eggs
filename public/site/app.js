@@ -1911,9 +1911,17 @@ function tribeCardHTML(t){
     : t.seatsOpen
       ? `<div class="pv2-metaline ok">${t.joined} travelers • ${t.seatsOpen} seats open</div>`
       : `<div class="pv2-metaline">${t.cap||t.joined} travelers</div>`;
+  const allImages = [];
+  if(t.thumb) allImages.push(t.thumb);
+  if(t.images && Array.isArray(t.images)) allImages.push(...t.images);
+  const uniqueImages = [...new Set(allImages)];
+  const thumbClick = uniqueImages.length > 1
+    ? `onclick="openCarousel(${JSON.stringify(uniqueImages).replace(/"/g, '&quot;')},0)"`
+    : '';
+  const thumbStyle = uniqueImages.length > 1 ? 'cursor:pointer' : '';
   return `
   <div class="pv2-tribe">
-    <div class="pv2-tribe-thumb" style="background-image:url('${t.thumb}')"></div>
+    <div class="pv2-tribe-thumb" style="background-image:url('${t.thumb}');${thumbStyle}" ${thumbClick}></div>
     <div class="pv2-tribe-body">
       <div class="pv2-tribe-title">${t.title}</div>
       <div class="pv2-tribe-meta">
@@ -1932,8 +1940,13 @@ function tribeCardHTML(t){
   </div>`;
 }
 function eventCardHTML(e){
+  const allImages = (e.images && Array.isArray(e.images) && e.images.length) ? e.images : [];
+  const imageHtml = allImages.length > 1
+    ? `<img class="pulse-card-image" src="${allImages[0]}" alt="" loading="lazy" style="cursor:pointer" onclick="openCarousel(${JSON.stringify(allImages).replace(/"/g, '&quot;')},0)" onerror="this.style.display='none'">`
+    : '';
   return `
   <div class="pv2-event">
+    ${imageHtml}
     <div class="pv2-event-t">${e.title}</div>
     <div class="pv2-event-org"><span class="pv2-event-org-dot">${e.org.slice(0,1)}</span>${e.org}</div>
     <div class="pv2-event-meta"><span>📍 ${e.where}</span><span>🕒 ${e.when}</span></div>
@@ -2689,6 +2702,55 @@ function parseGoogleMapsUrl(url){
   return { lat, lng, name };
 }
 
+// ───────────── IMAGE CAROUSEL ─────────────
+let __carouselImages = [];
+let __carouselIndex = 0;
+
+function openCarousel(images, startIndex){
+  if(!images || images.length === 0) return;
+  __carouselImages = images;
+  __carouselIndex = startIndex || 0;
+  renderCarousel();
+  document.getElementById('carouselOverlay').classList.add('active');
+}
+
+function closeCarousel(e){
+  if(e && e.target !== document.getElementById('carouselOverlay') && e.target.className !== 'carousel-close') return;
+  document.getElementById('carouselOverlay').classList.remove('active');
+}
+
+function carouselPrev(e){
+  if(e) e.stopPropagation();
+  __carouselIndex = (__carouselIndex - 1 + __carouselImages.length) % __carouselImages.length;
+  renderCarousel();
+}
+
+function carouselNext(e){
+  if(e) e.stopPropagation();
+  __carouselIndex = (__carouselIndex + 1) % __carouselImages.length;
+  renderCarousel();
+}
+
+function renderCarousel(){
+  const img = document.getElementById('carouselImg');
+  img.src = __carouselImages[__carouselIndex];
+  document.getElementById('carouselCounter').textContent = (__carouselIndex + 1) + ' / ' + __carouselImages.length;
+  const dots = document.getElementById('carouselDots');
+  dots.innerHTML = __carouselImages.map((_, i) =>
+    `<button class="carousel-dot${i===__carouselIndex?' active':''}" onclick="event.stopPropagation();__carouselIndex=${i};renderCarousel()"></button>`
+  ).join('');
+  // Hide nav if single image
+  document.querySelectorAll('.carousel-nav').forEach(el => el.style.display = __carouselImages.length > 1 ? '' : 'none');
+  dots.style.display = __carouselImages.length > 1 ? '' : 'none';
+}
+
+function buildCarouselImages(d){
+  const images = [];
+  if(d.image) images.push(d.image);
+  if(d.images && Array.isArray(d.images)) images.push(...d.images);
+  return [...new Set(images)];
+}
+
 function openDest(d) {
   currentDest = d;
   const cat = catStyle[d.category];
@@ -2704,6 +2766,7 @@ function openDest(d) {
   // (browsers block unmuted autoplay; the player's own controls let
   // the visitor unmute with one tap).
   const mediaEl = document.getElementById('deMedia');
+  const allImages = buildCarouselImages(d);
   if(d.videoUrl && d.videoType === 'youtube'){
     const yid = getYoutubeId(d.videoUrl);
     mediaEl.innerHTML = yid
@@ -2715,6 +2778,11 @@ function openDest(d) {
     if(vEl) vEl.play().catch(()=>{ /* autoplay blocked — controls still let them tap play */ });
   } else {
     mediaEl.innerHTML = `<img src="${d.image}" alt="${d.name}">`;
+    if(allImages.length > 1){
+      const photoEl = document.getElementById('dePhoto');
+      photoEl.classList.add('has-carousel');
+      photoEl.onclick = function(){ openCarousel(allImages, 0); };
+    }
   }
   document.getElementById('dePhoto').style.background = '';
   document.getElementById('deTitle').textContent = d.name;
@@ -4534,6 +4602,171 @@ async function loadTodayContent(){
   if(!adminTodayData) adminTodayData = JSON.parse(JSON.stringify(TODAY_DATA));
 }
 
+// ───────────── TODAY ADMIN ─────────────
+let __todayHappeningGalleries = {};
+let __todayLocalGalleries = {};
+let __todayNextHid = 0;
+let __todayNextLid = 0;
+
+function todayItemGalleryHtml(itemId, prefix, galleryMap, itemLabel){
+  const imgs = (galleryMap[itemId] || []).map((url, i) => `
+    <div class="admin-media-thumb">
+      <img src="${escapeHtml(url)}" onerror="this.parentElement.style.display='none'">
+      <button class="admin-media-del" onclick="todayRemoveItemImage('${itemId}',${i},'${prefix}')">&times;</button>
+    </div>`).join('');
+  return `
+    <label>Gallery images (tap + to upload from device, or paste a URL)</label>
+    <div class="admin-media-grid" id="${prefix}${itemId}Gallery">${imgs}
+      <label class="admin-media-add">
+        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="todayUploadItemImage(this,'${itemId}','${prefix}')" hidden>
+        <span>+</span>
+      </label>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:6px;">
+      <input id="${prefix}${itemId}UrlInput" placeholder="Or paste image URL…" style="flex:1;padding:7px 10px;border-radius:6px;border:1px solid var(--glass-border);background:var(--charcoal-input);color:var(--white-soft);font-size:.78rem;">
+      <button class="admin-mini-btn" onclick="todayAddItemImageUrl('${itemId}','${prefix}')">Add URL</button>
+    </div>`;
+}
+
+function todayAddItemImageUrl(itemId, prefix){
+  const inp = document.getElementById(prefix + itemId + 'UrlInput');
+  const url = (inp.value || '').trim();
+  if(!url) return;
+  if(prefix === 'happening'){
+    if(!__todayHappeningGalleries[itemId]) __todayHappeningGalleries[itemId] = [];
+    __todayHappeningGalleries[itemId].push(url);
+  } else {
+    if(!__todayLocalGalleries[itemId]) __todayLocalGalleries[itemId] = [];
+    __todayLocalGalleries[itemId].push(url);
+  }
+  inp.value = '';
+  todayRefreshItemGallery(itemId, prefix);
+}
+
+async function todayUploadItemImage(input, itemId, prefix){
+  const file = input.files[0];
+  if(!file) return;
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = 'today_' + prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '.' + ext;
+  try {
+    const { error } = await sb.storage.from('destination-images').upload(path, file, { cacheControl:'3600', upsert:false, contentType: file.type || 'image/jpeg' });
+    if(error) throw error;
+    const { data } = sb.storage.from('destination-images').getPublicUrl(path);
+    if(data && data.publicUrl){
+      if(prefix === 'happening'){
+        if(!__todayHappeningGalleries[itemId]) __todayHappeningGalleries[itemId] = [];
+        __todayHappeningGalleries[itemId].push(data.publicUrl);
+      } else {
+        if(!__todayLocalGalleries[itemId]) __todayLocalGalleries[itemId] = [];
+        __todayLocalGalleries[itemId].push(data.publicUrl);
+      }
+      todayRefreshItemGallery(itemId, prefix);
+    }
+  } catch(e){ alert('Upload failed: ' + e.message); }
+  input.value = '';
+}
+
+function todayRemoveItemImage(itemId, idx, prefix){
+  if(prefix === 'happening'){
+    if(__todayHappeningGalleries[itemId]) __todayHappeningGalleries[itemId].splice(idx, 1);
+  } else {
+    if(__todayLocalGalleries[itemId]) __todayLocalGalleries[itemId].splice(idx, 1);
+  }
+  todayRefreshItemGallery(itemId, prefix);
+}
+
+function todayRefreshItemGallery(itemId, prefix){
+  const grid = document.getElementById(prefix + itemId + 'Gallery');
+  if(!grid) return;
+  const galleryMap = prefix === 'happening' ? __todayHappeningGalleries : __todayLocalGalleries;
+  const imgs = (galleryMap[itemId] || []).map((url, i) => `
+    <div class="admin-media-thumb">
+      <img src="${escapeHtml(url)}" onerror="this.parentElement.style.display='none'">
+      <button class="admin-media-del" onclick="todayRemoveItemImage('${itemId}',${i},'${prefix}')">&times;</button>
+    </div>`).join('');
+  grid.innerHTML = imgs + `
+    <label class="admin-media-add">
+      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="todayUploadItemImage(this,'${itemId}','${prefix}')" hidden>
+      <span>+</span>
+    </label>`;
+}
+
+function todayRemoveHappening(id){
+  delete __todayHappeningGalleries[id];
+  const el = document.getElementById('happeningCard_' + id);
+  if(el) el.remove();
+}
+
+function todayRemoveLocal(id){
+  delete __todayLocalGalleries[id];
+  const el = document.getElementById('localCard_' + id);
+  if(el) el.remove();
+}
+
+function todayBuildHappeningCard(id, e){
+  __todayHappeningGalleries[id] = (e && e.images && Array.isArray(e.images)) ? e.images.slice() : [];
+  const title = e ? escapeHtml(e.title||'') : '';
+  const place = e ? escapeHtml(e.place||'') : '';
+  const time = e ? escapeHtml(e.time||'') : '';
+  const dist = e ? escapeHtml(e.dist||'') : '';
+  const vibe = e ? escapeHtml(e.vibe||'') : '';
+  return `
+    <div class="admin-list-item" id="happeningCard_${id}">
+      <div class="admin-list-item-head">
+        <div style="flex:1;">
+          <input id="hapTitle_${id}" value="${title}" placeholder="Title" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--charcoal-input);color:var(--white-soft);font-size:.78rem;margin-bottom:4px;">
+          <div class="admin-grid-2" style="margin-top:4px;">
+            <input id="hapPlace_${id}" value="${place}" placeholder="Place" style="padding:6px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--charcoal-input);color:var(--white-soft);font-size:.78rem;">
+            <input id="hapTime_${id}" value="${time}" placeholder="Time" style="padding:6px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--charcoal-input);color:var(--white-soft);font-size:.78rem;">
+          </div>
+          <div class="admin-grid-2" style="margin-top:4px;">
+            <input id="hapDist_${id}" value="${dist}" placeholder="Distance" style="padding:6px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--charcoal-input);color:var(--white-soft);font-size:.78rem;">
+            <input id="hapVibe_${id}" value="${vibe}" placeholder="Vibe" style="padding:6px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--charcoal-input);color:var(--white-soft);font-size:.78rem;">
+          </div>
+        </div>
+        <button class="admin-mini-btn danger" onclick="todayRemoveHappening('${id}')">&times;</button>
+      </div>
+      <div style="padding:0 8px 8px;">${todayItemGalleryHtml(id, 'happening', __todayHappeningGalleries, 'event')}</div>
+    </div>`;
+}
+
+function todayAddHappeningCard(){
+  const id = 'h_' + (++__todayNextHid);
+  const div = document.createElement('div');
+  div.innerHTML = todayBuildHappeningCard(id, null);
+  document.getElementById('todayHappeningCards').appendChild(div.firstElementChild);
+}
+
+function todayBuildLocalCard(id, l){
+  __todayLocalGalleries[id] = (l && l.images && Array.isArray(l.images)) ? l.images.slice() : [];
+  const badge = l ? escapeHtml(l.badge||'') : '';
+  const biz = l ? escapeHtml(l.biz||'') : '';
+  const text = l ? escapeHtml(l.text||'') : '';
+  const meta = l ? escapeHtml(l.meta||'') : '';
+  return `
+    <div class="admin-list-item" id="localCard_${id}">
+      <div class="admin-list-item-head">
+        <div style="flex:1;">
+          <div class="admin-grid-2">
+            <input id="locBadge_${id}" value="${badge}" placeholder="Badge (emoji)" style="padding:6px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--charcoal-input);color:var(--white-soft);font-size:.78rem;">
+            <input id="locBiz_${id}" value="${biz}" placeholder="Business name" style="padding:6px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--charcoal-input);color:var(--white-soft);font-size:.78rem;">
+          </div>
+          <input id="locText_${id}" value="${text}" placeholder="Tip text" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--charcoal-input);color:var(--white-soft);font-size:.78rem;margin-top:4px;">
+          <input id="locMeta_${id}" value="${meta}" placeholder="Meta" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--charcoal-input);color:var(--white-soft);font-size:.78rem;margin-top:4px;">
+        </div>
+        <button class="admin-mini-btn danger" onclick="todayRemoveLocal('${id}')">&times;</button>
+      </div>
+      <div style="padding:0 8px 8px;">${todayItemGalleryHtml(id, 'local', __todayLocalGalleries, 'tip')}</div>
+    </div>`;
+}
+
+function todayAddLocalCard(){
+  const id = 'l_' + (++__todayNextLid);
+  const div = document.createElement('div');
+  div.innerHTML = todayBuildLocalCard(id, null);
+  document.getElementById('todayLocalCards').appendChild(div.firstElementChild);
+}
+
 async function renderAdminToday(){
   const body = document.getElementById('adminBody');
   body.innerHTML = '<div class="admin-empty">Loading…</div>';
@@ -4546,6 +4779,22 @@ async function renderAdminToday(){
   const notices = (d.notices||[]);
   const path = (d.talaPick && d.talaPick.path) || [];
 
+  __todayHappeningGalleries = {};
+  __todayLocalGalleries = {};
+  __todayNextHid = 0;
+  __todayNextLid = 0;
+
+  let happeningCardsHtml = '';
+  happening.forEach((e, i) => {
+    const id = 'e' + i;
+    happeningCardsHtml += todayBuildHappeningCard(id, e);
+  });
+  let localCardsHtml = '';
+  locals.forEach((l, i) => {
+    const id = 'll' + i;
+    localCardsHtml += todayBuildLocalCard(id, l);
+  });
+
   body.innerHTML = `
     <div class="admin-field">
       <label>TALA's pick intro</label>
@@ -4556,8 +4805,9 @@ async function renderAdminToday(){
       <textarea id="atPickPath" rows="3">${path.map(p=> p.label+' | '+p.sub).join('\n')}</textarea>
     </div>
     <div class="admin-field">
-      <label>Happening today (one per line: Title | Place | Time | Distance | Vibe)</label>
-      <textarea id="atHappening" rows="4">${happening.map(e=> [e.title,e.place,e.time,e.dist,e.vibe].join(' | ')).join('\n')}</textarea>
+      <label>Happening today</label>
+      <div id="todayHappeningCards">${happeningCardsHtml}</div>
+      <button class="admin-add-btn" onclick="todayAddHappeningCard()" style="margin-top:8px;">+ Add event</button>
     </div>
     <div class="admin-field">
       <label>Joinable today (one per line: Title | Detail | Crowd)</label>
@@ -4568,8 +4818,9 @@ async function renderAdminToday(){
       <textarea id="atWeather" rows="3">${weather.map(w=> [w.icon,w.label,w.verdict].join(' | ')).join('\n')}</textarea>
     </div>
     <div class="admin-field">
-      <label>Local tips (one per line: Badge | Business | Text | Meta)</label>
-      <textarea id="atLocals" rows="3">${locals.map(l=> [l.badge,l.biz,l.text,l.meta].join(' | ')).join('\n')}</textarea>
+      <label>Local tips</label>
+      <div id="todayLocalCards">${localCardsHtml}</div>
+      <button class="admin-add-btn" onclick="todayAddLocalCard()" style="margin-top:8px;">+ Add tip</button>
     </div>
     <div class="admin-field">
       <label>Notices (one per line: Text)</label>
@@ -4589,16 +4840,53 @@ function parseLines(text, fieldCount){
   });
 }
 
+function collectTodayHappeningItems(){
+  const cards = document.querySelectorAll('[id^="happeningCard_"]');
+  const items = [];
+  cards.forEach(card => {
+    const id = card.id.replace('happeningCard_', '');
+    const title = (document.getElementById('hapTitle_' + id)||{}).value||'';
+    if(!title.trim()) return;
+    items.push({
+      title: title.trim(),
+      place: ((document.getElementById('hapPlace_' + id)||{}).value||'').trim(),
+      time: ((document.getElementById('hapTime_' + id)||{}).value||'').trim(),
+      dist: ((document.getElementById('hapDist_' + id)||{}).value||'').trim(),
+      vibe: ((document.getElementById('hapVibe_' + id)||{}).value||'').trim(),
+      images: (__todayHappeningGalleries[id] || []).slice()
+    });
+  });
+  return items;
+}
+
+function collectTodayLocalItems(){
+  const cards = document.querySelectorAll('[id^="localCard_"]');
+  const items = [];
+  cards.forEach(card => {
+    const id = card.id.replace('localCard_', '');
+    const text = (document.getElementById('locText_' + id)||{}).value||'';
+    if(!text.trim()) return;
+    items.push({
+      badge: ((document.getElementById('locBadge_' + id)||{}).value||'').trim(),
+      biz: ((document.getElementById('locBiz_' + id)||{}).value||'').trim(),
+      text: text.trim(),
+      meta: ((document.getElementById('locMeta_' + id)||{}).value||'').trim(),
+      images: (__todayLocalGalleries[id] || []).slice()
+    });
+  });
+  return items;
+}
+
 async function adminSaveToday(){
   const status = document.getElementById('atStatus');
   status.textContent = 'Saving…';
   try {
     const pickIntro = document.getElementById('atPickIntro').value.trim();
     const pickPath = parseLines(document.getElementById('atPickPath').value, 2).map(p=>({ label:p[0], sub:p[1] }));
-    const happening = parseLines(document.getElementById('atHappening').value, 5).map(p=>({ title:p[0], place:p[1], time:p[2], dist:p[3], vibe:p[4] }));
+    const happening = collectTodayHappeningItems();
     const joinable = parseLines(document.getElementById('atJoinable').value, 3).map(p=>({ title:p[0], detail:p[1], crowd:parseInt(p[2])||0 }));
     const weather = parseLines(document.getElementById('atWeather').value, 3).map(p=>({ icon:p[0], label:p[1], verdict:p[2] }));
-    const locals = parseLines(document.getElementById('atLocals').value, 4).map(p=>({ badge:p[0], biz:p[1], text:p[2], meta:p[3] }));
+    const locals = collectTodayLocalItems();
     const notices = parseLines(document.getElementById('atNotices').value, 1).map(p=>({ text:p[0] }));
 
     const rows = [
@@ -4623,7 +4911,7 @@ async function adminSaveToday(){
   }
 }
 
-// ───────────── TRIBES ADMIN ─────────────
+
 
 async function renderAdminTribes(){
   const body = document.getElementById('adminBody');
