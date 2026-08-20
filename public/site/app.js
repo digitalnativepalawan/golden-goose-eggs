@@ -744,12 +744,12 @@ function getAI(input) {
   const l = input.toLowerCase().replace(/[?.!,]/g,'').trim();
   for (const d of destinations) {
     if (l.includes(d.name.toLowerCase()) || d.name.toLowerCase().includes(l))
-      return `<strong>${d.name}</strong><br><br>${d.description}<br><br>${d.tip}`;
+      return { reply: `<strong>${d.name}</strong><br><br>${d.description}<br><br>${d.tip}`, dest: d };
   }
   let best=null, bestS=0;
   for (const item of aiData) for (const k of item.kw)
     if (l.includes(k) && k.length>bestS) { bestS=k.length; best=item.r; }
-  return best||defaultR;
+  return { reply: best||defaultR, dest: null };
 }
 
 // Live AI answer calling OpenRouter directly from the browser, using the API
@@ -773,6 +773,7 @@ function talaKnowledgeBlock(){
 }
 
 async function getAILive(input){
+  const destMatch = getAI(input).dest;
   const key = (talaAiKey || '').trim();
   const model = (talaAiModel || '').trim();
   if(!key) throw new Error('OpenRouter API key not set — add it in Backoffice > TALA AI');
@@ -799,18 +800,25 @@ async function getAILive(input){
     throw new Error(String(e));
   }
   const reply = ((j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '').trim();
-  return reply || getAI(input);
+  return { reply: reply || getAI(input).reply, dest: destMatch };
 }
 
 function answerTala(t){
   if(talaAiEnabled){
     document.getElementById('tshStatus').textContent = 'tala is thinking…';
     getAILive(t)
-      .then(reply=>{ markTalaIdle(); addMsg('bot', reply); speak(reply); })
-      .catch(err=>{ console.warn('[TALA] live AI unavailable, using curated answers:', err); markTalaIdle(); const fallback = getAI(t); addMsg('bot', fallback); speak(fallback); });
+      .then(obj => {
+        const { reply, dest } = obj;
+        if (dest && typeof openDest === 'function') {
+          openDest(dest);
+          openTalaSheet();
+        }
+        markTalaIdle(); addMsg('bot', reply); speak(reply);
+      })
+      .catch(err=>{ console.warn('[TALA] live AI unavailable, using curated answers:', err); markTalaIdle(); const fallback = getAI(t); addMsg('bot', fallback.reply); speak(fallback.reply); });
   } else {
     const r = getAI(t);
-    setTimeout(()=>{ addMsg('bot', r); speak(r); }, 140);
+    setTimeout(()=>{ addMsg('bot', r.reply); speak(r.reply); }, 140);
   }
 }
 function markTalaIdle(){
