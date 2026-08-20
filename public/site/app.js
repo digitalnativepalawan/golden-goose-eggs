@@ -6031,9 +6031,9 @@ async function adminPulseToggleBan(userId, banned){
 // ═══════════════════════════════════════════════════════
 let HUNT_SETTINGS = {};
 let HUNT_REWARDS = [
-  { id:'hr1', title:'Long Beach Explorer', subtitle:'Unlock Long Beach to earn this reward.', badge:'NEW', destId:'', pointsRequired:100, images:[], videoUrl:'', videoType:'', grad:'linear-gradient(135deg,#0ea5e9,#0c4a6e)' },
-  { id:'hr2', title:'Island Hopper', subtitle:'Discover all islands near Port Barton.', badge:'SOON', destId:'', pointsRequired:200, images:[], videoUrl:'', videoType:'', grad:'linear-gradient(135deg,#22d3ee,#164e63)' },
-  { id:'hr3', title:'Waterfall Hunter', subtitle:'Find Pamuayan Falls.', badge:'', destId:'', pointsRequired:150, images:[], videoUrl:'', videoType:'', grad:'linear-gradient(135deg,#34d399,#064e3b)' }
+  { id:'hr1', title:'Long Beach Explorer', subtitle:'Unlock Long Beach to earn this reward.', badge:'NEW', destId:'', pointsRequired:100, images:['https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=75','https://images.unsplash.com/photo-1519046904884-53103b34b206?w=400&q=75'], videoUrl:'', videoType:'', grad:'linear-gradient(135deg,#0ea5e9,#0c4a6e)' },
+  { id:'hr2', title:'Island Hopper', subtitle:'Discover all islands near Port Barton.', badge:'SOON', destId:'', pointsRequired:200, images:['https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400&q=75','https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400&q=75'], videoUrl:'', videoType:'', grad:'linear-gradient(135deg,#22d3ee,#164e63)' },
+  { id:'hr3', title:'Waterfall Hunter', subtitle:'Find Pamuayan Falls.', badge:'', destId:'', pointsRequired:150, images:['https://images.unsplash.com/photo-1432405972618-c6b0cfba8b0f?w=400&q=75'], videoUrl:'', videoType:'', grad:'linear-gradient(135deg,#34d399,#064e3b)' }
 ];
 
 // ═══════════════════════════════════════════════════════
@@ -6418,10 +6418,12 @@ function huntTrailGroups(){
     const items = byCat[k];
     const done = items.filter(d=>state.unlocked.includes(String(d.id))).length;
     const label = (window.catStyle && catStyle[k] && catStyle[k].label) || (k.charAt(0).toUpperCase()+k.slice(1));
+    const firstImg = items.find(d=>d.image)?.image || '';
     return {
       id:k, title:`${label} Trail`,
       desc:`Explore ${items.length} ${label.toLowerCase()} spot${items.length===1?'':'s'} across San Vicente.`,
       done, total:items.length,
+      image: firstImg,
       grad: huntGradientFor((items[0]&&items[0].color), i)
     };
   });
@@ -6556,7 +6558,7 @@ function renderHunt(){
 
   const todayBlock = today ? `
     <div class="hunt-section" id="huntToday">
-      <div class="hunt-today">
+      <div class="hunt-today" style="background-image:url('${today.image||''}');background-size:cover;background-position:center">
         <div class="hunt-today-body">
           <span class="hunt-today-badge">TODAY</span>
           <div class="hunt-today-title">${escapeHtml(today.name)} 🌅</div>
@@ -6609,15 +6611,27 @@ function renderHunt(){
         <button class="hunt-viewall" onclick="closeHuntPanel(); dockNav('discover');">View all ›</button>
       </div>
       <div class="hunt-hscroll">
-        ${nearby.length ? nearby.map((c,i)=>`
-          <div class="hunt-near-card" style="background-image:${huntGradientFor(null,i)}" onclick="huntNearbyTap(${i})">
+        ${nearby.length ? nearby.map((c,i)=>{
+          const huntNearbyImages = [
+            'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=75',
+            'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&q=75',
+            'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&q=75',
+            'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=75',
+            'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=400&q=75',
+            'https://images.unsplash.com/photo-1526367790999-0150786686a2?w=400&q=75'
+          ];
+          const matchDest = (Array.isArray(destinations)?destinations:[]).find(d=>d.name&&c.name&&d.name.toLowerCase().includes(c.name.toLowerCase().split(' ')[0]));
+          const imgSrc = matchDest?.image || huntNearbyImages[i%huntNearbyImages.length];
+          return `
+          <div class="hunt-near-card" style="background-image:url('${imgSrc}');background-size:cover;background-position:center" onclick="huntNearbyTap(${i})">
             ${c.dist ? `<span class="hunt-chip-dist">↖ ${escapeHtml(c.dist)}</span>` : ''}
             <div class="hunt-near-info">
               <div class="hunt-near-title">${escapeHtml(c.icon||'📍')} ${escapeHtml(c.name)}</div>
               <div class="hunt-near-desc">${escapeHtml(c.desc||'')}</div>
               <div class="hunt-near-meta">${escapeHtml(c.barangay||'')} • ${escapeHtml(c.cat||'')}</div>
             </div>
-          </div>`).join('') : '<div class="hunt-empty">No nearby places yet. Add some from the SANVIC Admin panel.</div>'}
+          </div>`;
+        }).join('') : '<div class="hunt-empty">No nearby places yet. Add some from the SANVIC Admin panel.</div>'}
       </div>
     </div>
 
@@ -6630,7 +6644,7 @@ function renderHunt(){
         ${trails.length ? trails.map(t=>`
           <div class="hunt-trail-card">
             <div class="hunt-trail-top">
-              <div class="hunt-trail-thumb" style="background:${t.grad}"></div>
+              <div class="hunt-trail-thumb" style="background-image:url('${t.image||''}');background-size:cover;background-position:center;background-color:${t.grad.includes('#') ? t.grad.match(/#[a-f0-9]+/i)?.[0] || '#1a2744' : '#1a2744'}"></div>
               <div class="hunt-trail-body">
                 <div class="hunt-trail-title">${escapeHtml(t.title)}</div>
                 <div class="hunt-trail-desc">${escapeHtml(t.desc)}</div>
@@ -6657,15 +6671,13 @@ function renderHunt(){
             const allImgs = [];
             if(r.images && Array.isArray(r.images)) allImgs.push(...r.images);
             const hasImages = allImgs.length > 0;
-            const imgClick = hasImages ? `onclick="openCarousel(${JSON.stringify(allImgs).replace(/"/g, '&quot;')},0)"` : '';
-            const imgHtml = hasImages ? `<img src="${escapeHtml(allImgs[0])}" style="width:100%;height:100px;object-fit:cover;border-radius:10px;margin-bottom:8px;cursor:pointer" ${imgClick} onerror="this.style.display='none'">` : '';
-            const videoHtml = r.videoUrl && r.videoType === 'youtube' ? (()=>{ const yid = getYoutubeId(r.videoUrl); return yid ? `<iframe src="https://www.youtube.com/embed/${yid}?mute=1&playsinline=1" style="width:100%;height:100px;border:none;border-radius:10px;margin-bottom:8px;" allowfullscreen></iframe>` : ''; })()
-              : r.videoUrl && r.videoType === 'upload' ? `<video src="${escapeHtml(r.videoUrl)}" style="width:100%;height:100px;object-fit:cover;border-radius:10px;margin-bottom:8px;" muted loop playsinline preload="metadata"></video>` : '';
+            const rewardBg = hasImages ? `background-image:url('${allImgs[0]}');background-size:cover;background-position:center` : `background:${r.grad}`;
+            const rewardOverlay = hasImages ? 'position:relative' : '';
             return `
-            <div class="hunt-reward-card" style="background:${r.grad}">
-              ${imgHtml || videoHtml}
-              <span class="hunt-reward-badge">${escapeHtml(r.badge)}</span>
-              <div>
+            <div class="hunt-reward-card" style="${rewardBg};${rewardOverlay}">
+              ${hasImages ? '<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.1),rgba(0,0,0,.7));border-radius:inherit"></div>' : ''}
+              <span class="hunt-reward-badge" style="position:relative">${escapeHtml(r.badge)}</span>
+              <div style="position:relative">
                 <div class="hunt-reward-t">${escapeHtml(r.title)}</div>
                 <div class="hunt-reward-s">${escapeHtml(r.subtitle||r.sub||'')}</div>
               </div>
