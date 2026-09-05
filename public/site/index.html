@@ -181,6 +181,7 @@ body.panel-open .hero-overlay{transform:translateY(-6px)}
 .map-util-btn.locating{color:var(--ocean-teal-light)}
 .map-util-btn.locating svg{animation:svLocateSpin 1s linear infinite}
 body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointer-events:none;transition:opacity .3s ease}
+body.explore-open .map-util-btn,body.explore-open .map-layer-toggle{opacity:1;pointer-events:auto}
 /* Barangay tooltips hidden at far zoom so canvas stays clean */
 .leaflet-container.zoom-far .leaflet-tooltip,
 .leaflet-container.zoom-far .barangay-tooltip{opacity:0!important;pointer-events:none!important;transition:opacity .3s ease}
@@ -191,6 +192,9 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
 .map-light .barangay-tooltip{box-shadow:0 6px 24px rgba(0,0,0,.45)!important}
 .map-light .leaflet-control-attribution{background:rgba(255,255,255,.85)!important;color:var(--charcoal)!important}
 .map-light .leaflet-control-attribution a{color:var(--ocean-teal)!important}
+.map-dark .leaflet-tile-pane{filter:brightness(.62) saturate(.55) contrast(1.18)}
+.map-dark .leaflet-control-attribution,.map-satellite .leaflet-control-attribution{background:rgba(3,9,20,.82)!important;color:rgba(255,255,255,.72)!important}
+.map-dark .leaflet-control-attribution a,.map-satellite .leaflet-control-attribution a{color:#5eead4!important}
 
 /* ═══════════════════════════════════
    BOTTOM DOCK NAV (4 items)
@@ -699,6 +703,20 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
 .admin-foot button{flex:1;padding:10px;border-radius:var(--radius-pill);border:1px solid var(--glass-border);background:rgba(255,255,255,.04);color:var(--white-muted);font-size:.72rem;cursor:pointer}
 .admin-foot button.reset{color:#ef4444;border-color:rgba(239,68,68,.2)}
 .admin-empty{text-align:center;color:var(--white-dim);font-size:.78rem;padding:30px 0}
+.admin-data-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;margin-bottom:10px;border:1px solid rgba(20,184,166,.28);border-radius:12px;background:rgba(20,184,166,.08)}
+.admin-data-banner.warning{border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.08)}
+.admin-data-banner strong{font-size:.78rem;color:var(--white-soft)}
+.admin-data-banner span{font-size:.68rem;color:var(--white-dim);text-align:right}
+.admin-data-note{padding:10px 12px;margin-bottom:12px;border-radius:10px;color:#fbbf24;background:rgba(245,158,11,.07);font-size:.7rem;line-height:1.45}
+.admin-directory-search{width:100%;margin:0 0 14px;padding:10px 13px;border-radius:12px;border:1px solid var(--glass-border);background:rgba(255,255,255,.04);color:var(--white-soft);font:400 .78rem var(--font-body);outline:none}
+.admin-directory-search:focus{border-color:rgba(20,184,166,.45)}
+.admin-quality{margin-top:5px;font-size:.62rem!important;line-height:1.35}
+.admin-quality.ready{color:#5eead4!important}
+.admin-quality.needs-work{color:#fbbf24!important}
+.admin-form-heading{font-family:var(--font-display);font-size:1.25rem;color:var(--white-soft);margin-bottom:4px}
+.admin-form-help{font-size:.7rem;color:var(--white-dim);line-height:1.5;margin-bottom:16px}
+.admin-form-section{font-size:.64rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ocean-teal-light);padding:12px 0 8px;border-top:1px solid var(--glass-border);margin-top:4px}
+@media(max-width:560px){.admin-data-banner{align-items:flex-start;flex-direction:column}.admin-data-banner span{text-align:left}.admin-row-actions{flex-wrap:wrap;justify-content:flex-end}.admin-grid-2{grid-template-columns:1fr}}
 
 .admin-tala-filters{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
 .admin-cat-tab{border:1px solid var(--glass-border);border-radius:var(--radius-pill);padding:6px 12px;background:rgba(255,255,255,.04);color:var(--white-muted);font-size:.7rem;cursor:pointer;display:flex;align-items:center;gap:5px}
@@ -767,9 +785,17 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
 
 <!-- ═══ LAYER TOGGLE ═══ -->
 <div class="map-layer-toggle" id="mapLayerToggle">
-  <button class="mlt-btn active" onclick="switchMapLayer('map',this)" aria-label="Street map">
+  <button class="mlt-btn active" onclick="switchMapLayer('street',this)" aria-label="Street map">
     <svg class="mlt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21 3 6"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
-    <span class="mlt-label">Map</span>
+    <span class="mlt-label">Street</span>
+  </button>
+  <button class="mlt-btn" onclick="switchMapLayer('dark',this)" aria-label="Dark map">
+    <svg class="mlt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+    <span class="mlt-label">Dark</span>
+  </button>
+  <button class="mlt-btn" onclick="switchMapLayer('satellite',this)" aria-label="Satellite map">
+    <svg class="mlt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>
+    <span class="mlt-label">Satellite</span>
   </button>
   <button class="mlt-btn" onclick="switchMapLayer('terrain',this)" aria-label="Terrain map">
     <svg class="mlt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 20 6-10 4 6 2-3 6 7"/><path d="m11 7 2-3 3 5"/></svg>
@@ -809,27 +835,23 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
   <svg class="dock-coachmark-arrow" viewBox="0 0 24 12" fill="none"><path d="M0 0 L12 12 L24 0 Z" fill="currentColor"/></svg>
 </div>
 
-<!-- ═══ BOTTOM DOCK (5 items — Today · Explore · Pulse · My Sanvic · The Hunt) ═══ -->
+<!-- ═══ BOTTOM DOCK (Explore is home; Hunt lives inside Explore) ═══ -->
 <div class="bottom-dock" id="bottomDock">
-  <button class="dock-item active" onclick="dockNav('map')" data-tab="map">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
-    <span>Today</span>
-  </button>
-  <button class="dock-item" onclick="dockNav('discover')" data-tab="discover">
+  <button class="dock-item active" onclick="dockNav('discover')" data-tab="discover">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
     <span>Explore</span>
   </button>
+  <button class="dock-item" onclick="dockNav('map')" data-tab="map">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    <span>Today</span>
+  </button>
   <button class="dock-item" onclick="dockNav('pulse')" data-tab="pulse">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M8.5 8.5a5 5 0 0 0 0 7"/><path d="M15.5 15.5a5 5 0 0 0 0 -7"/><path d="M5 5a9 9 0 0 0 0 14"/><path d="M19 19a9 9 0 0 0 0 -14"/></svg>
-    <span>Pulse</span>
+    <span>Community</span>
   </button>
   <button class="dock-item" onclick="dockNav('saved')" data-tab="saved">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-    <span>My Sanvic</span>
-  </button>
-  <button class="dock-item" onclick="dockNav('hunt')" data-tab="hunt">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>
-    <span>The Hunt</span>
+    <span>Saved</span>
   </button>
 </div>
 
@@ -1012,6 +1034,12 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
   .es-heading-copy{min-width:0}
   .es-heading-title{font-family:var(--font-display);font-size:1.75rem;line-height:1.05;color:#fff;font-weight:500;margin:0}
   .es-heading-sub{font-size:.82rem;line-height:1.45;color:rgba(255,255,255,.6);margin:5px 0 0}
+  .es-audience{display:flex;align-self:flex-start;padding:3px;border:1px solid rgba(255,255,255,.08);border-radius:999px;background:rgba(255,255,255,.035)}
+  .es-audience-btn{border:0;border-radius:999px;background:transparent;color:rgba(255,255,255,.56);padding:6px 11px;font:600 .68rem var(--font-body);cursor:pointer}
+  .es-audience-btn.active{background:rgba(20,184,166,.18);color:#99f6e4}
+  .es-section-copy{margin:-3px 0 12px;color:rgba(255,255,255,.62);font-size:.78rem;line-height:1.5}
+  .es-action-row{display:flex;flex-wrap:wrap;gap:8px}
+  .es-action{border:1px solid rgba(20,184,166,.35);border-radius:999px;background:rgba(20,184,166,.12);color:#99f6e4;padding:8px 12px;font:600 .72rem var(--font-body);cursor:pointer}
   .es-close{width:36px;height:36px;flex:0 0 36px;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-size:20px;cursor:pointer}
   .es-category-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   .es-category{display:flex;align-items:center;gap:10px;min-height:46px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#fff;text-align:left;cursor:pointer;font:600 .84rem var(--font-body)}
@@ -1079,13 +1107,17 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
     <div class="es-heading">
       <div class="es-heading-copy">
         <h2 class="es-heading-title">Explore San Vicente</h2>
-        <p class="es-heading-sub">Find beaches, food, stays and local places across every barangay.</p>
+        <p class="es-heading-sub" id="esHeadingSub">Find beaches, food, stays and local places across every barangay.</p>
       </div>
       <button class="es-close" onclick="dockNav('map')" aria-label="Close Explore">×</button>
     </div>
+    <div class="es-audience" aria-label="Choose Explore view">
+      <button class="es-audience-btn active" data-mode="visitor" onclick="setExploreAudience('visitor')">I'm visiting</button>
+      <button class="es-audience-btn" data-mode="local" onclick="setExploreAudience('local')">I'm local</button>
+    </div>
     <label class="es-search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input id="esSearchInput" type="search" placeholder="Search places or barangays" onfocus="setExploreSnap(2)" oninput="filterExploreResults(this.value)"/>
+      <input id="esSearchInput" type="search" placeholder="Beach, food, waterfall or barangay" onfocus="setExploreSnap(2)" oninput="filterExploreResults(this.value)"/>
     </label>
     <div class="es-ribbon" id="esRibbon"></div>
   </div>
@@ -1592,7 +1624,7 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
       <div class="admin-tabs">
         <button class="admin-tab active" id="adminTabDest" onclick="switchAdminTab('dest')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
-          Destinations
+          Places &amp; Businesses
         </button>
         <button class="admin-tab" id="adminTabTala" onclick="switchAdminTab('tala')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>

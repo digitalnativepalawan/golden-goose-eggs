@@ -108,6 +108,7 @@ let heroSubtitle = DEFAULT_HERO_SUBTITLE;
 let splashSubtext = DEFAULT_SPLASH_SUBTEXT;
 let splashFooter = DEFAULT_SPLASH_FOOTER;
 let dataReady = false;
+let destinationsSource = 'loading';
 
 // ═══════════════════════════════════════════════════════
 // AUTHENTICATION — Supabase Auth, Email Magic Link only for
@@ -540,7 +541,8 @@ async function loadDataFromSupabase(){
       });
     }
 
-    destinations = (destRes.data && destRes.data.length) ? destRes.data.map(destRowToObj) : DEFAULT_DESTINATIONS;
+    destinations = Array.isArray(destRes.data) ? destRes.data.map(destRowToObj) : [];
+    destinationsSource = 'supabase';
     aiData = (talaRes.data && talaRes.data.length) ? talaRes.data.map(r=>({ id:r.id, kw:r.keywords, r:r.response, cat:r.category||'knowledge' })) : DEFAULT_TALA_DATA;
     defaultR = (settingsRes.data && settingsRes.data.value) ? settingsRes.data.value : DEFAULT_FALLBACK_RESPONSE;
     talaSuggestions = (sugRes && sugRes.data && sugRes.data.length) ? sugRes.data : DEFAULT_SUGGESTIONS;
@@ -644,6 +646,7 @@ async function loadDataFromSupabase(){
   } catch(err) {
     console.warn('[SANVIC] Supabase load failed, using built-in defaults:', err);
     destinations = DEFAULT_DESTINATIONS;
+    destinationsSource = 'fallback';
     aiData = DEFAULT_TALA_DATA;
     defaultR = DEFAULT_FALLBACK_RESPONSE;
     talaSuggestions = DEFAULT_SUGGESTIONS;
@@ -659,6 +662,7 @@ async function loadDataFromSupabase(){
   }
   applyHeroText();
   applySplashText();
+  window.destinations = destinations;
   dataReady = true;
 }
 
@@ -927,7 +931,7 @@ function locateUser(){
   document.getElementById('heroOverlay').classList.remove('hidden');
   document.getElementById('heroFade').classList.remove('hidden');
   document.querySelectorAll('.dock-item').forEach(d=>d.classList.remove('active'));
-  document.querySelector('.dock-item[data-tab="map"]')?.classList.add('active');
+  document.querySelector('.dock-item[data-tab="discover"]')?.classList.add('active');
 
   const btn = document.getElementById('locateMeBtn');
   if(btn) btn.classList.add('locating');
@@ -985,8 +989,8 @@ async function initMap() {
     worldCopyJump:false
   });
 
-  // Open, no-key basemaps. Leaflet remains the map engine; these replace the
-  // CARTO tiles that began watermarking requests without an API key.
+  // No-key basemaps. Street and Dark share the same open OSM source (Dark is
+  // rendered locally with CSS), so the core map never depends on a token.
   const street = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
     attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
     maxZoom:19
@@ -996,9 +1000,13 @@ async function initMap() {
     maxZoom:17,
     subdomains:'abc'
   });
+  const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+    attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+    maxZoom:19
+  });
 
   street.addTo(map);
-  window._mS=street; window._mTerrain=terrain; window._mView='map';
+  window._mS=street; window._mTerrain=terrain; window._mSatellite=satellite; window._mView='street';
   document.body.classList.add('map-light');
 
   L.control.zoom({position:'bottomright'}).addTo(map);
@@ -1062,7 +1070,7 @@ function toggleBarangayLayer(){
 }
 
 function getBarangayStyle(){
-  const isLight = true;
+  const isLight = window._mView === 'street' || window._mView === 'terrain';
   return {
     color: isLight ? '#06122a' : '#e8dcc8',
     weight: 1.5,
@@ -1086,14 +1094,18 @@ function switchMapLayer(type,btn){
   const was = window._mView;
   if(was === type) return;
 
-  if(was === 'map') map.removeLayer(window._mS);
+  if(was === 'street' || was === 'dark') map.removeLayer(window._mS);
   else if(was === 'terrain') map.removeLayer(window._mTerrain);
+  else if(was === 'satellite') map.removeLayer(window._mSatellite);
 
-  if(type === 'map') window._mS.addTo(map);
+  if(type === 'street' || type === 'dark') window._mS.addTo(map);
   else if(type === 'terrain') window._mTerrain.addTo(map);
+  else if(type === 'satellite') window._mSatellite.addTo(map);
 
   window._mView = type;
-  document.body.classList.add('map-light');
+  document.body.classList.toggle('map-dark', type === 'dark');
+  document.body.classList.toggle('map-light', type === 'street' || type === 'terrain');
+  document.body.classList.toggle('map-satellite', type === 'satellite');
   updateBarangayStyle();
   map.invalidateSize({animate:false});
 }
@@ -1225,10 +1237,24 @@ function exploreChoices(){
   if(Array.isArray(p.picks)) arr.push(...p.picks);
   return arr.map(x=>String(x).toLowerCase());
 }
+let exploreAudience = localStorage.getItem('sanvic_explore_audience') === 'local' ? 'local' : 'visitor';
+function setExploreAudience(mode){
+  exploreAudience = mode === 'local' ? 'local' : 'visitor';
+  localStorage.setItem('sanvic_explore_audience', exploreAudience);
+  document.querySelectorAll('.es-audience-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===exploreAudience));
+  const sub = document.getElementById('esHeadingSub');
+  if(sub) sub.textContent = exploreAudience === 'local'
+    ? 'Find local businesses, services, community updates and places worth sharing.'
+    : 'Find beaches, food, stays and local places across every barangay.';
+  renderExploreContent();
+}
 function openExploreSheet(){
   const s = document.getElementById('exploreSheet');
   if(!s) return;
   renderExploreContent();
+  document.querySelectorAll('.es-audience-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===exploreAudience));
+  const sub = document.getElementById('esHeadingSub');
+  if(sub && exploreAudience==='local') sub.textContent = 'Find local businesses, services, community updates and places worth sharing.';
   s.classList.add('open');
   document.body.classList.add('explore-open');
   setExploreSnap(window.innerWidth >= 700 ? 3 : 2);
@@ -1352,6 +1378,11 @@ const EXPLORE_CATEGORIES = [
   {k:'activities',l:'🚵 Activities'},{k:'wellness',l:'💆 Wellness'},{k:'surf',l:'🏄 Surf'},
   {k:'transport',l:'🛵 Transport'},{k:'viewpoints',l:'📸 Viewpoints'},
 ];
+const EXPLORE_LOCAL_CATEGORIES = [
+  {k:'food',l:'🍽 Eat local'},{k:'stays',l:'🛏 Stays'},{k:'transport',l:'🛵 Transport'},
+  {k:'services',l:'🧰 Services'},{k:'culture',l:'🎭 Community'},{k:'activities',l:'🚤 Tours'},
+  {k:'wellness',l:'💆 Wellness'},{k:'shops',l:'🛍 Shops'},
+];
 const EXPLORE_MOODS = [
   {t:'I want something quiet', chips:['Wild beaches','Hammock spaces','Calm cafés']},
   {t:'I want to eat well', chips:['Seafood','Smashed burgers','Local markets','Beach dinners']},
@@ -1440,17 +1471,19 @@ function nearbyCardHTML(n){
 function renderExploreContent(){
   const forYou = forYouCards();
   const nearby = nearbyCards();
+  const isLocal = exploreAudience === 'local';
+  const categories = isLocal ? EXPLORE_LOCAL_CATEGORIES : EXPLORE_CATEGORIES;
 
   const rib = document.getElementById('esRibbon');
   if(rib){
-    rib.innerHTML = ['For You', ...forYou.slice(0,4).map(p=>String(p.name||'').split('—')[0].trim())]
+    rib.innerHTML = [isLocal ? 'Local essentials' : 'For You', ...forYou.slice(0,4).map(p=>String(p.name||'').split('—')[0].trim())]
       .map((label,i)=>`<button class="es-chip${i===0?' accent':''}" onclick="setExploreSnap(2)">${escT(label)}</button>`).join('');
   }
 
   const foryouHTML = `
     <section class="es-section">
-      <div class="es-kicker">For You</div>
-      <h3 class="es-title">${escT(FOR_YOU_VIBE)}</h3>
+      <div class="es-kicker">${isLocal ? 'Local directory' : 'For You'}</div>
+      <h3 class="es-title">${isLocal ? 'Businesses and places around town' : escT(FOR_YOU_VIBE)}</h3>
       <div class="sv-carousel">${forYou.map(forYouCardHTML).join('')}</div>
     </section>`;
 
@@ -1499,11 +1532,28 @@ function renderExploreContent(){
 
   const catsHTML = `
     <section class="es-section">
-      <div class="es-kicker">Browse by category</div>
-      <h3 class="es-title">What are you looking for?</h3>
+      <div class="es-kicker">${isLocal ? 'Local shortcuts' : 'Browse by category'}</div>
+      <h3 class="es-title">${isLocal ? 'What do you need nearby?' : 'What are you looking for?'}</h3>
       <div class="es-category-grid">
-        ${EXPLORE_CATEGORIES.slice(0,8).map(c=>`<button class="es-category" onclick="filterCategory('${c.k}');"><span class="es-category-icon">${c.l.split(' ')[0]}</span><span>${c.l.substring(c.l.indexOf(' ')+1)}</span></button>`).join('')}
+        ${categories.slice(0,8).map(c=>`<button class="es-category" onclick="filterCategory('${c.k}');setExploreSnap(1);"><span class="es-category-icon">${c.l.split(' ')[0]}</span><span>${c.l.substring(c.l.indexOf(' ')+1)}</span></button>`).join('')}
       </div>
+    </section>`;
+
+  const communityHTML = isLocal ? `
+    <section class="es-section es-community-card">
+      <div class="es-kicker">Community</div>
+      <h3 class="es-title">Share what is happening locally</h3>
+      <p class="es-section-copy">Post an update, find a tribe, or recommend a missing business to the SANVIC team.</p>
+      <div class="es-action-row">
+        <button class="es-action" onclick="dockNav('pulse')">Community updates</button>
+        <button class="es-action" onclick="closeExploreSheet();openTalaSheet();setTimeout(()=>{var i=document.getElementById('talaInput');if(i){i.value='I want to recommend a local place';i.focus();}},100)">Recommend a place</button>
+      </div>
+    </section>` : `
+    <section class="es-section es-community-card">
+      <div class="es-kicker">Explore more</div>
+      <h3 class="es-title">Turn the map into a trail</h3>
+      <p class="es-section-copy">Discover hidden spots, collect badges and support participating local places.</p>
+      <div class="es-action-row"><button class="es-action" onclick="closeExploreSheet();openHuntPanel()">Open The Hunt</button></div>
     </section>`;
 
   const allPlacesList = Object.values(EXPLORE_PLACES).map(placeCardHTML).join('');
@@ -1519,7 +1569,7 @@ function renderExploreContent(){
 
   const body = document.getElementById('exploreContent');
   if(body){
-    body.innerHTML = catsHTML + foryouHTML + areasHTML + nearbyHTML;
+    body.innerHTML = catsHTML + foryouHTML + areasHTML + nearbyHTML + communityHTML;
   }
 }
 
@@ -3229,6 +3279,7 @@ window.addEventListener('load',()=>{
   setTimeout(()=>{
     document.getElementById('bottomDock').classList.add('visible');
     document.getElementById('talaOrbWrap').classList.remove('hidden');
+    dockNav('discover');
     if(!localStorage.getItem(DOCK_SEEN_KEY)){
       setTimeout(()=>{
         document.getElementById('bottomDock').classList.add('intro-pulse');
@@ -3251,6 +3302,22 @@ let adminUnlocked = false;
 let adminTab = 'dest';
 let adminEditingDestId = null;   // null = not editing, 'new' = creating, else id
 let adminEditingTalaId = null;
+let adminCanWrite = false;
+
+async function refreshAdminAccess(){
+  adminCanWrite = false;
+  if(!currentUser) return;
+  try{
+    const { data } = await sb.from('user_roles').select('role').eq('user_id', currentUser.id).eq('role','admin').maybeSingle();
+    adminCanWrite = !!data;
+  }catch(e){}
+}
+function adminRequireWrite(){
+  if(adminCanWrite) return true;
+  alert('Sign in with a Supabase user that has the admin role before changing live content. The visible PIN only opens this interface; Supabase RLS is the real security gate.');
+  if(!currentUser) openLoginModal();
+  return false;
+}
 
 function adminBrandClick(){
   brandClickCount++;
@@ -3287,6 +3354,7 @@ function checkAdminPin(){
 
 async function openAdminPanel(){
   if(!dataReady) await loadDataFromSupabase();
+  await refreshAdminAccess();
   document.getElementById('adminPanelOverlay').classList.add('active');
   refreshAdminAiBadge();
   switchAdminTab(adminTab);
@@ -3340,6 +3408,31 @@ function escapeHtml(s){
 
 let destCatPanelOpen = false;
 let editingDestCatId = null; // null = not editing, 'new' = creating, else id
+let adminDestSearchQuery = '';
+
+function adminPlaceIssues(d){
+  const issues = [];
+  if(!String(d.name||'').trim()) issues.push('name');
+  if(!Number.isFinite(Number(d.lat)) || !Number.isFinite(Number(d.lng))) issues.push('map pin');
+  if(!String(d.category||'').trim()) issues.push('category');
+  if(!String(d.barangay||'').trim()) issues.push('barangay');
+  if(!String(d.description||'').trim()) issues.push('description');
+  if(!String(d.image||'').trim()) issues.push('cover photo');
+  return issues;
+}
+function adminFilterDestinations(value){
+  adminDestSearchQuery = String(value||'').trim().toLowerCase();
+  renderAdminDest();
+  const input = document.getElementById('adminDestSearch');
+  if(input){ input.focus(); input.setSelectionRange(input.value.length,input.value.length); }
+}
+function adminPreviewDest(id){
+  const d = destinations.find(x=>String(x.id)===String(id));
+  if(!d) return;
+  closeAdminPanel();
+  if(map){ map.flyTo([d.lat,d.lng],15,{duration:1}); }
+  openDest(d);
+}
 
 function adminToggleDestCatPanel(){
   destCatPanelOpen = !destCatPanelOpen;
@@ -3436,6 +3529,7 @@ function adminNewDestCat(){ editingDestCatId='new'; renderAdminDest(); }
 function adminEditDestCat(key){ editingDestCatId=key; renderAdminDest(); }
 
 async function adminSaveDestCat(existingKey){
+  if(!adminRequireWrite()) return;
   const isNew = !existingKey;
   const key = document.getElementById('dcfKey').value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
   const label = document.getElementById('dcfLabel').value.trim();
@@ -3463,6 +3557,7 @@ async function adminSaveDestCat(existingKey){
 }
 
 async function adminDeleteDestCat(key){
+  if(!adminRequireWrite()) return;
   const inUse = destinations.filter(d=>d.category===key).length;
   const warn = inUse ? ` ${inUse} destination${inUse===1?'':'s'} currently use this category and will show "${key}" until reassigned.` : '';
   if(!confirm(`Delete the "${catStyle[key]?.label||key}" category?${warn}`)) return;
@@ -3569,6 +3664,7 @@ function adminNewNearby(){ editingNearbyId='new'; renderAdminDest(); }
 function adminEditNearby(id){ editingNearbyId=id; renderAdminDest(); }
 
 async function adminSaveNearby(id){
+  if(!adminRequireWrite()) return;
   const barangay = document.getElementById('npfBarangay').value.trim();
   const name = document.getElementById('npfName').value.trim();
   const cat = document.getElementById('npfCat').value;
@@ -3595,6 +3691,7 @@ async function adminSaveNearby(id){
 }
 
 async function adminDeleteNearby(id){
+  if(!adminRequireWrite()) return;
   if(!confirm('Delete this place?')) return;
   try {
     const { error } = await sb.from('nearby_places').delete().eq('id', id);
@@ -3608,7 +3705,15 @@ async function adminDeleteNearby(id){
 
 function renderAdminDest(){
   const body = document.getElementById('adminBody');
+  const incomplete = destinations.filter(d=>adminPlaceIssues(d).length).length;
+  const q = adminDestSearchQuery;
+  const visibleDestinations = destinations.filter(d=>!q || [d.name,d.barangay,d.category,d.description].some(v=>String(v||'').toLowerCase().includes(q)));
   let html = `
+    <div class="admin-data-banner ${destinationsSource==='fallback'||!adminCanWrite?'warning':''}">
+      <strong>${destinationsSource==='supabase'?'Live Supabase directory':'Offline fallback data'}</strong>
+      <span>${destinations.length} listing${destinations.length===1?'':'s'} · ${incomplete} need${incomplete===1?'s':''} details · ${adminCanWrite?'Admin writes enabled':'Sign in as an assigned admin to save'}</span>
+    </div>
+    ${destinationsSource==='fallback'?'<div class="admin-data-note">The database could not be reached, so these are built-in demo records. Reconnect before editing; saving fallback entries can create duplicates.</div>':''}
     <div class="admin-section-toggle" onclick="adminToggleDestCatPanel()">
       <span>${lucideSvg('tag',13)} Manage categories ${destCatPanelOpen?'▾':'▸'}</span>
       <span class="admin-section-count">${Object.keys(catStyle).length}</span>
@@ -3623,28 +3728,34 @@ function renderAdminDest(){
     <div id="adfNearbyPanel" style="display:${nearbyPanelOpen?'':'none'}">
       ${adminNearbyPanelHtml()}
     </div>
-    <button class="admin-add-btn" style="margin-top:14px;" onclick="adminNewDest()">+ Add destination</button>`;
+    <button class="admin-add-btn" style="margin-top:14px;" onclick="adminNewDest()">+ Add business or tourist place</button>
+    <input class="admin-directory-search" id="adminDestSearch" value="${escapeHtml(adminDestSearchQuery)}" placeholder="Search name, barangay or category" oninput="adminFilterDestinations(this.value)">`;
 
   if(adminEditingDestId !== null){
     html += adminDestFormHtml();
   }
 
-  if(!destinations.length){
-    html += `<div class="admin-empty">No destinations yet.</div>`;
+  if(!visibleDestinations.length){
+    html += `<div class="admin-empty">${destinations.length?'No listings match that search.':'No live listings yet. Add your first business or tourist place above.'}</div>`;
   } else {
-    html += destinations.map(d=>`
+    html += visibleDestinations.map(d=>{
+      const issues = adminPlaceIssues(d);
+      return `
       <div class="admin-list-item">
         <div class="admin-list-item-head">
           <div onclick="adminEditDest(${d.id})" style="flex:1;cursor:pointer;">
             <strong>${escapeHtml(d.name)}</strong>${d.featured ? ` <span class="admin-feat-icon" title="Featured">${lucideSvg('star',12)}</span>` : ''}${d.videoUrl ? ` <span class="admin-feat-icon" title="Has video">${lucideSvg('film',12)}</span>` : ''}<br>
-            <span>${escapeHtml(catStyle[d.category]?.label||d.category)} · ${escapeHtml(d.stats.travel||'')}</span>
+            <span>${escapeHtml(catStyle[d.category]?.label||d.category)} · ${escapeHtml(d.barangay||'Barangay missing')}</span>
+            <div class="admin-quality ${issues.length?'needs-work':'ready'}">${issues.length?'Needs: '+escapeHtml(issues.join(', ')):'Ready for Explore'}</div>
           </div>
           <div class="admin-row-actions">
+            <button class="admin-mini-btn" onclick="adminPreviewDest(${d.id})">View</button>
             <button class="admin-mini-btn" onclick="adminEditDest(${d.id})">Edit</button>
             <button class="admin-mini-btn danger" onclick="adminDeleteDest(${d.id})">Delete</button>
           </div>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
   body.innerHTML = html;
 }
@@ -3659,12 +3770,15 @@ function adminDestFormHtml(){
   if(d.images && Array.isArray(d.images)) __mediaGallery.push(...d.images);
   return `
     <div class="admin-edit-box">
+      <div class="admin-form-heading">${isNew?'New listing':'Edit listing'}</div>
+      <div class="admin-form-help">Use this same form for beaches, attractions, accommodations, restaurants, tour operators, shops and local services. Saved records appear in Explore and on the map.</div>
       <div class="admin-toggle-row">
-        <label for="adfFeatured">Featured (shows on the Discover "All" tab)</label>
+        <label for="adfFeatured">Featured in Explore</label>
         <input type="checkbox" id="adfFeatured" ${d.featured?'checked':''}>
       </div>
 
-      <div class="admin-field"><label>Name</label><input id="adfName" value="${escapeHtml(d.name)}"></div>
+      <div class="admin-form-section">1. Identity and location</div>
+      <div class="admin-field"><label>Name *</label><input id="adfName" value="${escapeHtml(d.name)}" placeholder="Public business or place name"></div>
 
       <div class="admin-field">
         <label>Paste Google Maps link (fills name + lat/lng below)</label>
@@ -3679,9 +3793,9 @@ function adminDestFormHtml(){
         <div class="admin-field"><label>Longitude</label><input id="adfLng" value="${d.lng}"></div>
       </div>
       <div class="admin-field">
-        <label>Barangay (used for "What's around me" — must match a barangay name exactly)</label>
+        <label>Barangay *</label>
         <input id="adfBarangay" list="adfBarangayList" value="${escapeHtml(d.barangay||'')}" placeholder="e.g. Poblacion, Port Barton, Alimanguan...">
-        <datalist id="adfBarangayList">${Object.keys(nearbyPlacesByBarangay).map(b=>`<option value="${escapeHtml(b)}">`).join('')}</datalist>
+        <datalist id="adfBarangayList">${Array.from(new Set([...EXPLORE_AREAS.map(a=>a.k),...Object.keys(nearbyPlacesByBarangay)])).map(b=>`<option value="${escapeHtml(b)}">`).join('')}</datalist>
       </div>
       <div class="admin-field">
         <label>Google Business Profile URL (sightseeing, accommodation, cafe, tour office...)</label>
@@ -3704,14 +3818,15 @@ function adminDestFormHtml(){
         <div class="admin-field"><label>Marker color</label><input id="adfColor" value="${escapeHtml(d.color)}"></div>
       </div>
 
+      <div class="admin-form-section">2. Photos and visitor information</div>
       ${mediaGalleryHtml('adf','dest')}
       ${mediaVideoHtml('adf', d.videoUrl, d.videoType)}
 
-      <div class="admin-field"><label>Description</label><textarea id="adfDesc" rows="3">${escapeHtml(d.description)}</textarea></div>
-      <div class="admin-field"><label>Tip</label><textarea id="adfTip" rows="2">${escapeHtml(d.tip)}</textarea></div>
+      <div class="admin-field"><label>Description *</label><textarea id="adfDesc" rows="3" placeholder="What is this place, and why should someone visit or use it?">${escapeHtml(d.description)}</textarea></div>
+      <div class="admin-field"><label>Local tip</label><textarea id="adfTip" rows="2" placeholder="Access, hours, fees, cash, road or weather advice">${escapeHtml(d.tip)}</textarea></div>
       <div class="admin-grid-2">
         <div class="admin-field"><label>Rating</label><input id="adfRating" value="${escapeHtml(d.stats.rating)}"></div>
-        <div class="admin-field"><label>Travel time</label><input id="adfTravel" value="${escapeHtml(d.stats.travel)}"></div>
+        <div class="admin-field"><label>Access / travel time</label><input id="adfTravel" value="${escapeHtml(d.stats.travel)}" placeholder="e.g. 15 min from Poblacion"></div>
       </div>
       <div class="admin-grid-2">
         <div class="admin-field"><label>Temp</label><input id="adfTemp" value="${escapeHtml(d.stats.temp)}"></div>
@@ -3719,7 +3834,7 @@ function adminDestFormHtml(){
       </div>
 
       <div class="admin-edit-actions">
-        <button class="admin-save-btn" id="adfSaveBtn" onclick="adminSaveDest()">${isNew?'Create':'Save changes'}</button>
+        <button class="admin-save-btn" id="adfSaveBtn" onclick="adminSaveDest()">${isNew?'Create listing':'Save changes'}</button>
         <button class="admin-cancel-btn" onclick="adminEditingDestId=null;renderAdminDest();">Cancel</button>
       </div>
     </div>`;
@@ -4058,6 +4173,7 @@ async function adminUploadVideoIfNeeded(){
 }
 
 async function adminSaveDest(){
+  if(!adminRequireWrite()) return;
   const saveBtn = document.getElementById('adfSaveBtn');
   saveBtn.disabled = true;
   saveBtn.textContent = 'Saving...';
@@ -4087,8 +4203,16 @@ async function adminSaveDest(){
       barangay: document.getElementById('adfBarangay').value.trim(),
       google_business_url: document.getElementById('adfGbp').value.trim() || null,
     };
-    if(!payload.name || isNaN(payload.lat) || isNaN(payload.lng)){
-      alert('Name, latitude, and longitude are required.');
+    if(!payload.name || isNaN(payload.lat) || isNaN(payload.lng) || !payload.category || !payload.barangay || !payload.description){
+      alert('Complete the required fields: name, map coordinates, category, barangay, and description.');
+      saveBtn.disabled = false;
+      saveBtn.textContent = adminEditingDestId === 'new' ? 'Create listing' : 'Save changes';
+      return;
+    }
+    const insideSanVicente = payload.lat >= 10.25 && payload.lat <= 10.78 && payload.lng >= 118.95 && payload.lng <= 119.45;
+    if(!insideSanVicente && !confirm('These coordinates appear to be outside San Vicente. Save this listing anyway?')){
+      saveBtn.disabled = false;
+      saveBtn.textContent = adminEditingDestId === 'new' ? 'Create listing' : 'Save changes';
       return;
     }
 
@@ -4107,11 +4231,12 @@ async function adminSaveDest(){
   } catch(err){
     alert('Save failed: ' + (err.message || err));
     saveBtn.disabled = false;
-    saveBtn.textContent = adminEditingDestId === 'new' ? 'Create' : 'Save changes';
+    saveBtn.textContent = adminEditingDestId === 'new' ? 'Create listing' : 'Save changes';
   }
 }
 
 async function adminDeleteDest(id){
+  if(!adminRequireWrite()) return;
   if(!confirm('Delete this destination?')) return;
   try {
     const { error } = await sb.from('destinations').delete().eq('id', id);
