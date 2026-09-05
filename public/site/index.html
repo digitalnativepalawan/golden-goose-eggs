@@ -767,17 +767,13 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
 
 <!-- ═══ LAYER TOGGLE ═══ -->
 <div class="map-layer-toggle" id="mapLayerToggle">
-  <button class="mlt-btn" onclick="switchMapLayer('light',this)" aria-label="Light map">
-    <svg class="mlt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-    <span class="mlt-label">Light</span>
+  <button class="mlt-btn active" onclick="switchMapLayer('map',this)" aria-label="Street map">
+    <svg class="mlt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21 3 6"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+    <span class="mlt-label">Map</span>
   </button>
-  <button class="mlt-btn active" onclick="switchMapLayer('street',this)" aria-label="Dark map">
-    <svg class="mlt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-    <span class="mlt-label">Dark</span>
-  </button>
-  <button class="mlt-btn" onclick="switchMapLayer('satellite',this)" aria-label="Satellite view">
-    <svg class="mlt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7 9 3 5 7l4 4"/><path d="M17 11l4 4-4 4-4-4"/><path d="M8 12l4 4 6-6-4-4-6 6z"/><path d="M16 16l-5 5-2-2"/><path d="M2 22l3-3"/></svg>
-    <span class="mlt-label">Satellite</span>
+  <button class="mlt-btn" onclick="switchMapLayer('terrain',this)" aria-label="Terrain map">
+    <svg class="mlt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 20 6-10 4 6 2-3 6 7"/><path d="m11 7 2-3 3 5"/></svg>
+    <span class="mlt-label">Terrain</span>
   </button>
   <div class="mlt-divider"></div>
   <button class="mlt-btn active" id="barangayToggle" onclick="toggleBarangayLayer()" aria-label="Barangay boundaries">
@@ -1012,9 +1008,42 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
   .es-fchip{font-size:.7rem;font-weight:600;padding:6px 10px;border-radius:999px;
     background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.78);cursor:pointer}
   .es-fchip.on{background:rgba(20,184,166,.14);border-color:rgba(20,184,166,.36);color:rgba(153,246,228,.98)}
-  @media(min-width:900px){
-    .explore-sheet{left:auto;right:24px;bottom:24px;width:min(440px,92vw);border-radius:24px}
-    .explore-sheet.l3{height:min(82vh,780px)}
+  .es-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:4px 2px 2px}
+  .es-heading-copy{min-width:0}
+  .es-heading-title{font-family:var(--font-display);font-size:1.75rem;line-height:1.05;color:#fff;font-weight:500;margin:0}
+  .es-heading-sub{font-size:.82rem;line-height:1.45;color:rgba(255,255,255,.6);margin:5px 0 0}
+  .es-close{width:36px;height:36px;flex:0 0 36px;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;font-size:20px;cursor:pointer}
+  .es-category-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .es-category{display:flex;align-items:center;gap:10px;min-height:46px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#fff;text-align:left;cursor:pointer;font:600 .84rem var(--font-body)}
+  .es-category:hover,.es-category:focus-visible{background:rgba(20,184,166,.13);border-color:rgba(20,184,166,.4);outline:none}
+  .es-category-icon{font-size:1.1rem}
+  .es-empty{padding:24px 12px;text-align:center;color:rgba(255,255,255,.6);font-size:.86rem}
+  @media(min-width:1100px){
+    .explore-sheet{left:20px;right:auto;top:20px;bottom:20px;width:420px;height:auto!important;border-radius:26px;transform:translateX(calc(-100% - 30px));box-shadow:18px 0 60px rgba(0,0,0,.32)}
+    .explore-sheet.open{transform:translateX(0)}
+    .explore-sheet.l1,.explore-sheet.l2,.explore-sheet.l3{height:auto}
+    .es-handle{display:none}
+    .es-peek{padding:18px 18px 10px;gap:12px}
+    .es-body,.explore-sheet.l1 .es-body,.explore-sheet.l2 .es-body,.explore-sheet.l3 .es-body{display:flex;padding:4px 18px 28px;gap:12px}
+    .es-section{padding:14px;border-radius:18px}
+    .bottom-dock{left:calc(50% + 220px)}
+    body.explore-open .map-layer-toggle{right:20px}
+  }
+  @media(min-width:700px) and (max-width:1099px){
+    .explore-sheet{left:16px;right:auto;top:16px;bottom:88px;width:min(390px,46vw);height:auto!important;border-radius:24px;transform:translateX(calc(-100% - 24px))}
+    .explore-sheet.open{transform:translateX(0)}
+    .explore-sheet.l1,.explore-sheet.l2,.explore-sheet.l3{height:auto}
+    .es-handle{display:none}
+    .es-body,.explore-sheet.l1 .es-body,.explore-sheet.l2 .es-body,.explore-sheet.l3 .es-body{display:flex}
+  }
+  @media(max-width:699px){
+    .explore-sheet.l1{height:184px}
+    .explore-sheet.l2{height:62dvh}
+    .explore-sheet.l3{height:calc(100dvh - 8px)}
+    .es-heading-title{font-size:1.5rem}
+    .es-heading-sub{font-size:.78rem}
+    .es-body{padding-bottom:calc(92px + var(--safe-bottom,0px))}
+    .es-category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   }
   /* ─── Luxury horizontal image carousels ─── */
   .sv-carousel{display:flex;gap:12px;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
@@ -1047,9 +1076,16 @@ body.panel-open .map-util-btn,body.panel-open .map-layer-toggle{opacity:0;pointe
 <div class="explore-sheet" id="exploreSheet">
   <div class="es-handle" id="esHandle" onclick="cycleExploreSnap()"></div>
   <div class="es-peek">
+    <div class="es-heading">
+      <div class="es-heading-copy">
+        <h2 class="es-heading-title">Explore San Vicente</h2>
+        <p class="es-heading-sub">Find beaches, food, stays and local places across every barangay.</p>
+      </div>
+      <button class="es-close" onclick="dockNav('map')" aria-label="Close Explore">×</button>
+    </div>
     <label class="es-search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input id="esSearchInput" type="text" placeholder="Search or ask TALA…" onfocus="setExploreSnap(2)"/>
+      <input id="esSearchInput" type="search" placeholder="Search places or barangays" onfocus="setExploreSnap(2)" oninput="filterExploreResults(this.value)"/>
     </label>
     <div class="es-ribbon" id="esRibbon"></div>
   </div>

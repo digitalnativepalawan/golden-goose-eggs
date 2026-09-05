@@ -985,17 +985,21 @@ async function initMap() {
     worldCopyJump:false
   });
 
-  const street = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OSM &copy; CARTO',maxZoom:19,subdomains:'abcd'});
-  const light = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OSM &copy; CARTO',maxZoom:19,subdomains:'abcd'});
-  const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'&copy; Esri',maxZoom:19});
-  // Place-name labels (countries/provinces/municipalities/cities) drawn on top
-  // of the satellite imagery, since raw aerial photography has no text on it.
-  // Falls back gracefully (just stays empty) if this tile service is ever
-  // unavailable — it's a cosmetic overlay, never blocks the base imagery.
-  const satLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,errorTileUrl:''});
+  // Open, no-key basemaps. Leaflet remains the map engine; these replace the
+  // CARTO tiles that began watermarking requests without an API key.
+  const street = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
+    maxZoom:19
+  });
+  const terrain = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{
+    attribution:'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, style &copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
+    maxZoom:17,
+    subdomains:'abc'
+  });
 
   street.addTo(map);
-  window._mS=street; window._mLight=light; window._mSat=sat; window._mSatLabels=satLabels; window._mView='street';
+  window._mS=street; window._mTerrain=terrain; window._mView='map';
+  document.body.classList.add('map-light');
 
   L.control.zoom({position:'bottomright'}).addTo(map);
   document.getElementById('mapLayerToggle').classList.add('visible');
@@ -1058,7 +1062,7 @@ function toggleBarangayLayer(){
 }
 
 function getBarangayStyle(){
-  const isLight = window._mView === 'light';
+  const isLight = true;
   return {
     color: isLight ? '#06122a' : '#e8dcc8',
     weight: 1.5,
@@ -1082,23 +1086,14 @@ function switchMapLayer(type,btn){
   const was = window._mView;
   if(was === type) return;
 
-  if(was === 'street') map.removeLayer(window._mS);
-  else if(was === 'light') map.removeLayer(window._mLight);
-  else if(was === 'satellite'){
-    map.removeLayer(window._mSat);
-    map.removeLayer(window._mSatLabels);
-  }
+  if(was === 'map') map.removeLayer(window._mS);
+  else if(was === 'terrain') map.removeLayer(window._mTerrain);
 
-  if(type === 'street') window._mS.addTo(map);
-  else if(type === 'light') window._mLight.addTo(map);
-  else if(type === 'satellite'){
-    window._mSat.addTo(map);
-    window._mSatLabels.addTo(map);
-  }
+  if(type === 'map') window._mS.addTo(map);
+  else if(type === 'terrain') window._mTerrain.addTo(map);
 
   window._mView = type;
-  if(type === 'light') document.body.classList.add('map-light');
-  else document.body.classList.remove('map-light');
+  document.body.classList.add('map-light');
   updateBarangayStyle();
   map.invalidateSize({animate:false});
 }
@@ -1235,12 +1230,15 @@ function openExploreSheet(){
   if(!s) return;
   renderExploreContent();
   s.classList.add('open');
-  setExploreSnap(1);
+  document.body.classList.add('explore-open');
+  setExploreSnap(window.innerWidth >= 700 ? 3 : 2);
+  setTimeout(()=>{ if(map) map.invalidateSize({animate:false}); },350);
 }
 function closeExploreSheet(){
   const s = document.getElementById('exploreSheet');
   if(!s) return;
   s.classList.remove('open','l1','l2','l3');
+  document.body.classList.remove('explore-open');
 }
 function setExploreSnap(level){
   const s = document.getElementById('exploreSheet');
@@ -1501,10 +1499,10 @@ function renderExploreContent(){
 
   const catsHTML = `
     <section class="es-section">
-      <div class="es-kicker">Categories</div>
-      <h3 class="es-title">Quick lookups</h3>
-      <div class="es-grid-3">
-        ${EXPLORE_CATEGORIES.map(c=>`<button class="es-tile" onclick="filterCategory('${c.k}');setExploreSnap(1);"><div class="es-tile-t">${c.l}</div></button>`).join('')}
+      <div class="es-kicker">Browse by category</div>
+      <h3 class="es-title">What are you looking for?</h3>
+      <div class="es-category-grid">
+        ${EXPLORE_CATEGORIES.slice(0,8).map(c=>`<button class="es-category" onclick="filterCategory('${c.k}');"><span class="es-category-icon">${c.l.split(' ')[0]}</span><span>${c.l.substring(c.l.indexOf(' ')+1)}</span></button>`).join('')}
       </div>
     </section>`;
 
@@ -1521,8 +1519,19 @@ function renderExploreContent(){
 
   const body = document.getElementById('exploreContent');
   if(body){
-    body.innerHTML = foryouHTML + nearbyHTML + moodsHTML + collectionsHTML + areasHTML + catsHTML + allPlacesHTML;
+    body.innerHTML = catsHTML + foryouHTML + areasHTML + nearbyHTML;
   }
+}
+
+function filterExploreResults(raw){
+  const query = String(raw||'').trim().toLowerCase();
+  const body = document.getElementById('exploreContent');
+  if(!body) return;
+  if(!query){ renderExploreContent(); return; }
+  const matches = (Array.isArray(destinations) ? destinations : []).filter(d=>
+    [d.name,d.barangay,d.category,d.description].some(v=>String(v||'').toLowerCase().includes(query))
+  );
+  body.innerHTML = `<section class="es-section"><div class="es-kicker">Search results</div><h3 class="es-title">${matches.length} place${matches.length===1?'':'s'} found</h3>${matches.length?`<div class="sv-carousel">${matches.map(forYouCardHTML).join('')}</div>`:`<div class="es-empty">No places match “${escT(raw)}”. Try a barangay or category.</div>`}</section>`;
 }
 
 // ─── TODAY DAILY DATA (demo seed; DB wiring is a follow-up) ───
