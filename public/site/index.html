@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Palawan — SANVIC</title>
+<title>Explore San Vicente — SANVIC</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -783,30 +783,23 @@ body.explore-open .map-util-btn,body.explore-open .map-layer-toggle{opacity:1;po
 </header>
 <div class="hero-fade" id="heroFade"></div>
 
-<!-- ═══ LAYER TOGGLE ═══ -->
+<!-- ═══ MAP TOOLS: separate basemap and boundary controls ═══ -->
 <div class="map-layer-toggle" id="mapLayerToggle">
-  <button class="mlt-btn active" onclick="switchMapLayer('street',this)" aria-label="Street map">
-    <svg class="mlt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21 3 6"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
-    <span class="mlt-label">Street</span>
+  <button id="layersButton" class="layers-trigger" aria-expanded="false" aria-controls="layersMenu" onclick="toggleLayersMenu()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m3 8 9-5 9 5-9 5-9-5Zm0 4 9 5 9-5M3 16l9 5 9-5"/></svg>
+    <span>Layers</span>
   </button>
-  <button class="mlt-btn" onclick="switchMapLayer('dark',this)" aria-label="Dark map">
-    <svg class="mlt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
-    <span class="mlt-label">Dark</span>
-  </button>
-  <button class="mlt-btn" onclick="switchMapLayer('satellite',this)" aria-label="Satellite map">
-    <svg class="mlt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>
-    <span class="mlt-label">Satellite</span>
-  </button>
-  <button class="mlt-btn" onclick="switchMapLayer('terrain',this)" aria-label="Terrain map">
-    <svg class="mlt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 20 6-10 4 6 2-3 6 7"/><path d="m11 7 2-3 3 5"/></svg>
-    <span class="mlt-label">Terrain</span>
-  </button>
-  <div class="mlt-divider"></div>
-  <button class="mlt-btn active" id="barangayToggle" onclick="toggleBarangayLayer()" aria-label="Barangay boundaries">
-    <svg class="mlt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 20 7 20 17 12 22 4 17 4 7"/><line x1="12" y1="22" x2="12" y2="12"/><line x1="20" y1="7" x2="12" y2="12"/><line x1="4" y1="7" x2="12" y2="12"/></svg>
-    <span class="mlt-label">Barangays</span>
-  </button>
+  <div id="layersMenu" class="layers-menu" hidden>
+    <fieldset><legend>Map style</legend>
+      <label><input type="radio" name="basemap" value="street" checked onchange="switchMapLayer(this.value)"><span>Street<small>OpenStreetMap</small></span></label>
+      <label><input type="radio" name="basemap" value="dark" onchange="switchMapLayer(this.value)"><span>Dark<small>Low-light street map</small></span></label>
+      <label><input type="radio" name="basemap" value="satellite" onchange="switchMapLayer(this.value)"><span>Satellite<small>Esri imagery · not open data</small></span></label>
+      <label><input type="radio" name="basemap" value="terrain" onchange="switchMapLayer(this.value)"><span>Terrain<small>OpenTopoMap</small></span></label>
+    </fieldset>
+    <label class="boundary-option"><input id="barangayToggle" type="checkbox" checked onchange="toggleBarangayLayer()"> Barangay boundaries</label>
+  </div>
 </div>
+<div class="map-status" id="mapStatus" role="status" aria-live="polite" hidden></div>
 
 
 
@@ -1101,33 +1094,38 @@ body.explore-open .map-util-btn,body.explore-open .map-layer-toggle{opacity:1;po
     letter-spacing:.02em;text-shadow:0 1px 4px rgba(0,0,0,.6)}
 
 </style>
-<div class="explore-sheet" id="exploreSheet">
-  <div class="es-handle" id="esHandle" onclick="cycleExploreSnap()"></div>
+<section class="explore-sheet" id="exploreSheet" aria-label="Explore San Vicente" inert>
+  <button class="es-handle" id="esHandle" aria-label="Expand place list" aria-expanded="false"><span></span></button>
   <div class="es-peek">
     <div class="es-heading">
-      <div class="es-heading-copy">
-        <h2 class="es-heading-title">Explore San Vicente</h2>
-        <p class="es-heading-sub" id="esHeadingSub">Find beaches, food, stays and local places across every barangay.</p>
-      </div>
-      <button class="es-close" onclick="dockNav('map')" aria-label="Close Explore">×</button>
+      <div class="es-heading-copy"><p class="es-eyebrow">PALAWAN, PHILIPPINES</p><h2 class="es-heading-title">Explore San Vicente</h2></div>
+      <button class="es-close" onclick="closeExploreSheet()" aria-label="Collapse Explore panel">×</button>
     </div>
     <div class="es-audience" aria-label="Choose Explore view">
-      <button class="es-audience-btn active" data-mode="visitor" onclick="setExploreAudience('visitor')">I'm visiting</button>
-      <button class="es-audience-btn" data-mode="local" onclick="setExploreAudience('local')">I'm local</button>
+      <button class="es-audience-btn active" data-mode="visitor" aria-pressed="true" onclick="setExploreAudience('visitor')">I'm visiting</button>
+      <button class="es-audience-btn" data-mode="local" aria-pressed="false" onclick="setExploreAudience('local')">I'm local</button>
     </div>
     <label class="es-search">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input id="esSearchInput" type="search" placeholder="Beach, food, waterfall or barangay" onfocus="setExploreSnap(2)" oninput="filterExploreResults(this.value)"/>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-5-5"/></svg>
+      <input id="esSearchInput" type="search" aria-label="Search places" placeholder="Beach, food, waterfall or barangay" oninput="filterExploreResults(this.value)" autocomplete="off">
     </label>
-    <div class="es-ribbon" id="esRibbon"></div>
+    <div class="es-ribbon" id="esRibbon" aria-label="Place categories"></div>
+  </div>
+  <div class="es-browse-controls">
+    <div class="es-filter-row"><label class="es-area-label"><span class="sr-only">Barangay</span><select id="esArea" onchange="selectExploreArea(this.value)"><option value="">All barangays</option></select></label><button id="esNearby" class="es-action" aria-pressed="false" onclick="locateUser(true)">Near me</button></div>
+    <div class="es-results-heading"><span id="esResultCount" role="status">Loading places…</span><button id="esReset" onclick="resetExploreFilters()" hidden>Show all</button><button class="es-fit" onclick="fitExploreResults()">Fit on map</button></div>
+    <p class="es-data-status" id="esDataStatus" role="status"></p>
   </div>
   <div class="es-body" id="exploreContent"></div>
-</div>
+  <footer class="es-footer"><button onclick="dockNav('hunt')">The Hunt <span aria-hidden="true">↗</span></button><button onclick="window.openSanvicWelcome?.()">My interests</button><button onclick="askTalaFromExplore()">Ask TALA <span aria-hidden="true">↗</span></button></footer>
+</section>
+<button class="explore-reopen" onclick="dockNav('discover')">Explore places</button>
 
 
 <!-- ═══ DESTINATION BOTTOM SHEET ═══ -->
 <div class="dest-overlay" id="destOverlay"></div>
 <div class="dest-sheet" id="destSheet">
+  <button class="detail-back" id="detailBack" onclick="closeDestSheet()">← Back to places</button>
   <div class="dest-handle" onclick="toggleDestSheet()"></div>
 
   <!-- Compact view -->
@@ -1159,6 +1157,7 @@ body.explore-open .map-util-btn,body.explore-open .map-layer-toggle{opacity:1;po
       </button>
     </div>
     <h2 class="dest-exp-title" id="deTitle"></h2>
+    <p class="detail-barangay" id="deBarangay"></p>
     <div class="dest-exp-stats" id="deStats"></div>
     <p class="dest-exp-desc collapsed" id="deDesc"></p>
     <button class="dest-readmore" id="deReadMore" onclick="toggleReadMore()">Read more</button>
@@ -1942,7 +1941,7 @@ body.explore-open .map-util-btn,body.explore-open .map-layer-toggle{opacity:1;po
   // any JS file. Never trust a ?v= from the page URL — visitors arrive with
   // stale ?v= tokens (bookmarks, share links, published-site wrappers) that
   // pin browsers to old cached bundles, which is how mobile nav broke.
-  window.SANVIC_DEPLOY_VERSION = '2026-07-01-1';
+  window.SANVIC_DEPLOY_VERSION = '2026-09-05-explore-v2';
 </script>
 <script src="barangays.geojson.js"></script>
 <script>
@@ -1950,7 +1949,7 @@ body.explore-open .map-util-btn,body.explore-open .map-layer-toggle{opacity:1;po
     var v = encodeURIComponent(window.SANVIC_DEPLOY_VERSION);
     // async=false keeps execution order: supabase-config.js first (defines
     // sb + loads experience modules), then app.js which depends on it.
-    ['supabase-config.js', 'app.js'].forEach(function (file) {
+    ['supabase-config.js', 'explore-model.js', 'app.js'].forEach(function (file) {
       var s = document.createElement('script');
       s.src = file + '?v=' + v;
       s.async = false;
@@ -2027,5 +2026,6 @@ body.explore-open .map-util-btn,body.explore-open .map-layer-toggle{opacity:1;po
   <div class="carousel-dots" id="carouselDots"></div>
 </div>
 
+<link rel="stylesheet" href="explore-ux.css?v=2026-09-05-2">
 </body>
 </html>

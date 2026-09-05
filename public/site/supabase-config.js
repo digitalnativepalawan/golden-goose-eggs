@@ -16,7 +16,9 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   // SANVIC_DEPLOY_VERSION there refreshes everything at once. Date.now()
   // fallback keeps modules loading (uncached) if the stamp is ever missing.
   const v = encodeURIComponent(window.SANVIC_DEPLOY_VERSION || String(Date.now()));
-  ['entry-flow.js', 'personalize.js', 'pulse-demo-content.js', 'map-pin-boost.js', 'barangay-marker-polish.js'].forEach((file) => {
+  // Map hierarchy and sizing now belong to app.js. The legacy pin scripts
+  // repeatedly reset filters/zoom and are intentionally no longer loaded.
+  ['entry-flow.js', 'personalize.js', 'pulse-demo-content.js'].forEach((file) => {
     const script = document.createElement('script');
     script.src = file + '?v=' + v;
     document.body.appendChild(script);

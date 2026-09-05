@@ -512,6 +512,7 @@ function isSuggestionActiveToday(s){
 }
 
 async function loadDataFromSupabase(){
+  let directoryLoaded=false;
   try {
     const [destRes, talaRes, settingsRes, sugRes, siteRes, catRes, nearbyRes, aiSettingsRes, todayRes, tribesRes, eventsRes, upcomingRes, huntRewardsRes, huntSettingsRes] = await Promise.all([
       sb.from('destinations').select('*').order('sort_order', { ascending: true }),
@@ -528,10 +529,10 @@ async function loadDataFromSupabase(){
       sb.from('my_sanvic_upcoming').select('*').order('sort_order', { ascending: true }),
       sb.from('hunt_rewards').select('*').order('sort_order', { ascending: true }),
       sb.from('hunt_settings').select('*'),
-    ]);
+    ].map(request=>Promise.resolve(request).catch(error=>({data:null,error}))));
 
     if (destRes.error) throw destRes.error;
-    if (talaRes.error) throw talaRes.error;
+    // An optional assistant-table failure must not replace the live directory.
 
     if(aiSettingsRes && aiSettingsRes.data){
       aiSettingsRes.data.forEach(r=>{
@@ -543,6 +544,7 @@ async function loadDataFromSupabase(){
 
     destinations = Array.isArray(destRes.data) ? destRes.data.map(destRowToObj) : [];
     destinationsSource = 'supabase';
+    directoryLoaded=true;
     aiData = (talaRes.data && talaRes.data.length) ? talaRes.data.map(r=>({ id:r.id, kw:r.keywords, r:r.response, cat:r.category||'knowledge' })) : DEFAULT_TALA_DATA;
     defaultR = (settingsRes.data && settingsRes.data.value) ? settingsRes.data.value : DEFAULT_FALLBACK_RESPONSE;
     talaSuggestions = (sugRes && sugRes.data && sugRes.data.length) ? sugRes.data : DEFAULT_SUGGESTIONS;
@@ -645,8 +647,10 @@ async function loadDataFromSupabase(){
     }
   } catch(err) {
     console.warn('[SANVIC] Supabase load failed, using built-in defaults:', err);
-    destinations = DEFAULT_DESTINATIONS;
-    destinationsSource = 'fallback';
+    if(!directoryLoaded){
+      destinations = DEFAULT_DESTINATIONS;
+      destinationsSource = 'fallback';
+    }
     aiData = DEFAULT_TALA_DATA;
     defaultR = DEFAULT_FALLBACK_RESPONSE;
     talaSuggestions = DEFAULT_SUGGESTIONS;
@@ -664,6 +668,7 @@ async function loadDataFromSupabase(){
   applySplashText();
   window.destinations = destinations;
   dataReady = true;
+  if(document.getElementById('exploreSheet')?.classList.contains('open')) renderExploreContent();
 }
 
 function applyHeroText(){
@@ -872,16 +877,20 @@ function rebuildMarkers(){
   allMarkers=[];
   for(const k in markersByCat) delete markersByCat[k];
   destinations.forEach(d=>{
+    if(!SanvicExplore.hasCoordinates(d)) return;
     if(!markersByCat[d.category]) markersByCat[d.category]=[];
-    const color = neonColorForCategory(d.category);
-    const html = `<div class="sv-neon-pin" style="--sv-neon:${color}"><span class="sv-neon-core"></span></div>`;
-    const m = L.marker([d.lat,d.lng],{icon:L.divIcon({className:'sv-neon-icon',html,iconSize:[14,14],iconAnchor:[7,7]})});
+    const color = /^#[0-9a-f]{6}$/i.test(catStyle[d.category]?.color||'') ? catStyle[d.category].color : '#0d9488';
+    const html = `<span class="place-pin" style="--pin-color:${color}">${lucideSvg(catStyle[d.category]?.icon||'map-pin',18)}</span>`;
+    const m = L.marker([d.lat,d.lng],{title:d.name,alt:d.name,keyboard:true,icon:L.divIcon({className:'place-marker',html,iconSize:[44,44],iconAnchor:[22,22]})});
+    const label = document.createElement('span'); label.textContent=d.name;
+    m.bindTooltip(label,{direction:'top',offset:[0,-16]});
     m._d=d; m.on('click',()=>openDest(d));
     markersByCat[d.category].push(m); allMarkers.push(m);
   });
   activeMarkerSet = allMarkers;
   applyPinVisibility();
   renderDiscoverList(document.querySelector('.discover-cat.active')?.dataset.cat || 'all');
+  if(document.body.classList.contains('explore-open')) syncExploreMap();
 }
 
 // Adds/removes activeMarkerSet from the map based on current zoom,
@@ -890,7 +899,7 @@ function rebuildMarkers(){
 function applyPinVisibility(){
   if(!map) return;
   const z = map.getZoom();
-  const shouldShow = pinVisibilityOverride || z >= PIN_VISIBLE_ZOOM;
+  const shouldShow = pinVisibilityOverride || document.body.classList.contains('explore-open') || z >= PIN_VISIBLE_ZOOM;
   // Zoom-based label suppression: at zoom <= 11, hide barangay text tooltips
   // so the canvas reads as clean neon-dot nodes only.
   const cont = map.getContainer();
@@ -913,202 +922,120 @@ function applyPinVisibility(){
 // "where am I". Re-tapping the button gets a fresh fix.
 let userLocationMarker = null, userLocationAccuracyCircle = null;
 
-function locateUser(){
-  if(!navigator.geolocation){
-    alert('Geolocation is not available on this device.');
-    return;
-  }
-  if(!mapReady || !map){
-    alert('Give the map a second to finish loading, then try again.');
-    return;
-  }
-  // Bring the map into view first (in case Discover/Hunt/Pulse/MyTrip is
-  // open) so the "you are here" marker lands somewhere the visitor can
-  // actually see, instead of updating a hidden map underneath a panel.
-  dismissDockIntro();
-  closeAllPanels();
-  closeDiscoverPanel();
-  document.getElementById('heroOverlay').classList.remove('hidden');
-  document.getElementById('heroFade').classList.remove('hidden');
-  document.querySelectorAll('.dock-item').forEach(d=>d.classList.remove('active'));
-  document.querySelector('.dock-item[data-tab="discover"]')?.classList.add('active');
-
-  const btn = document.getElementById('locateMeBtn');
-  if(btn) btn.classList.add('locating');
-  navigator.geolocation.getCurrentPosition(
-    (pos)=>{
-      if(btn) btn.classList.remove('locating');
-      const { latitude:lat, longitude:lng, accuracy } = pos.coords;
-      const latlng = [lat, lng];
-
-      if(userLocationMarker) map.removeLayer(userLocationMarker);
-      if(userLocationAccuracyCircle) map.removeLayer(userLocationAccuracyCircle);
-
-      userLocationAccuracyCircle = L.circle(latlng, {
-        radius: accuracy, color: 'transparent', fillColor: '#14b8a6', fillOpacity: .12, interactive: false
-      }).addTo(map);
-      userLocationMarker = L.marker(latlng, {
-        icon: L.divIcon({ className:'sv-me-icon', html:'<div class="sv-me-wrap"><span class="sv-me-pulse"></span><span class="sv-me-dot"></span></div>', iconSize:[20,20], iconAnchor:[10,10] }),
-        interactive: false, keyboard: false, zIndexOffset: 500
-      }).addTo(map);
-
-      map.flyTo(latlng, Math.max(map.getZoom(), 15), { duration: 1 });
-    },
-    (err)=>{
-      if(btn) btn.classList.remove('locating');
-      alert(err.code === err.PERMISSION_DENIED
-        ? "Location access is blocked. Enable it in your browser/app settings to see yourself on the map."
-        : "Couldn't get your location right now. Try again in a moment.");
-    },
-    { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
-  );
+function mapNotice(message){
+  const el=document.getElementById('mapStatus');
+  el.textContent=message; el.hidden=!message;
 }
-
-async function initMap() {
-  if (mapReady) return;
-  mapReady = true;
-
-  if(!dataReady) await loadDataFromSupabase();
-
-  // Palawan island/province bounding box (covers Calamianes in the
-  // north down to Balabac in the south), padded slightly. Locks the
-  // viewport so users can pan/zoom out only as far as the island —
-  // never to the rest of the globe.
-  const PALAWAN_BOUNDS = L.latLngBounds([6.5, 116.6], [12.9, 121.0]);
-
-  map = L.map('map',{
-    center:[10.50,119.22],
-    zoom:11,
-    minZoom:8,
-    zoomControl:false,
-    attributionControl:true,
-    fadeAnimation:true,
-    zoomAnimation:true,
-    maxBounds:PALAWAN_BOUNDS,
-    maxBoundsViscosity:1.0,
-    worldCopyJump:false
+function locateUser(nearby=false){
+  if(!navigator.geolocation){mapNotice('Location is not available on this device. Search by barangay instead.');return;}
+  if(!map){mapNotice('The map is still loading. You can search for a place meanwhile.');return;}
+  if(!document.body.classList.contains('explore-open')) dockNav('discover');
+  if(currentDest) closeDestSheet(false);
+  if(!exploreIsSide())setExploreSnap(1);
+  const btn=document.getElementById('locateMeBtn');
+  btn.disabled=true; btn.classList.add('locating'); btn.setAttribute('aria-busy','true');
+  mapNotice('Finding your location…');
+  navigator.geolocation.getCurrentPosition(pos=>{
+    btn.disabled=false;btn.classList.remove('locating');btn.setAttribute('aria-busy','false');
+    const {latitude:lat,longitude:lng,accuracy}=pos.coords;
+    if(lat<6.5||lat>12.9||lng<116.6||lng>121){mapNotice('You are outside Palawan. Choose a barangay to explore San Vicente.');return;}
+    if(userLocationMarker)map.removeLayer(userLocationMarker);
+    if(userLocationAccuracyCircle)map.removeLayer(userLocationAccuracyCircle);
+    userLocationAccuracyCircle=L.circle([lat,lng],{radius:accuracy,color:'#0d9488',weight:1,fillOpacity:.08,interactive:false}).addTo(map);
+    userLocationMarker=L.marker([lat,lng],{title:'Your location',icon:L.divIcon({className:'user-location',html:'<span></span>',iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:1100}).addTo(map);
+    exploreState.nearby=!!nearby;
+    renderExploreContent(); syncExploreMap();
+    map.setView([lat,lng],14,{animate:!reducedMotion()});
+    mapNotice(nearby?'Places sorted by straight-line distance, not travel time.':'Your location is shown. Accuracy about '+Math.round(accuracy)+' m.');
+  },err=>{
+    btn.disabled=false;btn.classList.remove('locating');btn.setAttribute('aria-busy','false');
+    mapNotice(err.code===1?'Location permission is off. Enable it in your browser, or search by barangay.':'We could not locate you. Try again or search by barangay.');
+  },{enableHighAccuracy:false,timeout:10000,maximumAge:60000});
+}
+function reducedMotion(){return window.matchMedia('(prefers-reduced-motion: reduce)').matches;}
+let barangayLayer=null;
+let barangayVisible=true;
+async function initMap(){
+  if(mapReady)return;
+  mapReady=true;
+  if(!dataReady)await loadDataFromSupabase();
+  if(typeof L==='undefined'){mapNotice('The map could not load. You can still browse the directory. Reload when your connection returns.');return;}
+  map=L.map('map',{center:[10.50,119.22],zoom:11,minZoom:8,maxZoom:19,zoomControl:false,attributionControl:true,
+    maxBounds:[[6.5,116.6],[12.9,121.0]],maxBoundsViscosity:1,worldCopyJump:false});
+  const attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>';
+  window._mS=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution,maxZoom:19});
+  window._mTerrain=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{attribution:attribution+', SRTM | Style &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',maxNativeZoom:17,maxZoom:19,subdomains:'abc'});
+  window._mSatellite=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+    attribution:'Tiles &copy; Esri — Esri, Maxar, Earthstar Geographics, and the GIS User Community',maxZoom:19});
+  [window._mS,window._mTerrain,window._mSatellite].forEach(layer=>{
+    let errors=0;
+    layer.on('tileerror',()=>{
+      if(!map.hasLayer(layer))return;
+      if(++errors>=3) mapNotice('Some map tiles are unavailable. Try another layer; the place directory still works.');
+    });
+    layer.on('tileload',()=>{errors=0;});
   });
-
-  // No-key basemaps. Street and Dark share the same open OSM source (Dark is
-  // rendered locally with CSS), so the core map never depends on a token.
-  const street = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
-    maxZoom:19
-  });
-  const terrain = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{
-    attribution:'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, style &copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
-    maxZoom:17,
-    subdomains:'abc'
-  });
-  const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
-    attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
-    maxZoom:19
-  });
-
-  street.addTo(map);
-  window._mS=street; window._mTerrain=terrain; window._mSatellite=satellite; window._mView='street';
-  document.body.classList.add('map-light');
-
-  L.control.zoom({position:'bottomright'}).addTo(map);
+  window._mView=null;
+  let preferred='street';
+  try{preferred=sessionStorage.getItem('sanvic_basemap')||'street';barangayVisible=sessionStorage.getItem('sanvic_boundaries')!=='off';}catch(e){}
+  switchMapLayer(preferred);
+  L.control.zoom({position:'topright'}).addTo(map);
   document.getElementById('mapLayerToggle').classList.add('visible');
-  
-  document.getElementById('barangayToggle').classList.add('visible');
-
-  initBarangayLayer();
-  rebuildMarkers();
-
-  map.on('zoomend', applyPinVisibility);
+  initBarangayLayer(); rebuildMarkers();
+  map.on('zoomend',applyPinVisibility);
+  map.on('resize',()=>highlightExplorePlace(exploreState.selected));
+  syncMapViewport();
+  if(document.body.classList.contains('explore-open'))fitExploreResults();
 }
-
-// ─── BARANGAY BOUNDARIES ───
-// Static overlay, sourced once from official PSA/PSGC data (see
-// barangays.geojson.js). Boundaries don't change, so this is baked
-// in rather than admin-editable.
-let barangayLayer = null;
-let barangayVisible = true;
-
-function initBarangayLayer(){
-  if(typeof SAN_VICENTE_BARANGAYS === 'undefined') return;
-  barangayLayer = L.geoJSON(SAN_VICENTE_BARANGAYS, {
-    style: {
-      color: '#e8dcc8',
-      weight: 1.5,
-      opacity: 0.55,
-      fillColor: '#e8dcc8',
-      fillOpacity: 0.04,
-      dashArray: '4,4'
-    },
-    onEachFeature: (feature, layer) => {
-      if(feature.properties && feature.properties.name){
-        layer.bindTooltip(feature.properties.name, {
-          sticky: true,
-          className: 'barangay-tooltip',
-          opacity: 0.95
-        });
-      }
-    }
-  });
-  // Visible by default on first load — it's a quick, clear signal of
-  // what the app covers (San Vicente's barangays), then the user can
-  // hide it via the toggle if they want a cleaner map.
-  barangayLayer.addTo(map);
-  const btn = document.getElementById('barangayToggle');
-  if(btn) btn.classList.add('active');
-}
-
-function toggleBarangayLayer(){
-  if(!barangayLayer || !map) return;
-  const btn = document.getElementById('barangayToggle');
-  barangayVisible = !barangayVisible;
-  if(barangayVisible){
-    barangayLayer.addTo(map);
-    btn.classList.add('active');
-  } else {
-    map.removeLayer(barangayLayer);
-    btn.classList.remove('active');
-  }
-}
-
 function getBarangayStyle(){
-  const isLight = window._mView === 'street' || window._mView === 'terrain';
-  return {
-    color: isLight ? '#06122a' : '#e8dcc8',
-    weight: 1.5,
-    opacity: isLight ? 0.45 : 0.55,
-    fillColor: isLight ? '#06122a' : '#e8dcc8',
-    fillOpacity: isLight ? 0.03 : 0.04,
-    dashArray: '4,4'
-  };
+  const light=['street','terrain'].includes(window._mView);
+  return {color:light?'#34556b':'#d1e3ec',weight:1.3,opacity:.55,fillOpacity:.015,dashArray:'5,5'};
 }
-
-function updateBarangayStyle(){
-  if(!barangayLayer) return;
-  barangayLayer.setStyle(getBarangayStyle());
+function initBarangayLayer(){
+  if(typeof SAN_VICENTE_BARANGAYS==='undefined')return;
+  barangayLayer=L.geoJSON(SAN_VICENTE_BARANGAYS,{style:getBarangayStyle(),onEachFeature:(f,layer)=>{
+    const label=document.createElement('span');label.textContent=f.properties?.name||'Barangay';
+    layer.bindTooltip(label,{sticky:true,className:'barangay-tooltip'});
+  }});
+  if(barangayVisible)barangayLayer.addTo(map);
+  document.getElementById('barangayToggle').checked=barangayVisible;
 }
-
-function switchMapLayer(type,btn){
-  if(!mapReady) return;
-  document.querySelectorAll('.mlt-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-
-  const was = window._mView;
-  if(was === type) return;
-
-  if(was === 'street' || was === 'dark') map.removeLayer(window._mS);
-  else if(was === 'terrain') map.removeLayer(window._mTerrain);
-  else if(was === 'satellite') map.removeLayer(window._mSatellite);
-
-  if(type === 'street' || type === 'dark') window._mS.addTo(map);
-  else if(type === 'terrain') window._mTerrain.addTo(map);
-  else if(type === 'satellite') window._mSatellite.addTo(map);
-
-  window._mView = type;
-  document.body.classList.toggle('map-dark', type === 'dark');
-  document.body.classList.toggle('map-light', type === 'street' || type === 'terrain');
-  document.body.classList.toggle('map-satellite', type === 'satellite');
-  updateBarangayStyle();
-  map.invalidateSize({animate:false});
+function toggleBarangayLayer(){
+  barangayVisible=document.getElementById('barangayToggle').checked;
+  if(barangayLayer && map){if(barangayVisible)barangayLayer.addTo(map);else map.removeLayer(barangayLayer);}
+  try{sessionStorage.setItem('sanvic_boundaries',barangayVisible?'on':'off');}catch(e){}
 }
+function updateBarangayStyle(){barangayLayer?.setStyle(getBarangayStyle());}
+function switchMapLayer(type){
+  if(!map)return;
+  const layers={street:window._mS,dark:window._mS,terrain:window._mTerrain,satellite:window._mSatellite};
+  if(!layers[type])type='street';
+  const previous=layers[window._mView];
+  if(previous && previous!==layers[type])map.removeLayer(previous);
+  if(!map.hasLayer(layers[type]))layers[type].addTo(map);
+  window._mView=type;
+  document.body.classList.toggle('map-dark',type==='dark');
+  document.body.classList.toggle('map-light',type==='street'||type==='terrain');
+  document.body.classList.toggle('map-satellite',type==='satellite');
+  document.querySelectorAll('input[name="basemap"]').forEach(input=>{input.checked=input.value===type;});
+  try{sessionStorage.setItem('sanvic_basemap',type);}catch(e){}
+  updateBarangayStyle(); mapNotice('');
+}
+function toggleLayersMenu(force){
+  const menu=document.getElementById('layersMenu'), trigger=document.getElementById('layersButton');
+  const open=typeof force==='boolean'?force:menu.hidden;
+  menu.hidden=!open;trigger.setAttribute('aria-expanded',String(open));
+  if(open)menu.querySelector('input:checked')?.focus();
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#mapLayerToggle'))toggleLayersMenu(false);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  if(!document.getElementById('layersMenu').hidden){toggleLayersMenu(false);document.getElementById('layersButton').focus();}
+  else if(currentDest){closeDestSheet();}
+  else if(document.body.classList.contains('explore-open')&&!exploreIsSide()){setExploreSnap(1);document.getElementById('esHandle').focus();}
+});
 
 // ─── SINGLE-ACTIVE-LAYER SYSTEM ───
 // At any moment, at most ONE of: destSheet, talaSheet, search-focus is active.
@@ -1225,364 +1152,235 @@ function closeTodaySheet(){
   s.classList.add('hidden');
 }
 
-// ─── EXPLORE DRAWER (permanent places only — time-sensitive stuff belongs in TODAY) ───
-function exploreEntry(){
-  try{ return JSON.parse(localStorage.getItem('sanvic_entry_v1')||'{}')||{}; }catch(e){ return {}; }
-}
-function exploreChoices(){
-  const p = exploreEntry();
-  const arr = [];
-  if(Array.isArray(p.choices)) arr.push(...p.choices);
-  if(Array.isArray(p.moods)) arr.push(...p.moods);
-  if(Array.isArray(p.picks)) arr.push(...p.picks);
-  return arr.map(x=>String(x).toLowerCase());
-}
-let exploreAudience = localStorage.getItem('sanvic_explore_audience') === 'local' ? 'local' : 'visitor';
+// ─── EXPLORE — one shared state for the list, map and selected place ───
+const EXPLORE_SIDE_QUERY = '(min-width:1100px), (min-width:900px) and (orientation:landscape)';
+const EXPLORE_AREAS = typeof SAN_VICENTE_BARANGAYS === 'undefined' ? [] :
+  SAN_VICENTE_BARANGAYS.features.map(f=>({k:f.properties.name}));
+let exploreAudience = 'visitor';
+try{ exploreAudience = localStorage.getItem('sanvic_explore_audience') === 'local' ? 'local' : 'visitor'; }catch(e){}
+const exploreState = {query:'', category:'all', area:'', snap:1, selected:null, scroll:0, nearby:false};
+let exploreReturnView = null;
+let exploreResizeObserver = null;
+function exploreIsSide(){ return window.matchMedia(EXPLORE_SIDE_QUERY).matches; }
 function setExploreAudience(mode){
   exploreAudience = mode === 'local' ? 'local' : 'visitor';
-  localStorage.setItem('sanvic_explore_audience', exploreAudience);
-  document.querySelectorAll('.es-audience-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===exploreAudience));
-  const sub = document.getElementById('esHeadingSub');
-  if(sub) sub.textContent = exploreAudience === 'local'
-    ? 'Find local businesses, services, community updates and places worth sharing.'
-    : 'Find beaches, food, stays and local places across every barangay.';
+  try{localStorage.setItem('sanvic_explore_audience',exploreAudience);}catch(e){}
   renderExploreContent();
 }
 function openExploreSheet(){
   const s = document.getElementById('exploreSheet');
   if(!s) return;
-  renderExploreContent();
-  document.querySelectorAll('.es-audience-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===exploreAudience));
-  const sub = document.getElementById('esHeadingSub');
-  if(sub && exploreAudience==='local') sub.textContent = 'Find local businesses, services, community updates and places worth sharing.';
-  s.classList.add('open');
   document.body.classList.add('explore-open');
-  setExploreSnap(window.innerWidth >= 700 ? 3 : 2);
-  setTimeout(()=>{ if(map) map.invalidateSize({animate:false}); },350);
+  s.classList.add('open');
+  s.removeAttribute('inert');
+  document.getElementById('heroOverlay').classList.add('hidden');
+  document.getElementById('heroFade').classList.add('hidden');
+  setExploreSnap(exploreState.snap);
+  renderExploreContent();
+  requestAnimationFrame(()=>{ document.getElementById('exploreContent').scrollTop=exploreState.scroll; syncExploreMap(); });
 }
 function closeExploreSheet(){
   const s = document.getElementById('exploreSheet');
   if(!s) return;
-  s.classList.remove('open','l1','l2','l3');
+  exploreState.scroll = document.getElementById('exploreContent').scrollTop;
+  s.classList.remove('open');
+  s.setAttribute('inert','');
   document.body.classList.remove('explore-open');
+  syncMapViewport();
 }
 function setExploreSnap(level){
   const s = document.getElementById('exploreSheet');
   if(!s) return;
+  exploreState.snap = Math.max(1,Math.min(3,Number(level)||1));
   s.classList.remove('l1','l2','l3');
-  s.classList.add('l'+level);
-  s.dataset.snap = String(level);
+  s.classList.add('l'+exploreState.snap);
+  s.dataset.snap=String(exploreState.snap);
+  const handle=document.getElementById('esHandle');
+  handle.setAttribute('aria-label',exploreState.snap===3?'Collapse place list':'Expand place list');
+  handle.setAttribute('aria-expanded',String(exploreState.snap>1));
+  syncMapViewport();
 }
-function cycleExploreSnap(){
-  const s = document.getElementById('exploreSheet');
-  if(!s) return;
-  const cur = parseInt(s.dataset.snap||'1',10);
-  setExploreSnap(cur>=3 ? 1 : cur+1);
+function cycleExploreSnap(){ setExploreSnap(exploreState.snap===3?1:exploreState.snap+1); }
+function syncMapViewport(){
+  if(!map) return;
+  const sheet = document.getElementById('exploreSheet');
+  const detail = document.body.classList.contains('place-open');
+  const open = document.body.classList.contains('explore-open');
+  let bottom = 0;
+  if(!exploreIsSide()){
+    if(detail) bottom = document.getElementById('destSheet').getBoundingClientRect().height + 80;
+    else if(open) bottom = sheet.getBoundingClientRect().height + 80;
+  }
+  document.body.style.setProperty('--map-bottom',Math.min(bottom,window.innerHeight-160)+'px');
+  // Desktop map has its own column; Leaflet measures the actual available space.
+  map.invalidateSize({animate:false,pan:false});
 }
-
-// Drag-to-snap on handle (1:1 pointer tracking, snap to nearest)
-(function(){
-  let startY=0, dragging=false, startH=0, sheet=null;
-  const snaps = ()=>{
-    const vh = window.innerHeight;
-    return [168, Math.round(vh*0.5), vh]; // l1, l2, l3 heights in px
-  };
-  function down(e){
-    sheet = document.getElementById('exploreSheet');
-    if(!sheet) return;
-    const t = e.touches ? e.touches[0] : e;
-    startY = t.clientY; dragging = true;
-    startH = sheet.getBoundingClientRect().height;
-    sheet.style.transition = 'none';
-    if(e.cancelable) e.preventDefault();
-  }
-  function move(e){
-    if(!dragging||!sheet) return;
-    const t = e.touches ? e.touches[0] : e;
-    const dy = t.clientY - startY;
-    const h = Math.max(120, Math.min(window.innerHeight, startH - dy));
-    sheet.style.height = h + 'px';
-  }
-  function up(e){
-    if(!dragging||!sheet) return; dragging=false;
-    sheet.style.transition = '';
-    const curH = sheet.getBoundingClientRect().height;
-    const s = snaps();
-    let idx = 0, best = Infinity;
-    s.forEach((v,i)=>{ const d=Math.abs(curH-v); if(d<best){best=d;idx=i;} });
-    sheet.style.height = '';
-    setExploreSnap(idx+1);
-  }
-  document.addEventListener('DOMContentLoaded', ()=>{
-    const h = document.getElementById('esHandle');
-    if(!h) return;
-    h.style.touchAction = 'none';
-    h.addEventListener('touchstart', down, {passive:false});
-    h.addEventListener('touchmove', move, {passive:false});
-    h.addEventListener('touchend', up);
-    h.addEventListener('touchcancel', up);
-    h.addEventListener('mousedown', down);
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
+function exploreResults(){
+  const results=SanvicExplore.filter(destinations,exploreState,catStyle);
+  const localKeys=/food|shop|service|transport|market|stay|cafe|restaurant/i;
+  return results.sort((a,b)=>{
+    if(exploreState.nearby && userLocationMarker){
+      const p=userLocationMarker.getLatLng();
+      const dist=d=>SanvicExplore.hasCoordinates(d)?SanvicExplore.distanceKm(p,d):Infinity;
+      return dist(a)-dist(b);
+    }
+    if(exploreAudience==='local'){
+      const local=d=>localKeys.test(d.category+' '+(catStyle[d.category]?.label||''))?1:0;
+      if(local(a)!==local(b)) return local(b)-local(a);
+    }
+    return Number(!!b.featured)-Number(!!a.featured) || a.name.localeCompare(b.name);
   });
-})();
-
-
-// Editorial seed data — permanent places only.
-const EXPLORE_PLACES = {
-  long_beach_quiet: {emoji:'🌅', name:'Long Beach — quiet stretch', why:'Best sunset canvas', good:'long walks, wild space, scooter stops'},
-  alimanguan: {emoji:'🏄', name:'Alimanguan', why:'Surf + sunset energy', good:'waves, north coast, beach bars'},
-  new_agutaya: {emoji:'🌾', name:'New Agutaya', why:'Empty coast most tourists skip', good:'quiet swims, slow afternoons'},
-  boayan: {emoji:'🌊', name:'Boayan Island', why:'Best when the sea is calm', good:'island hopping, photos, quiet beaches'},
-  sunset_view: {emoji:'📸', name:'Sunset viewpoints', why:'Golden hour hits different up here', good:'photos, first-date pauses'},
-  port_barton_hop: {emoji:'⛵', name:'Port Barton island hopping', why:'The classic three-island loop', good:'lagoons, snorkel, lunch on sand'},
-  poblacion_market: {emoji:'🧺', name:'Poblacion Market', why:'Local life in motion', good:'snacks, seafood, morning wandering'},
-  slow_cafe: {emoji:'☕', name:'Slow cafés in Poblacion', why:'Where mornings actually breathe', good:'brunch, wifi, hammock energy'},
-  wellness: {emoji:'💆', name:'Beachfront massage slots', why:'The kind of hour you remember', good:'post-swim recovery, sunset wind-down'},
-};
-function placeCardHTML(p){
-  return `<div class="es-place" onclick="closeExploreSheet();">
-    <div class="es-place-name">${p.emoji} ${p.name}</div>
-    <div class="es-place-why">${p.why}</div>
-    <div class="es-place-good">Good for: ${p.good}</div>
-  </div>`;
 }
-function forYouSeed(){
-  const c = exploreChoices();
-  const has = (k)=> c.some(x=>x.includes(k));
-  const picks = [];
-  const push = (k)=>{ if(!picks.includes(k)) picks.push(k); };
-  if(has('wild')||has('beach')) { push('long_beach_quiet'); push('alimanguan'); push('new_agutaya'); }
-  if(has('photo')) { push('sunset_view'); push('boayan'); }
-  if(has('chardonnay')||has('private')||has('boat')) { push('port_barton_hop'); push('boayan'); }
-  if(has('market')||has('local')) { push('poblacion_market'); }
-  if(has('massage')||has('brunch')||has('wellness')) { push('wellness'); push('slow_cafe'); }
-  if(!picks.length){ push('long_beach_quiet'); push('boayan'); push('poblacion_market'); push('sunset_view'); }
-  return picks.slice(0,5).map(k=>EXPLORE_PLACES[k]).filter(Boolean);
-}
-
-const EXPLORE_AREAS = [
-  {k:'Poblacion', d:'Practical base, food, transport, local life.', c:[10.539,119.230]},
-  {k:'Port Barton', d:'Social, boats, backpackers, island hopping.', c:[10.454,119.222]},
-  {k:'Long Beach', d:'Huge, open, cinematic, quiet.', c:[10.610,119.180]},
-  {k:'Alimanguan', d:'Surf, sunsets, north coast energy.', c:[10.665,119.156]},
-  {k:'New Agutaya', d:'Empty coast, slow afternoons.', c:[10.700,119.145]},
-  {k:'San Isidro', d:'Farming roads, quiet inland pockets.', c:[10.560,119.260]},
-  {k:'Kemdeng', d:'Green hills, hidden coves.', c:[10.500,119.270]},
-  {k:'Binga', d:'Rural, off-highway, real Palawan quiet.', c:[10.480,119.290]},
-  {k:'Caruray', d:'South frontier, jungle-meets-sea.', c:[10.350,119.300]},
-];
-const EXPLORE_CATEGORIES = [
-  {k:'beaches',l:'🏖 Beaches'},{k:'islands',l:'🏝 Islands'},{k:'nature',l:'💧 Waterfalls'},
-  {k:'food',l:'🍽 Food & Drink'},{k:'nature',l:'🌿 Nature'},{k:'culture',l:'🎭 Culture'},
-  {k:'activities',l:'🚵 Activities'},{k:'wellness',l:'💆 Wellness'},{k:'surf',l:'🏄 Surf'},
-  {k:'transport',l:'🛵 Transport'},{k:'viewpoints',l:'📸 Viewpoints'},
-];
-const EXPLORE_LOCAL_CATEGORIES = [
-  {k:'food',l:'🍽 Eat local'},{k:'stays',l:'🛏 Stays'},{k:'transport',l:'🛵 Transport'},
-  {k:'services',l:'🧰 Services'},{k:'culture',l:'🎭 Community'},{k:'activities',l:'🚤 Tours'},
-  {k:'wellness',l:'💆 Wellness'},{k:'shops',l:'🛍 Shops'},
-];
-const EXPLORE_MOODS = [
-  {t:'I want something quiet', chips:['Wild beaches','Hammock spaces','Calm cafés']},
-  {t:'I want to eat well', chips:['Seafood','Smashed burgers','Local markets','Beach dinners']},
-  {t:'I want adventure', chips:['Jungle tracks','Waterfalls','Surf breaks','Scooter routes']},
-  {t:'I want beauty', chips:['Photo spots','Viewpoints','Sunset locations','Turquoise water']},
-  {t:'I want local life', chips:['Markets','Fiestas','Videoke spots','Fishermen rows']},
-];
-const EXPLORE_COLLECTIONS = [
-  {t:'Places most tourists miss', s:'The corners of San Vicente the guidebooks skipped.'},
-  {t:'Best places before sunset', s:'Where to be an hour before the sky turns.'},
-  {t:'Where to go when Port Barton feels too busy', s:'Quieter shores, ten minutes away.'},
-  {t:'Scooter routes worth getting dusty for', s:'The rides locals take on their day off.'},
-];
-const EXPLORE_NEARBY = [
-  {l:'🍽️ Lunch within 10 minutes', cat:'food'},
-  {l:'🌅 Sunset spot nearby', cat:'viewpoints'},
-  {l:'🛵 Scooter route close to you', cat:'transport'},
-  {l:'☕ Coffee nearby', cat:'food'},
-];
-const EXPLORE_SITUATIONAL = ['Open Now','Good for Sunset','Good when Raining','Hard to Reach','Easy to Reach','Social Travelers','Free','Bookable'];
-
-const FOR_YOU_VIBES = [
-  "San Vicente's shades",
-  "Salty hair, slow hours",
-  "Where the map fades",
-  "Off the grid, on the pulse",
-  "Low-tide secrets",
-  "Raw and unwritten",
-];
-const FOR_YOU_VIBE = FOR_YOU_VIBES[Math.floor(Math.random()*FOR_YOU_VIBES.length)];
-
-function forYouCards(){
-  const list = Array.isArray(destinations) ? destinations.slice() : [];
-  list.sort((a,b)=> (b.featured?1:0) - (a.featured?1:0));
-  const picks = list.slice(0, 8);
-  if(picks.length) return picks;
-  return forYouSeed().map((p,i)=>({ id:'seed-'+i, name:p.name, image:'', description:p.why, barangay:'', category:'nature', stats:{} }));
-}
-
-function nearbyCards(){
-  const flat = [];
-  try {
-    const byB = window.nearbyPlacesByBarangay || {};
-    Object.keys(byB).forEach(b=>{
-      (byB[b]||[]).forEach(n=> flat.push(Object.assign({ barangay:b }, n)));
-    });
-  } catch(e){}
-  return flat.slice(0, 10);
-}
-
-function svCardImage(d){
-  const img = d && d.image ? d.image : '';
-  if(img) return `<img src="${escT(img)}" alt="${escT(d.name||'')}" loading="lazy" onerror="this.style.display='none';this.parentNode.classList.add('sv-noimg')"/>`;
-  const glyph = (d && d.icon) ? d.icon : '📍';
-  return `<div class="sv-noimg-glyph">${escT(glyph)}</div>`;
-}
-
-function forYouCardHTML(d){
-  const cat = d.category ? String(d.category).toUpperCase() : '';
-  const bar = d.barangay || '';
-  const rating = d.stats && d.stats.rating ? d.stats.rating : '';
-  const idAttr = escT(String(d.id));
-  return `<button class="sv-card" data-dest-id="${idAttr}" onclick="(function(el){var x=el.getAttribute('data-dest-id');var f=(window.destinations||[]).find(function(z){return String(z.id)===x});if(f&&typeof openDest==='function'){openDest(f);}})(this)">
-    <div class="sv-card-media${d.image?'':' sv-noimg'}">${svCardImage(d)}</div>
-    <div class="sv-card-overlay"></div>
-    ${cat ? `<span class="sv-card-tag">${escT(cat)}</span>` : ''}
-    <div class="sv-card-body">
-      <div class="sv-card-title">${escT(d.name||'')}</div>
-      <div class="sv-card-meta">${bar?`<span>📍 ${escT(bar)}</span>`:''}${rating?`<span>★ ${escT(rating)}</span>`:''}</div>
-    </div>
+function explorePlaceCard(d){
+  const cat=catStyle[d.category] || {label:d.category||'Place',icon:'map-pin'};
+  const photo=SanvicExplore.safeUrl(d.image,true);
+  const selected=String(exploreState.selected)===String(d.id);
+  const distance=exploreState.nearby && userLocationMarker && SanvicExplore.hasCoordinates(d)
+    ? SanvicExplore.distanceKm(userLocationMarker.getLatLng(),d).toFixed(1)+' km straight-line' : '';
+  return `<button class="explore-result${selected?' selected':''}" data-place-id="${escT(d.id)}" aria-pressed="${selected}" onclick="selectExplorePlace(this.dataset.placeId)">
+    <span class="explore-result-image">${photo?`<img src="${escT(photo)}" alt="${escT(d.name)}" loading="lazy" onerror="this.hidden=true">`:''}<span class="image-placeholder" aria-hidden="true">${lucideSvg(cat.icon||'map-pin',24)}</span></span>
+    <span class="explore-result-copy"><span class="result-category">${escT(cat.label)}</span><strong>${escT(d.name)}</strong><span class="result-area">${lucideSvg('map-pin',13)} ${escT(d.barangay||'San Vicente')}</span>
+    ${distance||d.stats?.travel?`<span class="result-access">${escT(distance||d.stats.travel)}</span>`:''}</span><span class="result-arrow" aria-hidden="true">${lucideSvg('chevron-right',17)}</span>
   </button>`;
 }
-
-function nearbyCardHTML(n){
-  const glyph = n.icon || '📍';
-  return `<button class="sv-card sv-card-sm" onclick="filterCategory('${escT(n.category||'')}');setExploreSnap(1);">
-    <div class="sv-card-media sv-noimg"><div class="sv-noimg-glyph">${escT(glyph)}</div></div>
-    <div class="sv-card-overlay"></div>
-    <div class="sv-card-body">
-      <div class="sv-card-title">${escT(n.name||'')}</div>
-      <div class="sv-card-meta">${n.barangay?`<span>📍 ${escT(n.barangay)}</span>`:''}${n.distance_label?`<span>${escT(n.distance_label)}</span>`:''}</div>
-    </div>
-  </button>`;
-}
-
 function renderExploreContent(){
-  const forYou = forYouCards();
-  const nearby = nearbyCards();
-  const isLocal = exploreAudience === 'local';
-  const categories = isLocal ? EXPLORE_LOCAL_CATEGORIES : EXPLORE_CATEGORIES;
-
-  const rib = document.getElementById('esRibbon');
-  if(rib){
-    rib.innerHTML = [isLocal ? 'Local essentials' : 'For You', ...forYou.slice(0,4).map(p=>String(p.name||'').split('—')[0].trim())]
-      .map((label,i)=>`<button class="es-chip${i===0?' accent':''}" onclick="setExploreSnap(2)">${escT(label)}</button>`).join('');
-  }
-
-  const foryouHTML = `
-    <section class="es-section">
-      <div class="es-kicker">${isLocal ? 'Local directory' : 'For You'}</div>
-      <h3 class="es-title">${isLocal ? 'Businesses and places around town' : escT(FOR_YOU_VIBE)}</h3>
-      <div class="sv-carousel">${forYou.map(forYouCardHTML).join('')}</div>
-    </section>`;
-
-  const nearbyHTML = nearby.length ? `
-    <section class="es-section">
-      <div class="es-kicker">Nearby From You</div>
-      <h3 class="es-title">Close to where you are</h3>
-      <div class="sv-carousel">${nearby.map(nearbyCardHTML).join('')}</div>
-    </section>` : `
-    <section class="es-section">
-      <div class="es-kicker">Nearby From You</div>
-      <h3 class="es-title">Close to where you are</h3>
-      <div class="es-grid">
-        ${EXPLORE_NEARBY.map(n=>`<button class="es-tile" onclick="filterCategory('${n.cat}');setExploreSnap(1);"><div class="es-tile-t">${n.l}</div></button>`).join('')}
-      </div>
-    </section>`;
-
-  const moodsHTML = `
-    <section class="es-section">
-      <div class="es-kicker">By Mood</div>
-      <h3 class="es-title">What kind of day is it?</h3>
-      ${EXPLORE_MOODS.map(m=>`
-        <div class="es-mood">
-          <div class="es-mood-t">${m.t}</div>
-          <div class="es-mood-chips">${m.chips.map(c=>`<span class="es-chip">${c}</span>`).join('')}</div>
-        </div>`).join('')}
-    </section>`;
-
-  const collectionsHTML = `
-    <section class="es-section">
-      <div class="es-kicker">TALA Collections</div>
-      <h3 class="es-title">Resident wisdom, quietly kept</h3>
-      <div class="es-grid">
-        ${EXPLORE_COLLECTIONS.map(c=>`<div class="es-tile"><div class="es-tile-t">${c.t}</div><div class="es-tile-s">${c.s}</div></div>`).join('')}
-      </div>
-    </section>`;
-
-  const areasHTML = `
-    <section class="es-section">
-      <div class="es-kicker">Areas / Barangays</div>
-      <h3 class="es-title">San Vicente's shades</h3>
-      <div class="es-grid">
-        ${EXPLORE_AREAS.map(a=>`<button class="es-tile" onclick="if(window.map){map.flyTo([${a.c[0]},${a.c[1]}],13,{duration:1});} setExploreSnap(1);"><div class="es-tile-t">${a.k}</div><div class="es-tile-s">${a.d}</div></button>`).join('')}
-      </div>
-    </section>`;
-
-  const catsHTML = `
-    <section class="es-section">
-      <div class="es-kicker">${isLocal ? 'Local shortcuts' : 'Browse by category'}</div>
-      <h3 class="es-title">${isLocal ? 'What do you need nearby?' : 'What are you looking for?'}</h3>
-      <div class="es-category-grid">
-        ${categories.slice(0,8).map(c=>`<button class="es-category" onclick="filterCategory('${c.k}');setExploreSnap(1);"><span class="es-category-icon">${c.l.split(' ')[0]}</span><span>${c.l.substring(c.l.indexOf(' ')+1)}</span></button>`).join('')}
-      </div>
-    </section>`;
-
-  const communityHTML = isLocal ? `
-    <section class="es-section es-community-card">
-      <div class="es-kicker">Community</div>
-      <h3 class="es-title">Share what is happening locally</h3>
-      <p class="es-section-copy">Post an update, find a tribe, or recommend a missing business to the SANVIC team.</p>
-      <div class="es-action-row">
-        <button class="es-action" onclick="dockNav('pulse')">Community updates</button>
-        <button class="es-action" onclick="closeExploreSheet();openTalaSheet();setTimeout(()=>{var i=document.getElementById('talaInput');if(i){i.value='I want to recommend a local place';i.focus();}},100)">Recommend a place</button>
-      </div>
-    </section>` : `
-    <section class="es-section es-community-card">
-      <div class="es-kicker">Explore more</div>
-      <h3 class="es-title">Turn the map into a trail</h3>
-      <p class="es-section-copy">Discover hidden spots, collect badges and support participating local places.</p>
-      <div class="es-action-row"><button class="es-action" onclick="closeExploreSheet();openHuntPanel()">Open The Hunt</button></div>
-    </section>`;
-
-  const allPlacesList = Object.values(EXPLORE_PLACES).map(placeCardHTML).join('');
-  const allPlacesHTML = `
-    <section class="es-section">
-      <div class="es-kicker">All Places</div>
-      <h3 class="es-title">All places & experiences</h3>
-      <div class="es-filters">
-        ${EXPLORE_SITUATIONAL.map(f=>`<button class="es-fchip" onclick="this.classList.toggle('on')">${f}</button>`).join('')}
-      </div>
-      ${allPlacesList}
-    </section>`;
-
-  const body = document.getElementById('exploreContent');
-  if(body){
-    body.innerHTML = catsHTML + foryouHTML + areasHTML + nearbyHTML + communityHTML;
-  }
-}
-
-function filterExploreResults(raw){
-  const query = String(raw||'').trim().toLowerCase();
-  const body = document.getElementById('exploreContent');
+  const body=document.getElementById('exploreContent');
   if(!body) return;
-  if(!query){ renderExploreContent(); return; }
-  const matches = (Array.isArray(destinations) ? destinations : []).filter(d=>
-    [d.name,d.barangay,d.category,d.description].some(v=>String(v||'').toLowerCase().includes(query))
-  );
-  body.innerHTML = `<section class="es-section"><div class="es-kicker">Search results</div><h3 class="es-title">${matches.length} place${matches.length===1?'':'s'} found</h3>${matches.length?`<div class="sv-carousel">${matches.map(forYouCardHTML).join('')}</div>`:`<div class="es-empty">No places match “${escT(raw)}”. Try a barangay or category.</div>`}</section>`;
+  document.querySelectorAll('.es-audience-btn').forEach(b=>{
+    const active=b.dataset.mode===exploreAudience;
+    b.classList.toggle('active',active); b.setAttribute('aria-pressed',String(active));
+  });
+  const keys=Object.keys(catStyle).filter(k=>destinations.some(d=>d.category===k));
+  // Show real categories only; the admin remains free to add or rename them.
+  const ribbon=document.getElementById('esRibbon');
+  ribbon.innerHTML=`<button class="es-chip ${exploreState.category==='all'?'accent':''}" data-category="all" aria-pressed="${exploreState.category==='all'}" onclick="selectExploreCategory('all')">All places</button>`+
+    keys.map(k=>`<button class="es-chip ${exploreState.category===k?'accent':''}" data-category="${escT(k)}" aria-pressed="${exploreState.category===k}" onclick="selectExploreCategory(this.dataset.category)">${lucideSvg(catStyle[k].icon||'map-pin',16)}${escT(catStyle[k].label)}</button>`).join('');
+  const areas=Array.from(new Set(destinations.map(d=>d.barangay).filter(Boolean))).sort();
+  const area=document.getElementById('esArea');
+  area.innerHTML='<option value="">All barangays</option>'+areas.map(b=>`<option value="${escT(b)}">${escT(b)}</option>`).join('');
+  area.value=exploreState.area;
+  const matches=exploreResults();
+  document.getElementById('esResultCount').textContent=destinationsSource==='loading'?'Loading places…':matches.length+' place'+(matches.length===1?'':'s');
+  document.getElementById('esReset').hidden=!exploreState.query && exploreState.category==='all' && !exploreState.area && !exploreState.nearby;
+  document.getElementById('esNearby').setAttribute('aria-pressed',String(exploreState.nearby));
+  const status=document.getElementById('esDataStatus');
+  status.hidden=destinationsSource==='supabase';
+  status.innerHTML=destinationsSource==='fallback'
+    ? 'Directory unavailable. These are sample places, not verified live listings. <button onclick="retryExploreData()">Retry</button>'
+    : 'Loading the local directory…';
+  if(destinationsSource==='loading'){ body.innerHTML='<div class="explore-empty" role="status">Finding places across San Vicente…</div>'; return; }
+  body.innerHTML=matches.length?matches.map(explorePlaceCard).join(''):
+    `<div class="explore-empty">${lucideSvg('map-pin',32)}<h3>${destinations.length?'No matching places yet':'The directory is taking shape'}</h3><p>${destinations.length?'Try a different name, category or barangay.':'Local businesses and tourist places will appear here as they are added.'}</p>${destinations.length?'<button class="es-action" onclick="resetExploreFilters()">Show all places</button>':''}</div>`;
 }
+function syncExploreMap(){
+  if(!map) return;
+  const ids=new Set(exploreResults().filter(SanvicExplore.hasCoordinates).map(d=>String(d.id)));
+  allMarkers.forEach(m=>{ if(!ids.has(String(m._d.id))) map.removeLayer(m); });
+  activeMarkerSet=allMarkers.filter(m=>ids.has(String(m._d.id)));
+  pinVisibilityOverride=true;
+  applyPinVisibility();
+  highlightExplorePlace(exploreState.selected);
+}
+function filterExploreResults(raw){
+  exploreState.query=String(raw||'');
+  renderExploreContent(); syncExploreMap();
+}
+function selectExploreCategory(category){
+  exploreState.category=category;
+  renderExploreContent(); syncExploreMap(); fitExploreResults();
+}
+function selectExploreArea(area){
+  exploreState.area=area;
+  renderExploreContent(); syncExploreMap(); fitExploreResults();
+}
+function resetExploreFilters(){
+  Object.assign(exploreState,{query:'',category:'all',area:'',nearby:false});
+  document.getElementById('esSearchInput').value='';
+  renderExploreContent(); syncExploreMap(); fitExploreResults();
+}
+function fitExploreResults(){
+  if(!map) return;
+  const coords=exploreResults().filter(SanvicExplore.hasCoordinates).map(d=>[Number(d.lat),Number(d.lng)]);
+  if(!coords.length) return;
+  if(!exploreIsSide()) setExploreSnap(1);
+  syncMapViewport();
+  const bottom=exploreIsSide()?90:Math.min(document.getElementById('exploreSheet').getBoundingClientRect().height+100,window.innerHeight-180);
+  map.fitBounds(coords,{paddingTopLeft:[48,100],paddingBottomRight:[70,bottom],maxZoom:14,animate:false});
+}
+function selectExplorePlace(id){
+  const d=destinations.find(d=>String(d.id)===String(id));
+  if(d) openDest(d);
+}
+function highlightExplorePlace(id){
+  exploreState.selected=id;
+  allMarkers.forEach(m=>{
+    const selected=String(m._d.id)===String(id);
+    m.getElement()?.classList.toggle('selected',selected);
+    m.setZIndexOffset(selected?1000:0);
+  });
+  document.querySelectorAll('.explore-result').forEach(el=>{
+    const selected=el.dataset.placeId===String(id);
+    el.classList.toggle('selected',selected); el.setAttribute('aria-pressed',String(selected));
+  });
+}
+async function retryExploreData(){
+  destinationsSource='loading'; renderExploreContent();
+  await loadDataFromSupabase(); rebuildMarkers(); renderExploreContent(); syncExploreMap();
+}
+function askTalaFromExplore(){
+  closeAllPanels(); openTalaSheet();
+  const input=document.getElementById('talaInput');
+  input.value=exploreAudience==='local'?'Help me find a local business in San Vicente':'Help me plan a day exploring San Vicente';
+  input.focus();
+}
+function recommendExplorePlace(){
+  closeAllPanels(); openTalaSheet();
+  const input=document.getElementById('talaInput');
+  input.value='I would like to recommend a local place. How can I share its name, barangay and location with the SANVIC team?';
+  input.focus();
+  // This is assistance, not a submission form. Never imply it saves a listing.
+}
+function initExploreInteractions(){
+  const sheet=document.getElementById('exploreSheet'), handle=document.getElementById('esHandle');
+  let drag=null, moved=false;
+  handle.addEventListener('pointerdown',e=>{
+    if(exploreIsSide()) return;
+    drag={y:e.clientY,height:sheet.getBoundingClientRect().height}; moved=false;
+    handle.setPointerCapture(e.pointerId);
+    sheet.style.transition='none';
+  });
+  handle.addEventListener('pointermove',e=>{
+    if(!drag) return;
+    moved=moved||Math.abs(drag.y-e.clientY)>5;
+    sheet.style.setProperty('height',Math.max(180,Math.min(window.innerHeight-84,drag.height+drag.y-e.clientY))+'px','important');
+  });
+  function release(){
+    if(!drag) return;
+    const h=sheet.getBoundingClientRect().height;
+    sheet.style.height=''; sheet.style.transition='';
+    if(moved){
+      const heights=[Math.min(232,window.innerHeight*.4),window.innerHeight*.60,window.innerHeight-84];
+      let best=0; heights.forEach((v,i)=>{if(Math.abs(v-h)<Math.abs(heights[best]-h))best=i;});
+      setExploreSnap(best+1);
+    }
+    drag=null;
+  }
+  handle.addEventListener('pointerup',release);
+  handle.addEventListener('pointercancel',release);
+  handle.addEventListener('click',()=>{if(!moved)cycleExploreSnap(); moved=false;});
+  document.getElementById('esSearchInput').addEventListener('focus',()=>{if(!exploreIsSide())setExploreSnap(2);});
+  document.getElementById('exploreContent').addEventListener('scroll',e=>{exploreState.scroll=e.target.scrollTop;},{passive:true});
+  exploreResizeObserver=new ResizeObserver(syncMapViewport);
+  exploreResizeObserver.observe(sheet); exploreResizeObserver.observe(document.getElementById('destSheet'));
+  window.addEventListener('resize',syncMapViewport,{passive:true});
+  window.visualViewport?.addEventListener('resize',()=>{
+    const keyboard=window.innerHeight-window.visualViewport.height;
+    document.body.style.setProperty('--keyboard-inset',keyboard>120?keyboard+'px':'0px');
+    syncMapViewport();
+  });
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',initExploreInteractions,{once:true});
+else initExploreInteractions();
 
 // ─── TODAY DAILY DATA (demo seed; DB wiring is a follow-up) ───
 const TODAY_DATA = {
@@ -2855,118 +2653,111 @@ function buildCarouselImages(d){
   return [...new Set(images)];
 }
 
-function openDest(d) {
-  currentDest = d;
-  const cat = catStyle[d.category];
+function openDest(d,recordHistory=true){
+  if(!d)return;
+  if(!document.body.classList.contains('explore-open')){
+    closeAllPanels(); openExploreSheet(); setActiveDock('discover');
+  }
+  if(!exploreReturnView){
+    exploreReturnView={center:map?.getCenter(),zoom:map?.getZoom(),snap:exploreState.snap,scroll:document.getElementById('exploreContent').scrollTop};
+  }
+  currentDest=d;
+  highlightExplorePlace(d.id);
+  if(recordHistory){
+    const state={sanvic:true,tab:'discover',place:String(d.id)};
+    if(history.state?.place)history.replaceState(state,'');else history.pushState(state,'');
+  }
+  const category=catStyle[d.category]||{label:d.category||'Place',color:'#0d9488',bg:'rgba(13,148,136,.15)'};
+  const stats=d.stats||{};
+  const photo=document.getElementById('dePhoto');
+  const media=document.getElementById('deMedia');
+  const images=buildCarouselImages(d).map(u=>SanvicExplore.safeUrl(u,true)).filter(Boolean);
+  photo.classList.remove('has-carousel');photo.onclick=null;
+  photo.removeAttribute('tabindex');photo.removeAttribute('role');photo.removeAttribute('aria-label');photo.onkeydown=null;
+  media.replaceChildren();
+  const placeholder=document.createElement('div');placeholder.className='detail-image-placeholder';
+  placeholder.innerHTML=lucideSvg(category.icon||'map-pin',36)+'<span>San Vicente</span>';media.appendChild(placeholder);
+  const video=SanvicExplore.safeUrl(d.videoUrl);
+  if(video && d.videoType==='youtube' && getYoutubeId(video)){
+    const frame=document.createElement('iframe');frame.src='https://www.youtube.com/embed/'+encodeURIComponent(getYoutubeId(video))+'?playsinline=1&rel=0';
+    frame.title=d.name+' video';frame.allow='encrypted-media; picture-in-picture';frame.allowFullscreen=true;media.appendChild(frame);
+  }else if(video && d.videoType==='upload'){
+    const el=document.createElement('video');el.src=video;el.controls=true;el.playsInline=true;el.preload='metadata';if(images[0])el.poster=images[0];media.appendChild(el);
+  }else if(images[0]){
+    const img=document.createElement('img');img.src=images[0];img.alt=d.name;
+    img.onerror=()=>{img.hidden=true;photo.classList.remove('has-carousel');};media.appendChild(img);
+    if(images.length>1){
+      photo.classList.add('has-carousel');photo.setAttribute('role','button');photo.tabIndex=0;photo.setAttribute('aria-label','View '+images.length+' photos of '+d.name);
+      photo.onclick=()=>openCarousel(images,0);
+      photo.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openCarousel(images,0);}};
+    }
+  }
+  document.getElementById('deTitle').textContent=d.name;
+  document.getElementById('dcName').textContent=d.name;
+  document.getElementById('deBarangay').textContent=d.barangay?'Barangay '+d.barangay:'San Vicente, Palawan';
+  const cat=document.getElementById('deCat');cat.textContent=category.label;cat.style.background=category.bg;cat.style.color=category.color;
+  document.getElementById('deStats').innerHTML=[
+    stats.travel?['Access',stats.travel]:null,
+    stats.season?['Season',stats.season]:null,
+    stats.rating?['Listed rating',stats.rating+' · source not supplied']:null
+  ].filter(Boolean).map(([label,value])=>`<div class="dest-exp-stat"><strong>${escT(label)}</strong><span>${escT(value)}</span></div>`).join('');
+  const desc=document.getElementById('deDesc');desc.textContent=d.description||'More details will be added by the local team.';
+  desc.classList.remove('collapsed');document.getElementById('deReadMore').style.display='none';
+  const tip=document.getElementById('deTip');tip.textContent=d.tip||'';tip.hidden=!d.tip;
+  const directions=document.getElementById('deDirections');
+  directions.disabled=!SanvicExplore.hasCoordinates(d);
+  directions.onclick=()=>window.open('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(d.lat+','+d.lng),'_blank','noopener,noreferrer');
+  const gbp=document.getElementById('deGbp'), url=SanvicExplore.safeUrl(d.googleBusinessUrl);
+  gbp.style.display=url?'':'none';gbp.onclick=()=>{if(url)window.open(url,'_blank','noopener,noreferrer');};
+  const save=document.getElementById('deSaveBtn');save.setAttribute('aria-label','Save '+d.name);
+  save.disabled=destinationsSource!=='supabase';
+  save.title=save.disabled?'Sample places cannot be saved':'Save this place';
   refreshDestSaveButton(d.id);
-
-  // Compact
-  document.getElementById('dcImg').src = d.image;
-  document.getElementById('dcName').textContent = d.name;
-  document.getElementById('dcRating').innerHTML = `<span class="ds"></span>${d.stats.rating}`;
-  document.getElementById('dcTravel').innerHTML = `<span class="ds"></span>${d.stats.travel}`;
-
-  // Expanded — video replaces photo when present, autoplays muted
-  // (browsers block unmuted autoplay; the player's own controls let
-  // the visitor unmute with one tap).
-  const mediaEl = document.getElementById('deMedia');
-  const allImages = buildCarouselImages(d);
-  if(d.videoUrl && d.videoType === 'youtube'){
-    const yid = getYoutubeId(d.videoUrl);
-    mediaEl.innerHTML = yid
-      ? `<iframe src="https://www.youtube.com/embed/${yid}?autoplay=1&mute=1&playsinline=1&rel=0" title="${d.name} video" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`
-      : `<img src="${d.image}" alt="${d.name}">`;
-  } else if(d.videoUrl && d.videoType === 'upload'){
-    mediaEl.innerHTML = `<video src="${d.videoUrl}" autoplay muted loop controls playsinline preload="auto" poster="${d.image||''}"></video>`;
-    const vEl = mediaEl.querySelector('video');
-    if(vEl) vEl.play().catch(()=>{ /* autoplay blocked — controls still let them tap play */ });
-  } else {
-    mediaEl.innerHTML = `<img src="${d.image}" alt="${d.name}">`;
-    if(allImages.length > 1){
-      const photoEl = document.getElementById('dePhoto');
-      photoEl.classList.add('has-carousel');
-      photoEl.onclick = function(){ openCarousel(allImages, 0); };
-    }
-  }
-  document.getElementById('dePhoto').style.background = '';
-  document.getElementById('deTitle').textContent = d.name;
-  const catPill = document.getElementById('deCat');
-  catPill.textContent = cat.label; catPill.style.background=cat.bg; catPill.style.color=cat.color;
-
-  document.getElementById('deStats').innerHTML = `
-    <div class="dest-exp-stat"><span class="dot"></span>${d.stats.rating} rating</div>
-    <div class="dest-exp-stat"><span class="dot"></span>${d.stats.travel}</div>
-    <div class="dest-exp-stat"><span class="dot"></span>${d.stats.temp}</div>
-    <div class="dest-exp-stat"><span class="dot"></span>${d.stats.season}</div>`;
-
-  const descEl = document.getElementById('deDesc');
-  descEl.textContent = d.description;
-  descEl.classList.add('collapsed');
-  document.getElementById('deReadMore').style.display = '';
-  document.getElementById('deTip').textContent = d.tip;
-
-  document.getElementById('deDirections').onclick = ()=>{
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(d.lat + ',' + d.lng)}&travelmode=driving`;
-    window.open(url,'_blank','noopener');
+  document.getElementById('deAskTala').onclick=()=>{
+    closeDestSheet(false);openTalaSheet();
+    const input=document.getElementById('talaInput');input.value='Tell me about '+d.name+(d.barangay?' in '+d.barangay:'')+'. What should I know before visiting?';input.focus();
   };
-
-  const gbpBtn = document.getElementById('deGbp');
-  if(gbpBtn){
-    if(d.googleBusinessUrl){
-      gbpBtn.style.display = '';
-      gbpBtn.onclick = ()=>{ window.open(d.googleBusinessUrl,'_blank','noopener'); };
-    } else {
-      gbpBtn.style.display = 'none';
-    }
-  }
-
-  document.getElementById('deAskTala').onclick = ()=>{
-    closeDestSheet(true);
-    const name = d.name;
-    setTimeout(()=>{
-      openTalaSheet();
-      addMsg('user',`Tell me about ${name}`);
-      answerTala(name);
-    }, 300);
-  };
-
-  // Close everything else
   closeTalaSheet(false);
-
-  // Show compact sheet
-  const sheet = document.getElementById('destSheet');
-  sheet.style.transform = '';
-  sheet.className = 'dest-sheet closed';
-  document.getElementById('destOverlay').classList.add('active');
-  closeDiscoverPanel();
-  // Hide hero so map is interactive
-  document.getElementById('heroOverlay').classList.add('hidden');
-  document.getElementById('heroFade').classList.add('hidden');
-  if(map) map.flyTo([d.lat,d.lng],13,{duration:1});
-}
-
-function toggleDestSheet() {
-  const sheet = document.getElementById('destSheet');
-  sheet.style.transform = '';
-  if(sheet.classList.contains('closed')){
-    sheet.className = 'dest-sheet expanded';
-  } else {
-    sheet.className = 'dest-sheet closed';
-  }
-}
-
-function closeDestSheet(animate) {
-  const sheet = document.getElementById('destSheet');
-  sheet.style.transform = '';
-  sheet.className = 'dest-sheet';
+  const sheet=document.getElementById('destSheet');sheet.className='dest-sheet expanded';sheet.removeAttribute('inert');
+  sheet.setAttribute('role','region');sheet.setAttribute('aria-labelledby','deTitle');sheet.style.transform='';
   document.getElementById('destOverlay').classList.remove('active');
-  closeAroundMePanel();
-  currentDest = null;
-  // Show tala orb again
-  if(!talaOpen) document.getElementById('talaOrbWrap').classList.remove('hidden');
-  // Restore hero
-  document.getElementById('heroOverlay').classList.remove('hidden');
-  document.getElementById('heroFade').classList.remove('hidden');
+  document.body.classList.add('place-open');
+  document.getElementById('exploreSheet').setAttribute('inert','');
+  document.getElementById('heroOverlay').classList.add('hidden');document.getElementById('heroFade').classList.add('hidden');
+  document.querySelector('.dest-expanded').scrollTop=0;
+  syncMapViewport();
+  if(map && SanvicExplore.hasCoordinates(d)){
+    map.setView([d.lat,d.lng],Math.max(13,map.getZoom()),{animate:false});
+    if(!exploreIsSide())map.panBy([0,Math.min(window.innerHeight*.25,190)],{animate:false});
+  }
+  document.getElementById('detailBack').focus({preventScroll:true});
+}
+function toggleDestSheet(){
+  // Details are a single readable view. Explore owns the mobile snap states.
+  if(currentDest)document.querySelector('.dest-expanded').scrollTo({top:0,behavior:reducedMotion()?'auto':'smooth'});
+}
+function closeDestSheet(restore=true){
+  const sheet=document.getElementById('destSheet');
+  const wasOpen=!!currentDest;
+  sheet.style.transform='';sheet.className='dest-sheet';sheet.setAttribute('inert','');
+  document.getElementById('deMedia').replaceChildren(); // stop video/audio
+  document.getElementById('destOverlay').classList.remove('active');
+  document.body.classList.remove('place-open');
+  if(document.getElementById('exploreSheet').classList.contains('open'))document.getElementById('exploreSheet').removeAttribute('inert');
+  closeAroundMePanel();currentDest=null;
+  if(!talaOpen)document.getElementById('talaOrbWrap').classList.remove('hidden');
+  if(restore && wasOpen && exploreReturnView){
+    const previous=exploreReturnView;
+    setExploreSnap(previous.snap);
+    document.getElementById('exploreContent').scrollTop=previous.scroll;
+    syncMapViewport();
+    if(map && previous.center)map.setView(previous.center,previous.zoom,{animate:false});
+    const selected=Array.from(document.querySelectorAll('.explore-result')).find(el=>el.dataset.placeId===String(exploreState.selected));
+    (selected||document.getElementById('esSearchInput')).focus({preventScroll:true});
+  }
+  exploreReturnView=null;
+  if(!handlingExploreHistory && history.state?.place)history.replaceState({sanvic:true,tab:'discover'},'');
+  schedulePanelOpen();
 }
 
 // ─── DISCOVER + NAVIGATION ───
@@ -3218,10 +3009,14 @@ function dismissDockIntro(){
   document.getElementById('dockCoachmark')?.classList.remove('show');
   localStorage.setItem(DOCK_SEEN_KEY,'1');
 }
+let handlingExploreHistory=false;
 function dockNav(tab){
   dismissDockIntro();
-  document.querySelectorAll('.dock-item').forEach(d=>d.classList.remove('active'));
-  document.querySelector(`.dock-item[data-tab="${tab}"]`).classList.add('active');
+  setActiveDock(tab);
+  if(!handlingExploreHistory){
+    if(!history.state?.sanvic)history.replaceState({sanvic:true,tab},'');
+    else if(history.state.tab!==tab)history.pushState({sanvic:true,tab},'');
+  }
 
   switch(tab){
     case 'map': closeAllPanels(); closeDiscoverPanel(); document.getElementById('heroOverlay').classList.remove('hidden'); document.getElementById('heroFade').classList.remove('hidden'); if(map){ pinVisibilityOverride=false; activeMarkerSet=allMarkers; map.flyTo([10.50,119.22],11,{duration:1}); applyPinVisibility(); } openTodaySheet(); break;
@@ -3232,6 +3027,23 @@ function dockNav(tab){
     case 'hunt': closeAllPanels(); closeDiscoverPanel(); openHuntPanel(); break;
   }
 }
+
+function setActiveDock(tab){
+  document.body.dataset.activeTab=tab;
+  document.querySelectorAll('.dock-item').forEach(d=>{
+    const active=d.dataset.tab===tab || (tab==='hunt'&&d.dataset.tab==='discover');
+    d.classList.toggle('active',active);
+    if(active)d.setAttribute('aria-current','page');else d.removeAttribute('aria-current');
+  });
+}
+window.addEventListener('popstate',e=>{
+  if(!e.state?.sanvic)return;
+  handlingExploreHistory=true;
+  if(currentDest)closeDestSheet(true);
+  dockNav(e.state.tab||'discover');
+  if(e.state.place){const d=destinations.find(x=>String(x.id)===e.state.place);if(d)openDest(d,false);}
+  handlingExploreHistory=false;
+});
 
 function filterCategory(cat){
   if(!mapReady) return;
@@ -3269,8 +3081,8 @@ window.addEventListener('scroll',()=>{
 
 // ─── INIT ───
 window.addEventListener('load',()=>{
-  setTimeout(()=>{document.getElementById('splash').classList.add('hidden');},5000);
-  setTimeout(animPlaceholder,5600);
+  setTimeout(()=>{document.getElementById('splash').classList.add('hidden');},650);
+  setTimeout(animPlaceholder,1200);
   setTimeout(loadVoices,800);
   initAuth();
   initHeroWeather();
@@ -3287,7 +3099,7 @@ window.addEventListener('load',()=>{
       },400);
       setTimeout(dismissDockIntro,5200); // auto-dismiss if user never taps
     }
-  },5200);
+  },750);
 });
 
 // ═══════════════════════════════════════════════════════

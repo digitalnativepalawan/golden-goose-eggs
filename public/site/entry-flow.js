@@ -142,6 +142,12 @@
   document.addEventListener('touchend', function(e){ if(e.target && e.target.id === 'entryEnter') { e.preventDefault(); complete(); } }, true);
 
   css();
+  window.openSanvicWelcome=()=>{
+    completed=false;state.step=1;
+    document.body.classList.add('sanvic-entry-lock');
+    mount();render();
+    document.getElementById('sanvicEntry')?.classList.add('active');
+  };
   if(!shouldShow()){
     document.body.classList.remove('sanvic-entry-lock');
     const b=document.getElementById('bottomDock'); if(b) b.classList.add('visible');
@@ -149,7 +155,5 @@
     setTimeout(applyProfile,0);
     return;
   }
-  document.body.classList.add('sanvic-entry-lock');
-  mount();
-  window.addEventListener('load',()=>setTimeout(()=>{render(); const o=document.getElementById('sanvicEntry'); if(o)o.classList.add('active');},DELAY));
+  // Explore is immediately usable. Personalisation remains an explicit choice.
 })();
