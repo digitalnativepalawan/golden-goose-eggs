@@ -879,11 +879,14 @@ function rebuildMarkers(){
   destinations.forEach(d=>{
     if(!SanvicExplore.hasCoordinates(d)) return;
     if(!markersByCat[d.category]) markersByCat[d.category]=[];
-    const color = /^#[0-9a-f]{6}$/i.test(catStyle[d.category]?.color||'') ? catStyle[d.category].color : '#0d9488';
-    const html = `<span class="place-pin" style="--pin-color:${color}">${lucideSvg(catStyle[d.category]?.icon||'map-pin',18)}</span>`;
+    const style=catStyle[d.category] || DEFAULT_CAT_STYLE[d.category] || {};
+    const configured=style.icon;
+    const icon=LUCIDE_ICONS[configured] || EXTRA_ICONS[configured] ? configured : DEFAULT_CAT_STYLE[d.category]?.icon || 'map-pin';
+    const color=/^#[0-9a-f]{6}$/i.test(style.color||'') ? style.color : '#0ea5e9';
+    const html = `<span class="place-pin" style="--pin-color:${color}">${lucideSvg(icon,11)}</span>`;
     const m = L.marker([d.lat,d.lng],{title:d.name,alt:d.name,keyboard:true,icon:L.divIcon({className:'place-marker',html,iconSize:[44,44],iconAnchor:[22,22]})});
     const label = document.createElement('span'); label.textContent=d.name;
-    m.bindTooltip(label,{direction:'top',offset:[0,-16]});
+    m.bindTooltip(label,{direction:'top',offset:[0,-11]});
     m._d=d; m.on('click',()=>openDest(d));
     markersByCat[d.category].push(m); allMarkers.push(m);
   });
